@@ -19,7 +19,7 @@ DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=re
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 # ============ КТО АДМИН ============
-ADMIN_USERNAMES = {'AppleAT'} 
+ADMIN_USERNAMES = {'AppleAT'}
 
 
 # ---------- ПОДКЛЮЧЕНИЕ К БАЗЕ ----------
@@ -38,6 +38,12 @@ def init_db():
             created_at TEXT NOT NULL
         )
     ''')
+    # Добавляем новые колонки, если их ещё нет
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data BYTEA')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_mime TEXT')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS favorite_car_id INTEGER')
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS cars (
             id SERIAL PRIMARY KEY,
@@ -83,9 +89,59 @@ def create_user(username, password):
     conn.close()
 
 
+def get_user_profile(user_id):
+    """Возвращает dict с полной инфой о профиле."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id
+                 FROM users WHERE id = %s''', (user_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    if not row:
+        return None
+    return {
+        'id': row[0],
+        'username': row[1],
+        'avatar_data': row[2],
+        'avatar_mime': row[3],
+        'bio': row[4],
+        'favorite_car_id': row[5],
+    }
+
+
+def update_profile(user_id, bio, favorite_car_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('UPDATE users SET bio = %s, favorite_car_id = %s WHERE id = %s',
+              (bio, favorite_car_id, user_id))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+def update_avatar(user_id, avatar_data, avatar_mime):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('UPDATE users SET avatar_data = %s, avatar_mime = %s WHERE id = %s',
+              (psycopg2.Binary(avatar_data), avatar_mime, user_id))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+def get_user_avatar(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT avatar_data, avatar_mime FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row
+
+
 # ---------- Каталог машин ----------
 def get_catalog():
-    """Все машины в общем каталоге."""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT id, model, rating FROM cars ORDER BY id DESC')
@@ -116,11 +172,22 @@ def get_car_image(car_id):
     return row
 
 
+def get_car_info(car_id):
+    """Название и оценка машины по id."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT id, model, rating FROM cars WHERE id = %s', (car_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row
+
+
 def delete_car_from_catalog(car_id):
-    """Удаляет машину из каталога и из всех гаражей."""
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
+    c.execute('UPDATE users SET favorite_car_id = NULL WHERE favorite_car_id = %s', (car_id,))
     c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
     conn.commit()
     c.close()
@@ -129,7 +196,6 @@ def delete_car_from_catalog(car_id):
 
 # ---------- Личный гараж ----------
 def get_user_cars(user_id):
-    """Машины, которые игрок открыл себе в гараж."""
     conn = get_db()
     c = conn.cursor()
     c.execute('''
@@ -146,7 +212,6 @@ def get_user_cars(user_id):
 
 
 def has_car(user_id, car_id):
-    """Есть ли у игрока эта машина."""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
@@ -157,7 +222,6 @@ def has_car(user_id, car_id):
 
 
 def open_car(user_id, car_id):
-    """Открывает машину игроку (добавляет в личный гараж)."""
     conn = get_db()
     c = conn.cursor()
     c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) '
@@ -169,10 +233,12 @@ def open_car(user_id, car_id):
 
 
 def remove_car_from_garage(user_id, car_id):
-    """Убирает машину из личного гаража игрока (из каталога не удаляет)."""
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    # Если эта машина была любимой — сбрасываем
+    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
+              (user_id, car_id))
     conn.commit()
     c.close()
     conn.close()
@@ -181,6 +247,16 @@ def remove_car_from_garage(user_id, car_id):
 # ---------- ХЕЛПЕРЫ ----------
 def is_admin(username):
     return username in ADMIN_USERNAMES
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Сначала войди в аккаунт')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
 
 
 def admin_required(f):
@@ -202,8 +278,16 @@ ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 # ---------- МАРШРУТЫ ----------
 @app.route('/')
 def index():
+    profile = None
+    favorite_car = None
+    if 'user_id' in session:
+        profile = get_user_profile(session['user_id'])
+        if profile and profile['favorite_car_id']:
+            favorite_car = get_car_info(profile['favorite_car_id'])
     return render_template('index.html',
                            user=session.get('username'),
+                           profile=profile,
+                           favorite_car=favorite_car,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -264,12 +348,75 @@ def logout():
     return redirect(url_for('index'))
 
 
+# ---------- ПРОФИЛЬ ----------
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    user_id = session['user_id']
+    if request.method == 'POST':
+        bio = request.form.get('bio', '').strip()[:200]
+        fav = request.form.get('favorite_car_id', '').strip()
+
+        favorite_car_id = None
+        if fav and fav.isdigit():
+            car_id = int(fav)
+            # Проверим, что машина реально в гараже у пользователя
+            if has_car(user_id, car_id):
+                favorite_car_id = car_id
+
+        # Аватарка (если загрузили)
+        file = request.files.get('avatar')
+        if file and file.filename != '':
+            if file.mimetype in ALLOWED_MIME:
+                update_avatar(user_id, file.read(), file.mimetype)
+            else:
+                flash('Аватарка: разрешены PNG, JPG, WEBP, GIF')
+                return redirect(url_for('settings'))
+
+        update_profile(user_id, bio, favorite_car_id)
+        flash('Профиль обновлён!')
+        return redirect(url_for('index'))
+
+    profile = get_user_profile(user_id)
+    my_cars = get_user_cars(user_id)
+    return render_template('settings.html',
+                           user=session.get('username'),
+                           profile=profile,
+                           my_cars=my_cars,
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/avatar/<int:user_id>')
+def avatar(user_id):
+    row = get_user_avatar(user_id)
+    if not row or not row[0]:
+        return '', 404
+    image_data, mime = row
+    return Response(bytes(image_data), mimetype=mime or 'image/png')
+
+
+@app.route('/profile/<username>')
+def profile_page(username):
+    """Публичный профиль любого игрока."""
+    user_row = get_user(username)
+    if not user_row:
+        flash('Такого игрока нет')
+        return redirect(url_for('index'))
+    profile = get_user_profile(user_row[0])
+    favorite_car = None
+    if profile['favorite_car_id']:
+        favorite_car = get_car_info(profile['favorite_car_id'])
+    return render_template('profile.html',
+                           profile=profile,
+                           favorite_car=favorite_car,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
 # ---------- ЛИЧНЫЙ ГАРАЖ ----------
 @app.route('/garage')
+@login_required
 def garage():
-    if 'user_id' not in session:
-        flash('Сначала войди в аккаунт')
-        return redirect(url_for('login'))
     cars = get_user_cars(session['user_id'])
     return render_template('garage.html',
                            cars=cars,
@@ -278,9 +425,8 @@ def garage():
 
 
 @app.route('/garage/remove/<int:car_id>', methods=['POST'])
+@login_required
 def remove_from_garage(car_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
     remove_car_from_garage(session['user_id'], car_id)
     flash('Машина убрана из твоего гаража')
     return redirect(url_for('garage'))
@@ -288,12 +434,9 @@ def remove_from_garage(car_id):
 
 # ---------- КАТАЛОГ ----------
 @app.route('/catalog')
+@login_required
 def catalog():
-    if 'user_id' not in session:
-        flash('Сначала войди в аккаунт')
-        return redirect(url_for('login'))
     cars = get_catalog()
-    # Для каждой машины проверим, есть ли она у игрока
     cars_with_status = []
     for car in cars:
         car_id, model, rating = car
@@ -353,9 +496,8 @@ def delete_from_catalog(car_id):
 
 
 @app.route('/catalog/open/<int:car_id>', methods=['POST'])
+@login_required
 def open_car_page(car_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
     open_car(session['user_id'], car_id)
     flash('Машина добавлена в твой гараж!')
     return redirect(url_for('catalog'))
