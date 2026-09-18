@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Гараж — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>Гараж</h2>
+        {% if is_admin %}
+            <a href="/garage/add" class="btn btn-primary btn-small">+ Добавить машину</a>
+        {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if cars %}
+        <div class="cars-grid">
+            {% for car in cars %}
+                {% set car_id, model, image, rating = car %}
+                <div class="car-card">
+                    <div class="car-image">
+                        <img src="{{ url_for('static', filename='uploads/' + image) }}" alt="{{ model }}">
+                    </div>
+                    <div class="car-info">
+                        <div class="car-model">{{ model }}</div>
+                        <div class="car-stars">
+                            {% for i in range(1, 6) %}
+                                <span class="star {% if i <= rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">В гараже пока пусто. {% if is_admin %}Добавь первую машину!{% endif %}</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;">
+        <a href="/">← На главную</a>
+    </p>
+
+    <style>
+        .garage-header {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .garage-header h2 { font-size: 36px; color: #ff8c1a; }
+        .btn-small { padding: 10px 22px; font-size: 16px; }
+        .cars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 25px;
+            width: 100%;
+            max-width: 1100px;
+            margin-bottom: 30px;
+        }
+        .car-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .car-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(255, 140, 26, 0.3);
+            border-color: #ff8c1a;
+        }
+        .car-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        .car-image img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .car-info { padding: 15px 18px 20px; text-align: center; }
+        .car-model { font-size: 19px; font-weight: 700; color: #4a2c00; margin-bottom: 10px; }
+        .car-stars { font-size: 22px; letter-spacing: 2px; color: #ffd9a6; }
+        .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 6px rgba(255, 140, 26, 0.5); }
+    </style>
+
+{% endblock %}
