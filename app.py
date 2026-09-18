@@ -18,6 +18,12 @@ DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=re
 
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
+# ============ ЭКОНОМИКА ============
+START_BALANCE = 500        # сколько монет при регистрации
+DAILY_BONUS = 100          # ежедневный бонус
+SELL_RATE = 0.7            # 70% от цены при продаже
+BONUS_COOLDOWN = 86400     # 24 часа в секундах
+
 # ============ КТО АДМИН ============
 ADMIN_USERNAMES = {'AppleAT'}
 
@@ -42,6 +48,8 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_mime TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS favorite_car_id INTEGER')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INTEGER')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_bonus_at TEXT')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS cars (
@@ -53,6 +61,7 @@ def init_db():
             created_at TEXT NOT NULL
         )
     ''')
+    c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS price INTEGER')
     c.execute('''
         CREATE TABLE IF NOT EXISTS user_cars (
             id SERIAL PRIMARY KEY,
@@ -70,6 +79,11 @@ def init_db():
             UNIQUE(user_id, car_id)
         )
     ''')
+
+    # Миграция: у старых пользователей / машин без баланса и цены — ставим дефолт
+    c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
+    c.execute('UPDATE cars SET price = 500 WHERE price IS NULL')
+
     conn.commit()
     c.close()
     conn.close()
@@ -89,8 +103,9 @@ def get_user(username):
 def create_user(username, password):
     conn = get_db()
     c = conn.cursor()
-    c.execute('INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)',
-              (username, generate_password_hash(password), datetime.now().isoformat()))
+    c.execute('INSERT INTO users (username, password_hash, created_at, balance) '
+              'VALUES (%s, %s, %s, %s)',
+              (username, generate_password_hash(password), datetime.now().isoformat(), START_BALANCE))
     conn.commit()
     c.close()
     conn.close()
@@ -99,7 +114,7 @@ def create_user(username, password):
 def get_user_profile(user_id):
     conn = get_db()
     c = conn.cursor()
-    c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id
+    c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id, balance
                  FROM users WHERE id = %s''', (user_id,))
     row = c.fetchone()
     c.close()
@@ -113,6 +128,7 @@ def get_user_profile(user_id):
         'avatar_mime': row[3],
         'bio': row[4],
         'favorite_car_id': row[5],
+        'balance': row[6] or 0,
     }
 
 
@@ -146,23 +162,94 @@ def get_user_avatar(user_id):
     return row
 
 
-# ---------- Каталог ----------
+# ---------- Баланс и бонус ----------
+def get_balance(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT balance FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row[0] if row and row[0] is not None else 0
+
+
+def add_coins(user_id, amount):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+              (amount, user_id))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+def can_claim_bonus(user_id):
+    """Возвращает (можно_ли_получить, осталось_секунд)."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT last_bonus_at FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    if not row or not row[0]:
+        return True, 0
+    try:
+        last = datetime.fromisoformat(row[0])
+    except (ValueError, TypeError):
+        return True, 0
+    diff = (datetime.now() - last).total_seconds()
+    if diff >= BONUS_COOLDOWN:
+        return True, 0
+    return False, int(BONUS_COOLDOWN - diff)
+
+
+def claim_bonus(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s, last_bonus_at = %s '
+              'WHERE id = %s',
+              (DAILY_BONUS, datetime.now().isoformat(), user_id))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+def format_time_left(seconds):
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    if hours > 0:
+        return f"{hours} ч {minutes} мин"
+    return f"{minutes} мин"
+
+
+# ---------- Каталог / магазин ----------
 def get_catalog():
     conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT id, model, rating FROM cars ORDER BY id DESC')
+    c.execute('SELECT id, model, rating, price FROM cars ORDER BY id DESC')
     rows = c.fetchall()
     c.close()
     conn.close()
     return rows
 
 
-def add_car(model, rating, image_data, image_mime):
+def add_car(model, rating, price, image_data, image_mime):
     conn = get_db()
     c = conn.cursor()
-    c.execute('INSERT INTO cars (model, rating, image_data, image_mime, created_at) '
-              'VALUES (%s, %s, %s, %s, %s)',
-              (model, rating, psycopg2.Binary(image_data), image_mime, datetime.now().isoformat()))
+    c.execute('INSERT INTO cars (model, rating, price, image_data, image_mime, created_at) '
+              'VALUES (%s, %s, %s, %s, %s, %s)',
+              (model, rating, price, psycopg2.Binary(image_data), image_mime,
+               datetime.now().isoformat()))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+def update_car(car_id, model, rating, price):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('UPDATE cars SET model = %s, rating = %s, price = %s WHERE id = %s',
+              (model, rating, price, car_id))
     conn.commit()
     c.close()
     conn.close()
@@ -181,7 +268,7 @@ def get_car_image(car_id):
 def get_car_info(car_id):
     conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT id, model, rating FROM cars WHERE id = %s', (car_id,))
+    c.execute('SELECT id, model, rating, price FROM cars WHERE id = %s', (car_id,))
     row = c.fetchone()
     c.close()
     conn.close()
@@ -205,7 +292,7 @@ def get_user_cars(user_id):
     conn = get_db()
     c = conn.cursor()
     c.execute('''
-        SELECT c.id, c.model, c.rating
+        SELECT c.id, c.model, c.rating, c.price
         FROM cars c
         JOIN user_cars uc ON uc.car_id = c.id
         WHERE uc.user_id = %s
@@ -237,27 +324,54 @@ def has_car(user_id, car_id):
     return row is not None
 
 
-def open_car(user_id, car_id):
+def buy_car(user_id, car_id):
+    """Покупает машину, если хватает монет и её ещё нет в гараже.
+    Возвращает (успех, сообщение)."""
+    if has_car(user_id, car_id):
+        return False, 'Эта машина уже в твоём гараже'
+
+    car = get_car_info(car_id)
+    if not car:
+        return False, 'Машина не найдена'
+    price = car[3] or 0
+    balance = get_balance(user_id)
+    if balance < price:
+        return False, f'Не хватает монет. Нужно {price}, у тебя {balance}'
+
     conn = get_db()
     c = conn.cursor()
-    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) '
-              'VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING',
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s',
+              (price, user_id))
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
               (user_id, car_id, datetime.now().isoformat()))
     conn.commit()
     c.close()
     conn.close()
+    return True, f'Куплена «{car[1]}» за {price} монет!'
 
 
-def remove_car_from_garage(user_id, car_id):
+def sell_car(user_id, car_id):
+    """Продаёт машину за SELL_RATE от цены. Возвращает (успех, сообщение, сумма)."""
+    if not has_car(user_id, car_id):
+        return False, 'У тебя нет этой машины', 0
+    car = get_car_info(car_id)
+    if not car:
+        return False, 'Машина не найдена', 0
+    price = car[3] or 0
+    refund = int(price * SELL_RATE)
+
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
-              (user_id, car_id))
+    c.execute('UPDATE users SET favorite_car_id = NULL '
+              'WHERE id = %s AND favorite_car_id = %s', (user_id, car_id))
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+              (refund, user_id))
     conn.commit()
     c.close()
     conn.close()
+    return True, f'«{car[1]}» продана за {refund} монет', refund
 
 
 # ---------- Публичный гараж ----------
@@ -265,7 +379,7 @@ def get_public_cars(user_id):
     conn = get_db()
     c = conn.cursor()
     c.execute('''
-        SELECT c.id, c.model, c.rating
+        SELECT c.id, c.model, c.rating, c.price
         FROM cars c
         JOIN public_cars pc ON pc.car_id = c.id
         WHERE pc.user_id = %s
@@ -287,18 +401,7 @@ def get_public_ids(user_id):
     return {r[0] for r in rows}
 
 
-def count_public_cars(user_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM public_cars WHERE user_id = %s', (user_id,))
-    row = c.fetchone()
-    c.close()
-    conn.close()
-    return row[0] if row else 0
-
-
 def set_public_cars(user_id, car_ids):
-    """Полностью заменяет список публичных машин."""
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM public_cars WHERE user_id = %s', (user_id,))
@@ -347,17 +450,36 @@ def index():
     profile = None
     favorite_car = None
     cars_count = 0
+    bonus_ready = False
+    bonus_left_str = ''
     if 'user_id' in session:
         profile = get_user_profile(session['user_id'])
         if profile and profile['favorite_car_id']:
             favorite_car = get_car_info(profile['favorite_car_id'])
         cars_count = count_user_cars(session['user_id'])
+        bonus_ready, secs = can_claim_bonus(session['user_id'])
+        if not bonus_ready:
+            bonus_left_str = format_time_left(secs)
     return render_template('index.html',
                            user=session.get('username'),
                            profile=profile,
                            favorite_car=favorite_car,
                            cars_count=cars_count,
+                           bonus_ready=bonus_ready,
+                           bonus_left=bonus_left_str,
                            is_admin=is_admin(session.get('username')))
+
+
+@app.route('/bonus', methods=['POST'])
+@login_required
+def bonus():
+    ready, _ = can_claim_bonus(session['user_id'])
+    if ready:
+        claim_bonus(session['user_id'])
+        flash(f'🎁 Ежедневный бонус получен: +{DAILY_BONUS} монет!')
+    else:
+        flash('Бонус пока недоступен')
+    return redirect(url_for('index'))
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -387,6 +509,7 @@ def register():
         user = get_user(username)
         session['user_id'] = user[0]
         session['username'] = user[1]
+        flash(f'Добро пожаловать! Тебе начислено {START_BALANCE} монет')
         return redirect(url_for('index'))
 
     return render_template('register.html')
@@ -440,10 +563,8 @@ def settings():
                 flash('Аватарка: разрешены PNG, JPG, WEBP, GIF')
                 return redirect(url_for('settings'))
 
-        # Публичный гараж: список выбранных id
         public_ids = request.form.getlist('public_cars')
         public_ids = [int(x) for x in public_ids if x.isdigit()]
-        # Проверим, что все эти машины есть у пользователя
         my_ids = {car[0] for car in get_user_cars(user_id)}
         public_ids = [x for x in public_ids if x in my_ids]
         set_public_cars(user_id, public_ids)
@@ -498,8 +619,10 @@ def profile_page(username):
 @login_required
 def garage():
     cars = get_user_cars(session['user_id'])
+    balance = get_balance(session['user_id'])
     return render_template('garage.html',
                            cars=cars,
+                           balance=balance,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
@@ -507,37 +630,49 @@ def garage():
 @app.route('/garage/remove/<int:car_id>', methods=['POST'])
 @login_required
 def remove_from_garage(car_id):
-    remove_car_from_garage(session['user_id'], car_id)
-    flash('Машина убрана из твоего гаража')
+    success, msg, _ = sell_car(session['user_id'], car_id)
+    flash(msg)
     return redirect(url_for('garage'))
 
 
-# ---------- КАТАЛОГ ----------
-@app.route('/catalog')
+# ---------- МАГАЗИН ----------
+@app.route('/shop')
 @login_required
-def catalog():
+def shop():
     cars = get_catalog()
+    balance = get_balance(session['user_id'])
     cars_with_status = []
     for car in cars:
-        car_id, model, rating = car
+        car_id, model, rating, price = car
         cars_with_status.append({
             'id': car_id,
             'model': model,
             'rating': rating,
+            'price': price or 0,
             'owned': has_car(session['user_id'], car_id),
         })
-    return render_template('catalog.html',
+    return render_template('shop.html',
                            cars=cars_with_status,
+                           balance=balance,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
 
-@app.route('/catalog/add', methods=['GET', 'POST'])
+@app.route('/shop/buy/<int:car_id>', methods=['POST'])
+@login_required
+def shop_buy(car_id):
+    success, msg = buy_car(session['user_id'], car_id)
+    flash(msg)
+    return redirect(url_for('shop'))
+
+
+@app.route('/shop/add', methods=['GET', 'POST'])
 @admin_required
 def add_car_page():
     if request.method == 'POST':
         model = request.form.get('model', '').strip()
         rating = request.form.get('rating', '3')
+        price = request.form.get('price', '500')
         file = request.files.get('image')
 
         if not model:
@@ -545,10 +680,17 @@ def add_car_page():
             return redirect(url_for('add_car_page'))
         try:
             rating = int(rating)
-            if rating < 1 or rating > 5:
+            if rating < 1 or rating > 8:
                 raise ValueError
         except ValueError:
-            flash('Оценка должна быть от 1 до 5')
+            flash('Оценка должна быть от 1 до 8')
+            return redirect(url_for('add_car_page'))
+        try:
+            price = int(price)
+            if price < 0:
+                raise ValueError
+        except ValueError:
+            flash('Цена должна быть неотрицательным числом')
             return redirect(url_for('add_car_page'))
         if not file or file.filename == '':
             flash('Выбери картинку')
@@ -558,29 +700,62 @@ def add_car_page():
             return redirect(url_for('add_car_page'))
 
         image_data = file.read()
-        add_car(model, rating, image_data, file.mimetype)
-        flash(f'Машина «{model}» добавлена в каталог!')
-        return redirect(url_for('catalog'))
+        add_car(model, rating, price, image_data, file.mimetype)
+        flash(f'Машина «{model}» добавлена в магазин!')
+        return redirect(url_for('shop'))
 
     return render_template('add_car.html',
                            user=session.get('username'),
                            is_admin=True)
 
 
-@app.route('/catalog/delete/<int:car_id>', methods=['POST'])
+@app.route('/shop/edit/<int:car_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_car_page(car_id):
+    car = get_car_info(car_id)
+    if not car:
+        flash('Машина не найдена')
+        return redirect(url_for('shop'))
+
+    if request.method == 'POST':
+        model = request.form.get('model', '').strip()
+        rating = request.form.get('rating', '3')
+        price = request.form.get('price', '500')
+
+        if not model:
+            flash('Впиши название модели')
+            return redirect(url_for('edit_car_page', car_id=car_id))
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 8:
+                raise ValueError
+        except ValueError:
+            flash('Оценка должна быть от 1 до 8')
+            return redirect(url_for('edit_car_page', car_id=car_id))
+        try:
+            price = int(price)
+            if price < 0:
+                raise ValueError
+        except ValueError:
+            flash('Цена должна быть неотрицательным числом')
+            return redirect(url_for('edit_car_page', car_id=car_id))
+
+        update_car(car_id, model, rating, price)
+        flash('Машина обновлена')
+        return redirect(url_for('shop'))
+
+    return render_template('edit_car.html',
+                           car=car,
+                           user=session.get('username'),
+                           is_admin=True)
+
+
+@app.route('/shop/delete/<int:car_id>', methods=['POST'])
 @admin_required
 def delete_from_catalog(car_id):
     delete_car_from_catalog(car_id)
-    flash('Машина удалена из каталога и из всех гаражей')
-    return redirect(url_for('catalog'))
-
-
-@app.route('/catalog/open/<int:car_id>', methods=['POST'])
-@login_required
-def open_car_page(car_id):
-    open_car(session['user_id'], car_id)
-    flash('Машина добавлена в твой гараж!')
-    return redirect(url_for('catalog'))
+    flash('Машина удалена из магазина и из всех гаражей')
+    return redirect(url_for('shop'))
 
 
 # ---------- КАРТИНКИ ----------
