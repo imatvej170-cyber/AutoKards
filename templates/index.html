@@ -5,13 +5,12 @@
     <h1 class="logo"><a href="/">AutoKards</a></h1>
 
     {% if user %}
-        {# --- Если пользователь вошёл --- #}
         <p class="welcome">Добро пожаловать в гараж, <strong>{{ user }}</strong>!</p>
         <div class="buttons">
+            <a href="/garage" class="btn btn-primary">🏁 В гараж</a>
             <a href="/logout" class="btn btn-secondary">Выйти</a>
         </div>
     {% else %}
-        {# --- Если пользователь не вошёл --- #}
         <div class="buttons">
             <a href="/register" class="btn btn-primary">Регистрация</a>
             <a href="/login" class="btn btn-secondary">Войти</a>
