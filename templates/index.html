@@ -4,25 +4,147 @@
 
     <h1 class="logo"><a href="/">AutoKards</a></h1>
 
-{% if user %}
-    <p class="welcome">Добро пожаловать в гараж, <strong>{{ user }}</strong>!</p>
-    <div class="buttons">
-        <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
-        <a href="/catalog" class="btn btn-secondary">📖 Каталог машин</a>
-        <a href="/logout" class="btn btn-secondary">Выйти</a>
-    </div>
-{% else %}
+    {% if user %}
+        {# --- ПРОФИЛЬ НА ГЛАВНОЙ --- #}
+        <div class="profile-main">
+            <div class="profile-avatar-wrap">
+                {% if profile and profile.avatar_data %}
+                    <img class="profile-avatar" src="/avatar/{{ profile.id }}" alt="{{ user }}">
+                {% else %}
+                    <div class="profile-avatar profile-avatar-placeholder">
+                        {{ user[0]|upper }}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="profile-name">{{ user }}</div>
+
+            {% if profile and profile.bio %}
+                <div class="profile-bio">{{ profile.bio }}</div>
+            {% else %}
+                <div class="profile-bio profile-bio-empty">Описание пока не заполнено</div>
+            {% endif %}
+
+            {% if favorite_car %}
+                <div class="profile-fav">
+                    <div class="profile-fav-label">❤ Любимая машина</div>
+                    <div class="profile-fav-card">
+                        <img src="/car_image/{{ favorite_car[0] }}" alt="{{ favorite_car[1] }}">
+                        <div class="profile-fav-name">{{ favorite_car[1] }}</div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="profile-actions">
+                <a href="/settings" class="btn btn-primary">⚙ Настроить профиль</a>
+                <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
+                <a href="/catalog" class="btn btn-secondary">📖 Каталог</a>
+                <a href="/logout" class="btn btn-secondary">Выйти</a>
+            </div>
+        </div>
+    {% else %}
         <div class="buttons">
             <a href="/register" class="btn btn-primary">Регистрация</a>
             <a href="/login" class="btn btn-secondary">Войти</a>
         </div>
+
+        <p class="description">
+            <strong>AutoKards</strong> — это проект, рождённый из искренней любви к автомобилям.
+            Здесь ты сможешь не просто наблюдать, а стать частью мира машин вместе с друзьями.
+            Нажми <strong>«Регистрация»</strong>, если ты здесь впервые, или <strong>«Войти»</strong>,
+            если уже с нами. Добро пожаловать в гараж!
+        </p>
     {% endif %}
 
-    <p class="description">
-        <strong>AutoKards</strong> — это проект, рождённый из искренней любви к автомобилям.
-        Здесь ты сможешь не просто наблюдать, а стать частью мира машин вместе с друзьями.
-        Нажми <strong>«Регистрация»</strong>, если ты здесь впервые, или <strong>«Войти»</strong>,
-        если уже с нами. Добро пожаловать в гараж!
-    </p>
+    <style>
+        .profile-main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .profile-avatar-wrap { margin-bottom: 18px; }
+        .profile-avatar {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #ff8c1a;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.35);
+            background: #fff;
+        }
+        .profile-avatar-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+        }
+        .profile-name {
+            font-size: 34px;
+            font-weight: 900;
+            color: #ff8c1a;
+            margin-bottom: 12px;
+        }
+        .profile-bio {
+            max-width: 550px;
+            font-size: 17px;
+            line-height: 1.6;
+            color: #6b3d00;
+            background: rgba(255, 255, 255, 0.65);
+            padding: 16px 24px;
+            border-radius: 16px;
+            border: 1px solid #ffd9a6;
+            margin-bottom: 22px;
+            text-align: center;
+        }
+        .profile-bio-empty {
+            color: #b08855;
+            font-style: italic;
+        }
+        .profile-fav {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .profile-fav-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: #ff8c1a;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .profile-fav-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6;
+            border-radius: 16px;
+            padding: 12px 22px 12px 12px;
+            box-shadow: 0 4px 15px rgba(255, 140, 26, 0.15);
+        }
+        .profile-fav-card img {
+            width: 90px;
+            height: 60px;
+            object-fit: contain;
+        }
+        .profile-fav-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #4a2c00;
+        }
+        .profile-actions {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .profile-actions .btn {
+            padding: 12px 26px;
+            font-size: 17px;
+        }
+    </style>
 
 {% endblock %}
