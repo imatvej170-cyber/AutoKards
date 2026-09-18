@@ -14,67 +14,123 @@
         {% endif %}
     {% endwith %}
 
-    <div class="wheel-box">
-        <div class="wheel {% if result %}spinning{% endif %}">
-            <div class="wheel-center">🎁</div>
-            {% for i in range(8) %}
-                <div class="wheel-spoke" style="transform: rotate({{ i * 45 }}deg);"></div>
-            {% endfor %}
-        </div>
-
-        {% if result %}
+    {% if result %}
+        <div class="result-box {% if result.type == 'car' %}result-car{% else %}result-coins{% endif %}">
             {% if result.type == 'car' %}
-                <div class="result-box result-car">
-                    <div class="result-label">🎉 Ты выиграл машину!</div>
-                    <img src="/car_image/{{ result.car_id }}" alt="{{ result.model }}">
-                    <div class="result-name">{{ result.model }}</div>
-                    <div class="result-stars">
-                        {% for i in range(1, 9) %}
-                            <span class="star {% if i <= result.rating %}filled{% endif %}">★</span>
-                        {% endfor %}
-                    </div>
+                <div class="result-label">🎉 Ты выиграл машину!</div>
+                <img src="/car_image/{{ result.car_id }}" alt="{{ result.model }}">
+                <div class="result-name">{{ result.model }}</div>
+                <div class="result-stars">
+                    {% for i in range(1, 9) %}
+                        <span class="star {% if i <= result.rating %}filled{% endif %}">★</span>
+                    {% endfor %}
                 </div>
             {% else %}
-                <div class="result-box result-coins">
-                    <div class="result-label">💰 Ты выиграл монеты!</div>
-                    <div class="result-amount">+{{ result.amount }}</div>
-                </div>
+                <div class="result-label">💰 Ты выиграл монеты!</div>
+                <div class="result-amount">+{{ result.amount }}</div>
             {% endif %}
-        {% endif %}
+        </div>
+    {% endif %}
 
-        {% if ready %}
-            <form method="POST" action="/wheel/spin" class="spin-form">
-                <button type="submit" class="btn btn-primary btn-spin">
-                    {% if result %}Крутить ещё? (недоступно){% else %}🎡 Крутить колесо{% endif %}
+    <div class="wheels-row">
+
+        {# ===== БЕСПЛАТНОЕ КОЛЕСО ===== #}
+        <div class="wheel-column">
+            <h3 class="wheel-title">🎡 Бесплатное</h3>
+            <div class="wheel {% if result and not result.paid %}spinning{% endif %}">
+                <div class="wheel-center">🎁</div>
+                {% for i in range(8) %}
+                    <div class="wheel-spoke" style="transform: rotate({{ i * 45 }}deg);"></div>
+                {% endfor %}
+            </div>
+            <div class="wheel-info">
+                🚗 Шанс машины: {{ free_info.car_chance }}%<br>
+                💰 Монеты: {{ free_info.coin_min }}–{{ free_info.coin_max }}<br>
+                ⭐ Звёзды: {{ free_info.car_min_rating }}–{{ free_info.car_max_rating }}
+            </div>
+            {% if ready %}
+                <form method="POST" action="/wheel/spin" class="spin-form">
+                    <button type="submit" class="btn btn-primary btn-spin">🎡 Крутить бесплатно</button>
+                </form>
+            {% else %}
+                <div class="cooldown-box">Через <strong>{{ time_left }}</strong></div>
+            {% endif %}
+        </div>
+
+        {# ===== ПРЕМИУМ-КОЛЕСО ===== #}
+        {% if paid_enabled %}
+        <div class="wheel-column premium-column">
+            <h3 class="wheel-title premium-title">💎 Премиум</h3>
+            <div class="wheel premium {% if result and result.paid %}spinning{% endif %}">
+                <div class="wheel-center premium-center">💎</div>
+                {% for i in range(8) %}
+                    <div class="wheel-spoke" style="transform: rotate({{ i * 45 }}deg);"></div>
+                {% endfor %}
+            </div>
+            <div class="wheel-info premium-info">
+                🚗 Шанс машины: {{ paid_info.car_chance }}%<br>
+                💰 Монеты: {{ paid_info.coin_min }}–{{ paid_info.coin_max }}<br>
+                ⭐ Звёзды: {{ paid_info.car_min_rating }}–{{ paid_info.car_max_rating }}
+            </div>
+            <form method="POST" action="/wheel/spin_paid" class="spin-form">
+                <button type="submit" class="btn btn-primary btn-spin premium-btn"
+                        {% if balance < paid_price %}disabled title="Не хватает монет"{% endif %}>
+                    💎 Крутить за {{ paid_price }} 💰
                 </button>
             </form>
-        {% else %}
-            <div class="cooldown-box">
-                Следующая попытка через <strong>{{ time_left }}</strong>
+            <div class="wheel-warn">
+                Призы заметно лучше! Без кулдауна — можно крутить сколько хочешь.
             </div>
+        </div>
         {% endif %}
 
-        <div class="balance-line">💰 Твой баланс: <strong>{{ balance }}</strong></div>
     </div>
+
+    <div class="balance-line">💰 Твой баланс: <strong>{{ balance }}</strong></div>
 
     <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
 
     <style>
         .page-title { font-size: 34px; color: #ff8c1a; margin-bottom: 25px; text-align: center; }
-        .wheel-box { display: flex; flex-direction: column; align-items: center; gap: 25px; }
+        .wheels-row {
+            display: flex; gap: 40px; flex-wrap: wrap;
+            justify-content: center; align-items: flex-start;
+            margin-bottom: 25px;
+        }
+        .wheel-column {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 16px; min-width: 280px; max-width: 320px;
+        }
+        .premium-column {
+            background: linear-gradient(160deg, #fff8ec 0%, #ffe0b3 100%);
+            border: 3px solid #ff8c1a;
+            border-radius: 24px; padding: 22px 18px;
+            box-shadow: 0 12px 35px rgba(255, 140, 26, 0.3);
+        }
+        .wheel-title { font-size: 22px; font-weight: 900; color: #ff8c1a; }
+        .premium-title { color: #d97706; }
+
         .wheel {
-            position: relative; width: 260px; height: 260px;
-            border-radius: 50%;
+            position: relative; width: 220px; height: 220px; border-radius: 50%;
             background: conic-gradient(
                 #ff8c1a 0deg 45deg, #ffb347 45deg 90deg,
                 #ff8c1a 90deg 135deg, #ffb347 135deg 180deg,
                 #ff8c1a 180deg 225deg, #ffb347 225deg 270deg,
                 #ff8c1a 270deg 315deg, #ffb347 315deg 360deg
             );
-            box-shadow: 0 12px 35px rgba(255, 140, 26, 0.4),
-                        inset 0 0 0 12px #fff,
-                        inset 0 0 0 16px #ff8c1a;
+            box-shadow: 0 10px 30px rgba(255, 140, 26, 0.4),
+                        inset 0 0 0 10px #fff, inset 0 0 0 14px #ff8c1a;
             display: flex; align-items: center; justify-content: center;
+        }
+        .wheel.premium {
+            background: conic-gradient(
+                #d97706 0deg 45deg, #fbbf24 45deg 90deg,
+                #d97706 90deg 135deg, #fbbf24 135deg 180deg,
+                #d97706 180deg 225deg, #fbbf24 225deg 270deg,
+                #d97706 270deg 315deg, #fbbf24 315deg 360deg
+            );
+            box-shadow: 0 10px 35px rgba(217, 119, 6, 0.55),
+                        inset 0 0 0 10px #fff, inset 0 0 0 14px #d97706;
         }
         .wheel.spinning { animation: spinOnce 2s cubic-bezier(.2,.8,.2,1); }
         @keyframes spinOnce {
@@ -82,30 +138,40 @@
             100% { transform: rotate(1080deg); }
         }
         .wheel-center {
-            width: 90px; height: 90px; border-radius: 50%;
-            background: #fff; display: flex; align-items: center;
-            justify-content: center; font-size: 42px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            z-index: 2;
+            width: 80px; height: 80px; border-radius: 50%; background: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 38px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); z-index: 2;
         }
+        .premium-center { background: linear-gradient(135deg, #fff8ec, #fde68a); }
         .wheel-spoke {
             position: absolute; top: 50%; left: 50%;
-            width: 2px; height: 50%;
-            background: rgba(255, 255, 255, 0.4);
+            width: 2px; height: 50%; background: rgba(255, 255, 255, 0.4);
             transform-origin: top center;
         }
         .spin-form { margin: 0; }
-        .btn-spin { padding: 16px 42px; font-size: 19px; }
+        .btn-spin { padding: 14px 32px; font-size: 17px; }
+        .premium-btn { background: linear-gradient(135deg, #d97706, #f59e0b); }
+        .premium-btn:hover { background: linear-gradient(135deg, #b45309, #d97706); }
+        .premium-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .cooldown-box {
-            font-size: 16px; color: #6b3d00;
-            background: #fff5e6; padding: 14px 28px;
-            border-radius: 30px; border: 2px dashed #ffd9a6;
+            font-size: 15px; color: #6b3d00; background: #fff5e6;
+            padding: 12px 24px; border-radius: 30px; border: 2px dashed #ffd9a6;
         }
         .cooldown-box strong { color: #ff8c1a; }
+        .wheel-info {
+            font-size: 13px; line-height: 1.7; color: #6b3d00;
+            text-align: center; background: rgba(255, 255, 255, 0.7);
+            padding: 10px 16px; border-radius: 12px; border: 1px solid #ffd9a6;
+        }
+        .premium-info { background: rgba(255, 255, 255, 0.85); border-color: #d97706; }
+        .wheel-warn {
+            font-size: 12px; color: #b45309; text-align: center;
+            font-style: italic; max-width: 260px;
+        }
         .result-box {
             display: flex; flex-direction: column; align-items: center;
             padding: 22px 40px; border-radius: 20px;
-            animation: popIn 0.5s ease;
+            margin-bottom: 25px; animation: popIn 0.5s ease;
         }
         @keyframes popIn {
             0% { transform: scale(0.7); opacity: 0; }
@@ -127,7 +193,7 @@
         .result-stars { font-size: 18px; letter-spacing: 2px; color: #ffd9a6; }
         .result-stars .star.filled { color: #ff8c1a; }
         .result-amount { font-size: 48px; font-weight: 900; color: #2e7d32; }
-        .balance-line { font-size: 17px; color: #6b3d00; }
+        .balance-line { font-size: 17px; color: #6b3d00; text-align: center; }
         .balance-line strong { color: #ff8c1a; }
     </style>
 
