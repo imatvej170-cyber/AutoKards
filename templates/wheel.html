@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Колесо фортуны — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">🎡 Колесо фортуны</h2>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="wheel-box">
+        <div class="wheel {% if result %}spinning{% endif %}">
+            <div class="wheel-center">🎁</div>
+            {% for i in range(8) %}
+                <div class="wheel-spoke" style="transform: rotate({{ i * 45 }}deg);"></div>
+            {% endfor %}
+        </div>
+
+        {% if result %}
+            {% if result.type == 'car' %}
+                <div class="result-box result-car">
+                    <div class="result-label">🎉 Ты выиграл машину!</div>
+                    <img src="/car_image/{{ result.car_id }}" alt="{{ result.model }}">
+                    <div class="result-name">{{ result.model }}</div>
+                    <div class="result-stars">
+                        {% for i in range(1, 9) %}
+                            <span class="star {% if i <= result.rating %}filled{% endif %}">★</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="result-box result-coins">
+                    <div class="result-label">💰 Ты выиграл монеты!</div>
+                    <div class="result-amount">+{{ result.amount }}</div>
+                </div>
+            {% endif %}
+        {% endif %}
+
+        {% if ready %}
+            <form method="POST" action="/wheel/spin" class="spin-form">
+                <button type="submit" class="btn btn-primary btn-spin">
+                    {% if result %}Крутить ещё? (недоступно){% else %}🎡 Крутить колесо{% endif %}
+                </button>
+            </form>
+        {% else %}
+            <div class="cooldown-box">
+                Следующая попытка через <strong>{{ time_left }}</strong>
+            </div>
+        {% endif %}
+
+        <div class="balance-line">💰 Твой баланс: <strong>{{ balance }}</strong></div>
+    </div>
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .page-title { font-size: 34px; color: #ff8c1a; margin-bottom: 25px; text-align: center; }
+        .wheel-box { display: flex; flex-direction: column; align-items: center; gap: 25px; }
+        .wheel {
+            position: relative; width: 260px; height: 260px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #ff8c1a 0deg 45deg, #ffb347 45deg 90deg,
+                #ff8c1a 90deg 135deg, #ffb347 135deg 180deg,
+                #ff8c1a 180deg 225deg, #ffb347 225deg 270deg,
+                #ff8c1a 270deg 315deg, #ffb347 315deg 360deg
+            );
+            box-shadow: 0 12px 35px rgba(255, 140, 26, 0.4),
+                        inset 0 0 0 12px #fff,
+                        inset 0 0 0 16px #ff8c1a;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .wheel.spinning { animation: spinOnce 2s cubic-bezier(.2,.8,.2,1); }
+        @keyframes spinOnce {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(1080deg); }
+        }
+        .wheel-center {
+            width: 90px; height: 90px; border-radius: 50%;
+            background: #fff; display: flex; align-items: center;
+            justify-content: center; font-size: 42px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            z-index: 2;
+        }
+        .wheel-spoke {
+            position: absolute; top: 50%; left: 50%;
+            width: 2px; height: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transform-origin: top center;
+        }
+        .spin-form { margin: 0; }
+        .btn-spin { padding: 16px 42px; font-size: 19px; }
+        .cooldown-box {
+            font-size: 16px; color: #6b3d00;
+            background: #fff5e6; padding: 14px 28px;
+            border-radius: 30px; border: 2px dashed #ffd9a6;
+        }
+        .cooldown-box strong { color: #ff8c1a; }
+        .result-box {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 22px 40px; border-radius: 20px;
+            animation: popIn 0.5s ease;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.7); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .result-car {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            border: 3px solid #ff8c1a;
+            box-shadow: 0 12px 35px rgba(255, 140, 26, 0.4);
+        }
+        .result-coins {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border: 3px solid #4caf50;
+            box-shadow: 0 12px 35px rgba(76, 175, 80, 0.4);
+        }
+        .result-label { font-size: 20px; font-weight: 900; color: #4a2c00; margin-bottom: 12px; }
+        .result-car img { width: 180px; height: 110px; object-fit: contain; margin-bottom: 8px; }
+        .result-name { font-size: 22px; font-weight: 900; color: #ff8c1a; margin-bottom: 6px; }
+        .result-stars { font-size: 18px; letter-spacing: 2px; color: #ffd9a6; }
+        .result-stars .star.filled { color: #ff8c1a; }
+        .result-amount { font-size: 48px; font-weight: 900; color: #2e7d32; }
+        .balance-line { font-size: 17px; color: #6b3d00; }
+        .balance-line strong { color: #ff8c1a; }
+    </style>
+
+{% endblock %}
