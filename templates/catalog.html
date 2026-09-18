@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Каталог машин — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>Каталог машин</h2>
+        <a href="/garage" class="btn btn-secondary btn-small">🏁 В мой гараж</a>
+        {% if is_admin %}
+            <a href="/catalog/add" class="btn btn-primary btn-small">+ Добавить машину</a>
+        {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if cars %}
+        <div class="cars-grid">
+            {% for car in cars %}
+                <div class="car-card">
+                    {% if is_admin %}
+                        <form method="POST" action="/catalog/delete/{{ car.id }}" class="delete-form"
+                              onsubmit="return confirm('Удалить «{{ car.model }}» из каталога? Она пропадёт из гаражей всех игроков!');">
+                            <button type="submit" class="delete-btn" title="Удалить из каталога">✕</button>
+                        </form>
+                    {% endif %}
+                    <div class="car-image">
+                        <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                    </div>
+                    <div class="car-info">
+                        <div class="car-model">{{ car.model }}</div>
+                        <div class="car-stars">
+                            {% for i in range(1, 6) %}
+                                <span class="star {% if i <= car.rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                        <div class="car-action">
+                            {% if car.owned %}
+                                <span class="owned-badge">✓ В твоём гараже</span>
+                            {% else %}
+                                <form method="POST" action="/catalog/open/{{ car.id }}">
+                                    <button type="submit" class="btn btn-primary btn-tiny">Открыть</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">
+            Каталог пока пуст.
+            {% if is_admin %}Добавь первую машину!{% endif %}
+        </p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;">
+        <a href="/">← На главную</a>
+    </p>
+
+    <style>
+        .garage-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .garage-header h2 { font-size: 36px; color: #ff8c1a; }
+        .btn-small { padding: 10px 22px; font-size: 16px; }
+        .btn-tiny { padding: 8px 20px; font-size: 14px; }
+        .cars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 25px;
+            width: 100%;
+            max-width: 1100px;
+            margin-bottom: 30px;
+        }
+        .car-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .car-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(255, 140, 26, 0.3);
+            border-color: #ff8c1a;
+        }
+        .car-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .car-info { padding: 15px 18px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; }
+        .car-model { font-size: 19px; font-weight: 700; color: #4a2c00; margin-bottom: 10px; }
+        .car-stars { font-size: 22px; letter-spacing: 2px; color: #ffd9a6; margin-bottom: 15px; }
+        .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 6px rgba(255, 140, 26, 0.5); }
+        .car-action { margin-top: auto; }
+        .car-action form { margin: 0; }
+        .owned-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 30px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .delete-form {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 2;
+            margin: 0;
+        }
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            color: #ff8c1a;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .delete-btn:hover { background: #ff8c1a; color: #fff; transform: scale(1.1); }
+    </style>
+
+{% endblock %}
