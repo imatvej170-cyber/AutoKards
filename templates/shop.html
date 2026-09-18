@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Магазин — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>🛒 Магазин</h2>
+        <div class="balance-pill">💰 {{ balance }} монет</div>
+        <a href="/garage" class="btn btn-secondary btn-small">🏁 Мой гараж</a>
+        {% if is_admin %}
+            <a href="/shop/add" class="btn btn-primary btn-small">+ Добавить машину</a>
+        {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if cars %}
+        <div class="cars-grid">
+            {% for car in cars %}
+                <div class="car-card">
+                    {% if is_admin %}
+                        <div class="admin-actions">
+                            <a href="/shop/edit/{{ car.id }}" class="admin-btn" title="Редактировать">✎</a>
+                            <form method="POST" action="/shop/delete/{{ car.id }}" class="admin-form"
+                                  onsubmit="return confirm('Удалить «{{ car.model }}» из магазина? Она пропадёт из гаражей всех игроков!');">
+                                <button type="submit" class="admin-btn" title="Удалить">✕</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                    <div class="car-image">
+                        <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                    </div>
+                    <div class="car-info">
+                        <div class="car-model">{{ car.model }}</div>
+                        <div class="car-stars">
+                            {% for i in range(1, 9) %}
+                                <span class="star {% if i <= car.rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                        <div class="car-price">💰 {{ car.price }}</div>
+                        <div class="car-action">
+                            {% if car.owned %}
+                                <span class="owned-badge">✓ В гараже</span>
+                            {% else %}
+                                <form method="POST" action="/shop/buy/{{ car.id }}">
+                                    <button type="submit" class="btn btn-primary btn-tiny"
+                                            {% if balance < car.price %}disabled title="Не хватает монет"{% endif %}>
+                                        Купить
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">
+            Магазин пока пуст.
+            {% if is_admin %}Добавь первую машину!{% endif %}
+        </p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;">
+        <a href="/">← На главную</a>
+    </p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 30px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 36px; color: #ff8c1a; }
+        .balance-pill {
+            font-size: 17px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px;
+            border-radius: 30px; border: 2px solid #ffd9a6;
+            box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
+        }
+        .btn-small { padding: 10px 22px; font-size: 16px; }
+        .btn-tiny { padding: 8px 22px; font-size: 14px; }
+        .btn-tiny:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .cars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 25px; width: 100%; max-width: 1100px; margin-bottom: 30px;
+        }
+        .car-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        .car-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(255, 140, 26, 0.3);
+            border-color: #ff8c1a;
+        }
+        .car-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            height: 150px; display: flex; align-items: center;
+            justify-content: center; padding: 12px;
+        }
+        .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .car-info { padding: 15px 18px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; }
+        .car-model { font-size: 18px; font-weight: 700; color: #4a2c00; margin-bottom: 8px; }
+        .car-stars { font-size: 17px; letter-spacing: 1px; color: #ffd9a6; margin-bottom: 10px; }
+        .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 5px rgba(255, 140, 26, 0.5); }
+        .car-price {
+            font-size: 18px; font-weight: 900; color: #ff8c1a;
+            margin-bottom: 14px;
+        }
+        .car-action { margin-top: auto; }
+        .car-action form { margin: 0; }
+        .owned-badge {
+            display: inline-block; padding: 8px 16px; border-radius: 30px;
+            background: #e8f5e9; color: #2e7d32; font-weight: 700; font-size: 14px;
+        }
+
+        .admin-actions {
+            position: absolute; top: 8px; right: 8px; z-index: 2;
+            display: flex; gap: 6px;
+        }
+        .admin-form { margin: 0; }
+        .admin-btn {
+            width: 30px; height: 30px; border-radius: 50%;
+            border: none; background: rgba(255, 255, 255, 0.9);
+            color: #ff8c1a; font-size: 15px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease; font-family: inherit;
+            text-decoration: none; line-height: 1;
+        }
+        .admin-btn:hover { background: #ff8c1a; color: #fff; transform: scale(1.1); }
+    </style>
+
+{% endblock %}
