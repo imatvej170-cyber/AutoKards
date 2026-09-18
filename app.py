@@ -107,6 +107,15 @@ def get_car_image(car_id):
     conn.close()
     return row
 
+def delete_car(car_id):
+    """Удаляет машину из базы по id."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+
 
 # ---------- ХЕЛПЕРЫ ----------
 def is_admin(user_id):
@@ -245,6 +254,14 @@ def car_image(car_id):
         return '', 404
     image_data, mime = row
     return Response(bytes(image_data), mimetype=mime)
+
+@app.route('/garage/delete/<int:car_id>', methods=['POST'])
+@admin_required
+def delete_car_page(car_id):
+    """Удаление машины — только для админа."""
+    delete_car(car_id)
+    flash('Машина удалена из гаража')
+    return redirect(url_for('garage'))
 
 
 init_db()
