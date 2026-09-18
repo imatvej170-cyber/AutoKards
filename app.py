@@ -38,7 +38,6 @@ def init_db():
             created_at TEXT NOT NULL
         )
     ''')
-    # Добавляем новые колонки, если их ещё нет
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data BYTEA')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_mime TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT')
@@ -60,6 +59,14 @@ def init_db():
             user_id INTEGER NOT NULL,
             car_id INTEGER NOT NULL,
             opened_at TEXT NOT NULL,
+            UNIQUE(user_id, car_id)
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS public_cars (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            car_id INTEGER NOT NULL,
             UNIQUE(user_id, car_id)
         )
     ''')
@@ -90,7 +97,6 @@ def create_user(username, password):
 
 
 def get_user_profile(user_id):
-    """Возвращает dict с полной инфой о профиле."""
     conn = get_db()
     c = conn.cursor()
     c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id
@@ -140,7 +146,7 @@ def get_user_avatar(user_id):
     return row
 
 
-# ---------- Каталог машин ----------
+# ---------- Каталог ----------
 def get_catalog():
     conn = get_db()
     c = conn.cursor()
@@ -173,7 +179,6 @@ def get_car_image(car_id):
 
 
 def get_car_info(car_id):
-    """Название и оценка машины по id."""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT id, model, rating FROM cars WHERE id = %s', (car_id,))
@@ -187,6 +192,7 @@ def delete_car_from_catalog(car_id):
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
+    c.execute('DELETE FROM public_cars WHERE car_id = %s', (car_id,))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE favorite_car_id = %s', (car_id,))
     c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
     conn.commit()
@@ -209,6 +215,16 @@ def get_user_cars(user_id):
     c.close()
     conn.close()
     return rows
+
+
+def count_user_cars(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM user_cars WHERE user_id = %s', (user_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row[0] if row else 0
 
 
 def has_car(user_id, car_id):
@@ -236,9 +252,59 @@ def remove_car_from_garage(user_id, car_id):
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    # Если эта машина была любимой — сбрасываем
+    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
               (user_id, car_id))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+# ---------- Публичный гараж ----------
+def get_public_cars(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT c.id, c.model, c.rating
+        FROM cars c
+        JOIN public_cars pc ON pc.car_id = c.id
+        WHERE pc.user_id = %s
+        ORDER BY pc.id DESC
+    ''', (user_id,))
+    rows = c.fetchall()
+    c.close()
+    conn.close()
+    return rows
+
+
+def get_public_ids(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT car_id FROM public_cars WHERE user_id = %s', (user_id,))
+    rows = c.fetchall()
+    c.close()
+    conn.close()
+    return {r[0] for r in rows}
+
+
+def count_public_cars(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM public_cars WHERE user_id = %s', (user_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row[0] if row else 0
+
+
+def set_public_cars(user_id, car_ids):
+    """Полностью заменяет список публичных машин."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM public_cars WHERE user_id = %s', (user_id,))
+    for car_id in car_ids:
+        c.execute('INSERT INTO public_cars (user_id, car_id) VALUES (%s, %s) '
+                  'ON CONFLICT (user_id, car_id) DO NOTHING', (user_id, car_id))
     conn.commit()
     c.close()
     conn.close()
@@ -280,14 +346,17 @@ ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 def index():
     profile = None
     favorite_car = None
+    cars_count = 0
     if 'user_id' in session:
         profile = get_user_profile(session['user_id'])
         if profile and profile['favorite_car_id']:
             favorite_car = get_car_info(profile['favorite_car_id'])
+        cars_count = count_user_cars(session['user_id'])
     return render_template('index.html',
                            user=session.get('username'),
                            profile=profile,
                            favorite_car=favorite_car,
+                           cars_count=cars_count,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -360,11 +429,9 @@ def settings():
         favorite_car_id = None
         if fav and fav.isdigit():
             car_id = int(fav)
-            # Проверим, что машина реально в гараже у пользователя
             if has_car(user_id, car_id):
                 favorite_car_id = car_id
 
-        # Аватарка (если загрузили)
         file = request.files.get('avatar')
         if file and file.filename != '':
             if file.mimetype in ALLOWED_MIME:
@@ -373,16 +440,26 @@ def settings():
                 flash('Аватарка: разрешены PNG, JPG, WEBP, GIF')
                 return redirect(url_for('settings'))
 
+        # Публичный гараж: список выбранных id
+        public_ids = request.form.getlist('public_cars')
+        public_ids = [int(x) for x in public_ids if x.isdigit()]
+        # Проверим, что все эти машины есть у пользователя
+        my_ids = {car[0] for car in get_user_cars(user_id)}
+        public_ids = [x for x in public_ids if x in my_ids]
+        set_public_cars(user_id, public_ids)
+
         update_profile(user_id, bio, favorite_car_id)
         flash('Профиль обновлён!')
         return redirect(url_for('index'))
 
     profile = get_user_profile(user_id)
     my_cars = get_user_cars(user_id)
+    public_ids = get_public_ids(user_id)
     return render_template('settings.html',
                            user=session.get('username'),
                            profile=profile,
                            my_cars=my_cars,
+                           public_ids=public_ids,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -397,7 +474,6 @@ def avatar(user_id):
 
 @app.route('/profile/<username>')
 def profile_page(username):
-    """Публичный профиль любого игрока."""
     user_row = get_user(username)
     if not user_row:
         flash('Такого игрока нет')
@@ -406,9 +482,13 @@ def profile_page(username):
     favorite_car = None
     if profile['favorite_car_id']:
         favorite_car = get_car_info(profile['favorite_car_id'])
+    public_cars = get_public_cars(user_row[0])
+    cars_count = count_user_cars(user_row[0])
     return render_template('profile.html',
                            profile=profile,
                            favorite_car=favorite_car,
+                           public_cars=public_cars,
+                           cars_count=cars_count,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
