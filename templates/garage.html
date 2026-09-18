@@ -23,19 +23,25 @@
     <div class="cars-grid">
         {% for car in cars %}
             {% set car_id, model, rating = car %}
-            <div class="car-card">
-                <div class="car-image">
-                    <img src="/car_image/{{ car_id }}" alt="{{ model }}">
-                </div>
-                <div class="car-info">
-                    <div class="car-model">{{ model }}</div>
-                    <div class="car-stars">
-                        {% for i in range(1, 6) %}
-                            <span class="star {% if i <= rating %}filled{% endif %}">★</span>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
+           <div class="car-card">
+    {% if is_admin %}
+        <form method="POST" action="/garage/delete/{{ car_id }}" class="delete-form"
+              onsubmit="return confirm('Удалить «{{ model }}» из гаража?');">
+            <button type="submit" class="delete-btn" title="Удалить">✕</button>
+        </form>
+    {% endif %}
+    <div class="car-image">
+        <img src="/car_image/{{ car_id }}" alt="{{ model }}">
+    </div>
+    <div class="car-info">
+        <div class="car-model">{{ model }}</div>
+        <div class="car-stars">
+            {% for i in range(1, 6) %}
+                <span class="star {% if i <= rating %}filled{% endif %}">★</span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
         {% endfor %}
     </div>
 {% else %}
