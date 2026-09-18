@@ -19,7 +19,7 @@ DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=re
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 # ============ КТО АДМИН ============
-ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
+ADMIN_USERNAMES = {'AppleAT'} 
 
 
 # ---------- ПОДКЛЮЧЕНИЕ К БАЗЕ ----------
