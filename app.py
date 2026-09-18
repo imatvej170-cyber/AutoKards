@@ -12,21 +12,19 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-me-please')
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
-    raise RuntimeError('Не найдена переменная DATABASE_URL. Проверь настройки проекта.')
+    raise RuntimeError('Не найдена переменная DATABASE_URL.')
 
 DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=require', '')
 
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 # ============ КТО АДМИН ============
-# Впиши сюда свой ник (в кавычках). Можно несколько через запятую.
-ADMIN_USERNAMES = {'Apple AT'}
+ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
 
 
 # ---------- ПОДКЛЮЧЕНИЕ К БАЗЕ ----------
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    return psycopg2.connect(DATABASE_URL)
 
 
 def init_db():
@@ -50,11 +48,21 @@ def init_db():
             created_at TEXT NOT NULL
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS user_cars (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            car_id INTEGER NOT NULL,
+            opened_at TEXT NOT NULL,
+            UNIQUE(user_id, car_id)
+        )
+    ''')
     conn.commit()
     c.close()
     conn.close()
 
 
+# ---------- Пользователи ----------
 def get_user(username):
     conn = get_db()
     c = conn.cursor()
@@ -68,16 +76,16 @@ def get_user(username):
 def create_user(username, password):
     conn = get_db()
     c = conn.cursor()
-    c.execute(
-        'INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)',
-        (username, generate_password_hash(password), datetime.now().isoformat())
-    )
+    c.execute('INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)',
+              (username, generate_password_hash(password), datetime.now().isoformat()))
     conn.commit()
     c.close()
     conn.close()
 
 
-def get_all_cars():
+# ---------- Каталог машин ----------
+def get_catalog():
+    """Все машины в общем каталоге."""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT id, model, rating FROM cars ORDER BY id DESC')
@@ -90,11 +98,9 @@ def get_all_cars():
 def add_car(model, rating, image_data, image_mime):
     conn = get_db()
     c = conn.cursor()
-    c.execute(
-        'INSERT INTO cars (model, rating, image_data, image_mime, created_at) '
-        'VALUES (%s, %s, %s, %s, %s)',
-        (model, rating, psycopg2.Binary(image_data), image_mime, datetime.now().isoformat())
-    )
+    c.execute('INSERT INTO cars (model, rating, image_data, image_mime, created_at) '
+              'VALUES (%s, %s, %s, %s, %s)',
+              (model, rating, psycopg2.Binary(image_data), image_mime, datetime.now().isoformat()))
     conn.commit()
     c.close()
     conn.close()
@@ -110,10 +116,63 @@ def get_car_image(car_id):
     return row
 
 
-def delete_car(car_id):
+def delete_car_from_catalog(car_id):
+    """Удаляет машину из каталога и из всех гаражей."""
     conn = get_db()
     c = conn.cursor()
+    c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
     c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+# ---------- Личный гараж ----------
+def get_user_cars(user_id):
+    """Машины, которые игрок открыл себе в гараж."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT c.id, c.model, c.rating
+        FROM cars c
+        JOIN user_cars uc ON uc.car_id = c.id
+        WHERE uc.user_id = %s
+        ORDER BY uc.id DESC
+    ''', (user_id,))
+    rows = c.fetchall()
+    c.close()
+    conn.close()
+    return rows
+
+
+def has_car(user_id, car_id):
+    """Есть ли у игрока эта машина."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row is not None
+
+
+def open_car(user_id, car_id):
+    """Открывает машину игроку (добавляет в личный гараж)."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) '
+              'VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING',
+              (user_id, car_id, datetime.now().isoformat()))
+    conn.commit()
+    c.close()
+    conn.close()
+
+
+def remove_car_from_garage(user_id, car_id):
+    """Убирает машину из личного гаража игрока (из каталога не удаляет)."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     conn.commit()
     c.close()
     conn.close()
@@ -205,19 +264,52 @@ def logout():
     return redirect(url_for('index'))
 
 
+# ---------- ЛИЧНЫЙ ГАРАЖ ----------
 @app.route('/garage')
 def garage():
     if 'user_id' not in session:
         flash('Сначала войди в аккаунт')
         return redirect(url_for('login'))
-    cars = get_all_cars()
+    cars = get_user_cars(session['user_id'])
     return render_template('garage.html',
                            cars=cars,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
 
-@app.route('/garage/add', methods=['GET', 'POST'])
+@app.route('/garage/remove/<int:car_id>', methods=['POST'])
+def remove_from_garage(car_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    remove_car_from_garage(session['user_id'], car_id)
+    flash('Машина убрана из твоего гаража')
+    return redirect(url_for('garage'))
+
+
+# ---------- КАТАЛОГ ----------
+@app.route('/catalog')
+def catalog():
+    if 'user_id' not in session:
+        flash('Сначала войди в аккаунт')
+        return redirect(url_for('login'))
+    cars = get_catalog()
+    # Для каждой машины проверим, есть ли она у игрока
+    cars_with_status = []
+    for car in cars:
+        car_id, model, rating = car
+        cars_with_status.append({
+            'id': car_id,
+            'model': model,
+            'rating': rating,
+            'owned': has_car(session['user_id'], car_id),
+        })
+    return render_template('catalog.html',
+                           cars=cars_with_status,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/catalog/add', methods=['GET', 'POST'])
 @admin_required
 def add_car_page():
     if request.method == 'POST':
@@ -244,14 +336,32 @@ def add_car_page():
 
         image_data = file.read()
         add_car(model, rating, image_data, file.mimetype)
-        flash(f'Машина «{model}» добавлена в гараж!')
-        return redirect(url_for('garage'))
+        flash(f'Машина «{model}» добавлена в каталог!')
+        return redirect(url_for('catalog'))
 
     return render_template('add_car.html',
                            user=session.get('username'),
                            is_admin=True)
 
 
+@app.route('/catalog/delete/<int:car_id>', methods=['POST'])
+@admin_required
+def delete_from_catalog(car_id):
+    delete_car_from_catalog(car_id)
+    flash('Машина удалена из каталога и из всех гаражей')
+    return redirect(url_for('catalog'))
+
+
+@app.route('/catalog/open/<int:car_id>', methods=['POST'])
+def open_car_page(car_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    open_car(session['user_id'], car_id)
+    flash('Машина добавлена в твой гараж!')
+    return redirect(url_for('catalog'))
+
+
+# ---------- КАРТИНКИ ----------
 @app.route('/car_image/<int:car_id>')
 def car_image(car_id):
     row = get_car_image(car_id)
@@ -259,14 +369,6 @@ def car_image(car_id):
         return '', 404
     image_data, mime = row
     return Response(bytes(image_data), mimetype=mime)
-
-
-@app.route('/garage/delete/<int:car_id>', methods=['POST'])
-@admin_required
-def delete_car_page(car_id):
-    delete_car(car_id)
-    flash('Машина удалена из гаража')
-    return redirect(url_for('garage'))
 
 
 init_db()
