@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Достижения — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">🏆 Достижения</h2>
+
+    <div class="progress-bar-wrap">
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ (unlocked_count * 100 / total) | round(1) }}%;"></div>
+        </div>
+        <div class="progress-text">Открыто {{ unlocked_count }} из {{ total }}</div>
+    </div>
+
+    <div class="ach-grid">
+        {% for a in achievements %}
+            <div class="ach-card {% if a.unlocked %}unlocked{% else %}locked{% endif %}">
+                <div class="ach-icon">{{ a.icon if a.unlocked else '🔒' }}</div>
+                <div class="ach-title">{{ a.title }}</div>
+                <div class="ach-desc">{{ a.desc }}</div>
+                {% if a.unlocked %}
+                    <div class="ach-status">✓ Получено</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .page-title { font-size: 34px; color: #ff8c1a; margin-bottom: 20px; text-align: center; }
+        .progress-bar-wrap { max-width: 600px; width: 100%; margin-bottom: 30px; }
+        .progress-bar {
+            height: 18px; background: #fff5e6; border-radius: 30px;
+            border: 2px solid #ffd9a6; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c1a, #ffb347);
+            transition: width 0.6s ease;
+        }
+        .progress-text {
+            text-align: center; margin-top: 8px;
+            font-size: 15px; font-weight: 700; color: #6b3d00;
+        }
+        .ach-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 18px; width: 100%; max-width: 1100px;
+        }
+        .ach-card {
+            background: #fff; border: 2px solid #ffd9a6; border-radius: 18px;
+            padding: 20px 18px; text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex; flex-direction: column;
+        }
+        .ach-card.unlocked {
+            border-color: #ff8c1a;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.25);
+            background: linear-gradient(160deg, #fff8ec 0%, #ffe9c7 100%);
+        }
+        .ach-card.unlocked:hover { transform: translateY(-4px); }
+        .ach-card.locked { opacity: 0.55; }
+        .ach-icon { font-size: 44px; margin-bottom: 10px; }
+        .ach-title {
+            font-size: 17px; font-weight: 900; color: #4a2c00;
+            margin-bottom: 6px;
+        }
+        .ach-card.unlocked .ach-title { color: #ff8c1a; }
+        .ach-desc { font-size: 13px; color: #6b3d00; line-height: 1.5; flex: 1; }
+        .ach-status {
+            margin-top: 12px; font-size: 12px; font-weight: 700;
+            color: #2e7d32; letter-spacing: 0.5px;
+        }
+    </style>
+
+{% endblock %}
