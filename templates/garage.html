@@ -6,7 +6,8 @@
 
     <div class="garage-header">
         <h2>Мой гараж</h2>
-        <a href="/catalog" class="btn btn-primary btn-small">📖 Каталог машин</a>
+        <div class="balance-pill">💰 {{ balance }} монет</div>
+        <a href="/shop" class="btn btn-primary btn-small">🛒 В магазин</a>
     </div>
 
     {% with messages = get_flashed_messages() %}
@@ -20,11 +21,12 @@
     {% if cars %}
         <div class="cars-grid">
             {% for car in cars %}
-                {% set car_id, model, rating = car %}
+                {% set car_id, model, rating, price = car %}
+                {% set refund = (price * 0.7) | int %}
                 <div class="car-card">
                     <form method="POST" action="/garage/remove/{{ car_id }}" class="delete-form"
-                          onsubmit="return confirm('Убрать «{{ model }}» из гаража?');">
-                        <button type="submit" class="delete-btn" title="Убрать из гаража">✕</button>
+                          onsubmit="return confirm('Продать «{{ model }}» за {{ refund }} монет?');">
+                        <button type="submit" class="delete-btn" title="Продать за {{ refund }}">💰</button>
                     </form>
                     <div class="car-image">
                         <img src="/car_image/{{ car_id }}" alt="{{ model }}">
@@ -32,10 +34,11 @@
                     <div class="car-info">
                         <div class="car-model">{{ model }}</div>
                         <div class="car-stars">
-                            {% for i in range(1, 6) %}
+                            {% for i in range(1, 9) %}
                                 <span class="star {% if i <= rating %}filled{% endif %}">★</span>
                             {% endfor %}
                         </div>
+                        <div class="car-refund">💰 Продать за {{ refund }}</div>
                     </div>
                 </div>
             {% endfor %}
@@ -43,7 +46,7 @@
     {% else %}
         <p class="description">
             В твоём гараже пока пусто.<br>
-            Загляни в <a href="/catalog" style="color:#ff8c1a;font-weight:700;">каталог машин</a> и открой свою первую тачку!
+            Загляни в <a href="/shop" style="color:#ff8c1a;font-weight:700;">магазин</a> и купи свою первую тачку!
         </p>
     {% endif %}
 
@@ -53,28 +56,27 @@
 
     <style>
         .garage-header {
-            display: flex;
-            align-items: center;
-            gap: 25px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            justify-content: center;
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 30px; flex-wrap: wrap; justify-content: center;
         }
         .garage-header h2 { font-size: 36px; color: #ff8c1a; }
+        .balance-pill {
+            font-size: 17px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px;
+            border-radius: 30px; border: 2px solid #ffd9a6;
+            box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
+        }
         .btn-small { padding: 10px 22px; font-size: 16px; }
+
         .cars-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 25px;
-            width: 100%;
-            max-width: 1100px;
-            margin-bottom: 30px;
+            gap: 25px; width: 100%; max-width: 1100px; margin-bottom: 30px;
         }
         .car-card {
             position: relative;
             background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #ffd9a6;
-            border-radius: 20px;
+            border: 2px solid #ffd9a6; border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -86,48 +88,30 @@
         }
         .car-image {
             background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
-            height: 160px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px;
+            height: 150px; display: flex; align-items: center;
+            justify-content: center; padding: 12px;
         }
         .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .car-info { padding: 15px 18px 20px; text-align: center; }
-        .car-model { font-size: 19px; font-weight: 700; color: #4a2c00; margin-bottom: 10px; }
-        .car-stars { font-size: 22px; letter-spacing: 2px; color: #ffd9a6; }
-        .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 6px rgba(255, 140, 26, 0.5); }
+        .car-model { font-size: 18px; font-weight: 700; color: #4a2c00; margin-bottom: 8px; }
+        .car-stars { font-size: 17px; letter-spacing: 1px; color: #ffd9a6; margin-bottom: 10px; }
+        .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 5px rgba(255, 140, 26, 0.5); }
+        .car-refund {
+            font-size: 14px; font-weight: 700; color: #2e7d32;
+            background: #e8f5e9; padding: 6px 14px;
+            border-radius: 20px; display: inline-block;
+        }
 
-        .delete-form {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            z-index: 2;
-            margin: 0;
-        }
+        .delete-form { position: absolute; top: 8px; right: 8px; z-index: 2; margin: 0; }
         .delete-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: none;
-            background: rgba(255, 255, 255, 0.9);
-            color: #ff8c1a;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease;
-            font-family: inherit;
-            line-height: 1;
+            width: 34px; height: 34px; border-radius: 50%;
+            border: none; background: rgba(255, 255, 255, 0.95);
+            font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease; font-family: inherit; line-height: 1;
         }
-        .delete-btn:hover {
-            background: #ff8c1a;
-            color: #fff;
-            transform: scale(1.1);
-        }
+        .delete-btn:hover { background: #fff; transform: scale(1.12); box-shadow: 0 4px 12px rgba(255, 200, 0, 0.5); }
     </style>
 
 {% endblock %}
