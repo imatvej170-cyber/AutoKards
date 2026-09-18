@@ -19,26 +19,26 @@
         {% endif %}
     {% endwith %}
 
-    {% if cars %}
-        <div class="cars-grid">
-            {% for car in cars %}
-                {% set car_id, model, image, rating = car %}
-                <div class="car-card">
-                    <div class="car-image">
-                        <img src="{{ url_for('static', filename='uploads/' + image) }}" alt="{{ model }}">
-                    </div>
-                    <div class="car-info">
-                        <div class="car-model">{{ model }}</div>
-                        <div class="car-stars">
-                            {% for i in range(1, 6) %}
-                                <span class="star {% if i <= rating %}filled{% endif %}">★</span>
-                            {% endfor %}
-                        </div>
+{% if cars %}
+    <div class="cars-grid">
+        {% for car in cars %}
+            {% set car_id, model, rating = car %}
+            <div class="car-card">
+                <div class="car-image">
+                    <img src="/car_image/{{ car_id }}" alt="{{ model }}">
+                </div>
+                <div class="car-info">
+                    <div class="car-model">{{ model }}</div>
+                    <div class="car-stars">
+                        {% for i in range(1, 6) %}
+                            <span class="star {% if i <= rating %}filled{% endif %}">★</span>
+                        {% endfor %}
                     </div>
                 </div>
-            {% endfor %}
-        </div>
-    {% else %}
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
         <p class="description">В гараже пока пусто. {% if is_admin %}Добавь первую машину!{% endif %}</p>
     {% endif %}
 
