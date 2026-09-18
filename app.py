@@ -19,6 +19,8 @@ DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=re
 
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 МБ на файл
 
+# Кто админ (можно перечислить несколько через запятую)
+ADMIN_USERNAMES = {'Apple AT'}
 
 # ---------- ПОДКЛЮЧЕНИЕ К БАЗЕ ----------
 def get_db():
@@ -118,9 +120,8 @@ def delete_car(car_id):
 
 
 # ---------- ХЕЛПЕРЫ ----------
-def is_admin(user_id):
-    return user_id == 1
-
+def is_admin(username):
+    return username in ADMIN_USERNAMES
 
 def admin_required(f):
     @wraps(f)
@@ -128,7 +129,7 @@ def admin_required(f):
         if 'user_id' not in session:
             flash('Сначала войди в аккаунт')
             return redirect(url_for('login'))
-        if not is_admin(session['user_id']):
+       if not is_admin(session.get('username')):
             flash('Доступ только для администратора')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
@@ -142,7 +143,7 @@ ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 @app.route('/')
 def index():
     return render_template('index.html', user=session.get('username'),
-                           is_admin=is_admin(session.get('user_id', 0)))
+                           is_admin=is_admin(session.get('username'))
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -210,7 +211,7 @@ def garage():
     cars = get_all_cars()
     return render_template('garage.html', cars=cars,
                            user=session.get('username'),
-                           is_admin=is_admin(session.get('user_id')))
+                           is_admin=is_admin(session.get('username'))
 
 
 @app.route('/garage/add', methods=['GET', 'POST'])
