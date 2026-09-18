@@ -1,10 +1,10 @@
 from flask import (Flask, render_template, request, redirect,
                    url_for, session, flash)
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from functools import wraps
 import sqlite3
 import os
+import traceback
 import uuid
 from datetime import datetime
 
@@ -12,17 +12,14 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-me-please')
 
 DB_PATH = 'autokards.db'
-
-# Настройки загрузки картинок
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 МБ на файл
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# ---------- БАЗА ДАННЫХ ----------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -59,10 +56,8 @@ def get_user(username):
 def create_user(username, password):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(
-        'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
-        (username, generate_password_hash(password), datetime.now().isoformat())
-    )
+    c.execute('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
+              (username, generate_password_hash(password), datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
@@ -79,17 +74,13 @@ def get_all_cars():
 def add_car(model, image_filename, rating):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(
-        'INSERT INTO cars (model, image_filename, rating, created_at) VALUES (?, ?, ?, ?)',
-        (model, image_filename, rating, datetime.now().isoformat())
-    )
+    c.execute('INSERT INTO cars (model, image_filename, rating, created_at) VALUES (?, ?, ?, ?)',
+              (model, image_filename, rating, datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
 
-# ---------- ХЕЛПЕРЫ ----------
 def is_admin(user_id):
-    """Админ — это первый зарегистрированный пользователь."""
     return user_id == 1
 
 
@@ -110,7 +101,36 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-# ---------- МАРШРУТЫ ----------
+# ============ ДИАГНОСТИЧЕСКИЙ МАРШРУТ ============
+@app.route('/debug')
+def debug():
+    info = {
+        'cwd': os.getcwd(),
+        'db_path': DB_PATH,
+        'db_exists': os.path.exists(DB_PATH),
+        'db_abspath': os.path.abspath(DB_PATH),
+        'templates_exist': {
+            'garage.html': os.path.exists('templates/garage.html'),
+            'add_car.html': os.path.exists('templates/add_car.html'),
+            'index.html': os.path.exists('templates/index.html'),
+        },
+        'uploads_exists': os.path.exists(UPLOAD_FOLDER),
+    }
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        info['tables'] = [row[0] for row in c.fetchall()]
+        conn.close()
+    except Exception as e:
+        info['db_error'] = str(e)
+        info['db_traceback'] = traceback.format_exc()
+
+    return '<pre style="font-size:16px;padding:20px;">' + \
+           str(info).replace(',', ',\n').replace('{', '{\n').replace('}', '\n}') + \
+           '</pre>'
+
+
 @app.route('/')
 def index():
     return render_template('index.html', user=session.get('username'),
@@ -123,15 +143,11 @@ def register():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         password2 = request.form.get('password2', '')
-
         if not username or not password:
             flash('Заполни все поля')
             return redirect(url_for('register'))
-        if len(username) < 3:
-            flash('Никнейм должен быть не короче 3 символов')
-            return redirect(url_for('register'))
-        if len(username) > 20:
-            flash('Никнейм должен быть не длиннее 20 символов')
+        if len(username) < 3 or len(username) > 20:
+            flash('Никнейм должен быть от 3 до 20 символов')
             return redirect(url_for('register'))
         if len(password) < 6:
             flash('Пароль должен быть не короче 6 символов')
@@ -142,13 +158,11 @@ def register():
         if get_user(username):
             flash('Такой никнейм уже занят')
             return redirect(url_for('register'))
-
         create_user(username, password)
         user = get_user(username)
         session['user_id'] = user[0]
         session['username'] = user[1]
         return redirect(url_for('index'))
-
     return render_template('register.html')
 
 
@@ -157,16 +171,13 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-
         user = get_user(username)
         if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]
             session['username'] = user[1]
             return redirect(url_for('index'))
-
         flash('Неверный никнейм или пароль')
         return redirect(url_for('login'))
-
     return render_template('login.html')
 
 
@@ -179,26 +190,27 @@ def logout():
 
 @app.route('/garage')
 def garage():
-    """Гараж — видят все, кто вошёл."""
     if 'user_id' not in session:
         flash('Сначала войди в аккаунт')
         return redirect(url_for('login'))
-    cars = get_all_cars()
-    return render_template('garage.html', cars=cars,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('user_id')))
+    try:
+        cars = get_all_cars()
+        return render_template('garage.html', cars=cars,
+                               user=session.get('username'),
+                               is_admin=is_admin(session.get('user_id')))
+    except Exception:
+        # Показываем полную ошибку прямо на странице
+        return '<h2>Ошибка в /garage:</h2><pre style="font-size:15px;padding:20px;background:#fff0f0;">' + \
+               traceback.format_exc() + '</pre>', 500
 
 
 @app.route('/garage/add', methods=['GET', 'POST'])
 @admin_required
 def add_car_page():
-    """Добавление машины — только для админа."""
     if request.method == 'POST':
         model = request.form.get('model', '').strip()
         rating = request.form.get('rating', '3')
         file = request.files.get('image')
-
-        # Проверки
         if not model:
             flash('Впиши название модели')
             return redirect(url_for('add_car_page'))
@@ -215,20 +227,14 @@ def add_car_page():
         if not allowed_file(file.filename):
             flash('Разрешены только png, jpg, jpeg, webp, gif')
             return redirect(url_for('add_car_page'))
-
-        # Сохраняем файл с уникальным именем
         ext = file.filename.rsplit('.', 1)[1].lower()
         unique_name = f"{uuid.uuid4().hex}.{ext}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
         file.save(filepath)
-
-        # Пишем в базу
         add_car(model, unique_name, rating)
         flash(f'Машина «{model}» добавлена в гараж!')
         return redirect(url_for('garage'))
-
-    return render_template('add_car.html', user=session.get('username'),
-                           is_admin=True)
+    return render_template('add_car.html', user=session.get('username'), is_admin=True)
 
 
 init_db()
