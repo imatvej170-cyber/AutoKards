@@ -1,85 +1,111 @@
 from flask import (Flask, render_template, request, redirect,
-                   url_for, session, flash)
+                   url_for, session, flash, Response)
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from functools import wraps
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
-import uuid
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-me-please')
 
-DB_PATH = 'autokards.db'
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    raise RuntimeError('Не найдена переменная DATABASE_URL. Проверь настройки проекта.')
 
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+# RelaxDev подсказал: sslmode нужно убрать
+DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=require', '')
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 МБ на файл
 
 
-# ---------- БАЗА ДАННЫХ ----------
+# ---------- ПОДКЛЮЧЕНИЕ К БАЗЕ ----------
+def get_db():
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(20) UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             created_at TEXT NOT NULL
         )
     ''')
     c.execute('''
         CREATE TABLE IF NOT EXISTS cars (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            model TEXT NOT NULL,
-            image_filename TEXT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            model VARCHAR(60) NOT NULL,
             rating INTEGER NOT NULL,
+            image_data BYTEA NOT NULL,
+            image_mime TEXT NOT NULL,
             created_at TEXT NOT NULL
         )
     ''')
     conn.commit()
+    c.close()
     conn.close()
 
 
 def get_user(username):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT id, username, password_hash FROM users WHERE username = ?', (username,))
+    c.execute('SELECT id, username, password_hash FROM users WHERE username = %s', (username,))
     row = c.fetchone()
+    c.close()
     conn.close()
     return row
 
 
 def create_user(username, password):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
-              (username, generate_password_hash(password), datetime.now().isoformat()))
+    c.execute(
+        'INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)',
+        (username, generate_password_hash(password), datetime.now().isoformat())
+    )
     conn.commit()
+    c.close()
     conn.close()
 
 
 def get_all_cars():
-    conn = sqlite3.connect(DB_PATH)
+    """Возвращает список (id, model, rating). Картинки грузим отдельно по id."""
+    conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT id, model, image_filename, rating FROM cars ORDER BY id DESC')
+    c.execute('SELECT id, model, rating FROM cars ORDER BY id DESC')
     rows = c.fetchall()
+    c.close()
     conn.close()
     return rows
 
 
-def add_car(model, image_filename, rating):
-    conn = sqlite3.connect(DB_PATH)
+def add_car(model, rating, image_data, image_mime):
+    conn = get_db()
     c = conn.cursor()
-    c.execute('INSERT INTO cars (model, image_filename, rating, created_at) VALUES (?, ?, ?, ?)',
-              (model, image_filename, rating, datetime.now().isoformat()))
+    c.execute(
+        'INSERT INTO cars (model, rating, image_data, image_mime, created_at) '
+        'VALUES (%s, %s, %s, %s, %s)',
+        (model, rating, psycopg2.Binary(image_data), image_mime, datetime.now().isoformat())
+    )
     conn.commit()
+    c.close()
     conn.close()
+
+
+def get_car_image(car_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT image_data, image_mime FROM cars WHERE id = %s', (car_id,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    return row
 
 
 # ---------- ХЕЛПЕРЫ ----------
@@ -100,8 +126,7 @@ def admin_required(f):
     return decorated
 
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 
 
 # ---------- МАРШРУТЫ ----------
@@ -200,20 +225,26 @@ def add_car_page():
         if not file or file.filename == '':
             flash('Выбери картинку')
             return redirect(url_for('add_car_page'))
-        if not allowed_file(file.filename):
-            flash('Разрешены только png, jpg, jpeg, webp, gif')
+        if file.mimetype not in ALLOWED_MIME:
+            flash('Разрешены только PNG, JPG, WEBP, GIF')
             return redirect(url_for('add_car_page'))
 
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        unique_name = f"{uuid.uuid4().hex}.{ext}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        file.save(filepath)
-
-        add_car(model, unique_name, rating)
+        image_data = file.read()
+        add_car(model, rating, image_data, file.mimetype)
         flash(f'Машина «{model}» добавлена в гараж!')
         return redirect(url_for('garage'))
 
     return render_template('add_car.html', user=session.get('username'), is_admin=True)
+
+
+@app.route('/car_image/<int:car_id>')
+def car_image(car_id):
+    """Отдаёт картинку машины из базы."""
+    row = get_car_image(car_id)
+    if not row:
+        return '', 404
+    image_data, mime = row
+    return Response(bytes(image_data), mimetype=mime)
 
 
 init_db()
