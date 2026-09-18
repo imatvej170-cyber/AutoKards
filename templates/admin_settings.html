@@ -77,6 +77,38 @@
             <input type="number" name="wheel_cooldown_hours" min="1"
                    value="{{ settings.wheel_cooldown_hours }}" class="form-input">
 
+            <h3 class="section">💎 Премиум-колесо</h3>
+
+<label class="check-row">
+    <input type="checkbox" name="paid_wheel_enabled" value="1"
+           {% if settings.paid_wheel_enabled == '1' %}checked{% endif %}>
+    Включить премиум-колесо
+</label>
+
+<label class="form-label">Цена спина (монет)</label>
+<input type="number" name="paid_wheel_price" min="1"
+       value="{{ settings.paid_wheel_price }}" class="form-input">
+
+<label class="form-label">Мин. монет за спин</label>
+<input type="number" name="paid_wheel_coin_min" min="1"
+       value="{{ settings.paid_wheel_coin_min }}" class="form-input">
+
+<label class="form-label">Макс. монет за спин</label>
+<input type="number" name="paid_wheel_coin_max" min="1"
+       value="{{ settings.paid_wheel_coin_max }}" class="form-input">
+
+<label class="form-label">Шанс выиграть машину (%)</label>
+<input type="number" name="paid_wheel_car_chance" min="0" max="100"
+       value="{{ settings.paid_wheel_car_chance }}" class="form-input">
+
+<label class="form-label">Мин. рейтинг машины (★)</label>
+<input type="number" name="paid_wheel_car_min_rating" min="1" max="8"
+       value="{{ settings.paid_wheel_car_min_rating }}" class="form-input">
+
+<label class="form-label">Макс. рейтинг машины (★)</label>
+<input type="number" name="paid_wheel_car_max_rating" min="1" max="8"
+       value="{{ settings.paid_wheel_car_max_rating }}" class="form-input">
+
             <button type="submit" class="btn btn-primary">Сохранить настройки</button>
         </form>
 
