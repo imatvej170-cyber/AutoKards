@@ -20,7 +20,7 @@
             <label class="form-label">Аватарка</label>
             <div class="avatar-preview">
                 {% if profile.avatar_data %}
-                    <img src="/avatar/{{ profile.id }}?t={{ range(100000) | random }}" alt="Аватар">
+                    <img src="/avatar/{{ profile.id }}" alt="Аватар">
                 {% else %}
                     <div class="avatar-preview-placeholder">{{ user[0]|upper }}</div>
                 {% endif %}
@@ -50,6 +50,25 @@
                 </p>
             {% endif %}
 
+            <label class="form-label">Публичный гараж — что показывать другим</label>
+            {% if my_cars %}
+                <p class="public-hint">
+                    Отметь машины, которые будут видны на твоём публичном профиле.
+                </p>
+                <div class="public-list">
+                    {% for car in my_cars %}
+                        {% set car_id, model, rating = car %}
+                        <label class="public-item">
+                            <input type="checkbox" name="public_cars" value="{{ car_id }}"
+                                   {% if car_id in public_ids %}checked{% endif %}>
+                            <span class="public-item-name">{{ model }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="no-cars-hint">Открывать пока нечего — сначала собери машины.</p>
+            {% endif %}
+
             <button type="submit" class="btn btn-primary">Сохранить</button>
         </form>
 
@@ -57,93 +76,72 @@
     </div>
 
     <style>
-        .settings-box { max-width: 500px; }
+        .settings-box { max-width: 520px; }
         .form-label {
-            display: block;
-            text-align: left;
-            font-size: 14px;
-            color: #6b3d00;
-            margin-bottom: 8px;
-            margin-top: 18px;
-            font-weight: 700;
+            display: block; text-align: left; font-size: 14px; color: #6b3d00;
+            margin-bottom: 8px; margin-top: 20px; font-weight: 700;
         }
-        .avatar-preview {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 12px;
-        }
+        .avatar-preview { display: flex; justify-content: center; margin-bottom: 12px; }
         .avatar-preview img {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid #ff8c1a;
-            box-shadow: 0 6px 18px rgba(255, 140, 26, 0.3);
+            width: 110px; height: 110px; border-radius: 50%; object-fit: cover;
+            border: 4px solid #ff8c1a; box-shadow: 0 6px 18px rgba(255, 140, 26, 0.3);
         }
         .avatar-preview-placeholder {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            font-weight: 900;
-            color: #fff;
+            width: 110px; height: 110px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 48px; font-weight: 900; color: #fff;
             background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
             box-shadow: 0 6px 18px rgba(255, 140, 26, 0.3);
         }
         .form-textarea, .form-select {
-            width: 100%;
-            padding: 12px 16px;
-            font-size: 16px;
-            border: 2px solid #ffd9a6;
-            border-radius: 12px;
-            margin-bottom: 8px;
-            font-family: inherit;
-            background: #fff;
-            color: #4a2c00;
-            resize: vertical;
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 8px;
+            font-family: inherit; background: #fff; color: #4a2c00; resize: vertical;
         }
-        .form-textarea:focus, .form-select:focus {
-            outline: none;
-            border-color: #ff8c1a;
-        }
+        .form-textarea:focus, .form-select:focus { outline: none; border-color: #ff8c1a; }
         .form-file {
-            width: 100%;
-            padding: 12px 16px;
-            font-size: 15px;
-            border: 2px solid #ffd9a6;
-            border-radius: 12px;
-            margin-bottom: 8px;
-            font-family: inherit;
-            background: #fff;
-            color: #4a2c00;
+            width: 100%; padding: 12px 16px; font-size: 15px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 8px;
+            font-family: inherit; background: #fff; color: #4a2c00;
         }
         .form-file::file-selector-button {
-            background: #ffe0b3;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 8px;
-            color: #6b3d00;
-            font-weight: 600;
-            cursor: pointer;
-            margin-right: 12px;
-            font-family: inherit;
+            background: #ffe0b3; border: none; padding: 8px 14px;
+            border-radius: 8px; color: #6b3d00; font-weight: 600;
+            cursor: pointer; margin-right: 12px; font-family: inherit;
         }
         .form-file::file-selector-button:hover { background: #ffd9a6; }
         .no-cars-hint {
-            font-size: 14px;
-            color: #b08855;
-            text-align: left;
-            padding: 10px 14px;
-            background: #fff5e6;
-            border-radius: 10px;
-            border: 1px dashed #ffd9a6;
-            margin-bottom: 8px;
+            font-size: 14px; color: #b08855; text-align: left; padding: 10px 14px;
+            background: #fff5e6; border-radius: 10px; border: 1px dashed #ffd9a6; margin-bottom: 8px;
         }
         .no-cars-hint a { color: #ff8c1a; font-weight: 700; text-decoration: none; }
         .no-cars-hint a:hover { text-decoration: underline; }
+
+        .public-hint {
+            font-size: 13px; color: #6b3d00; text-align: left;
+            margin-bottom: 10px;
+        }
+        .public-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .public-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 14px; background: #fff;
+            border: 2px solid #ffd9a6; border-radius: 10px;
+            cursor: pointer; transition: all 0.2s;
+            font-size: 15px;
+        }
+        .public-item:hover { border-color: #ff8c1a; background: #fff8ec; }
+        .public-item input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: #ff8c1a; cursor: pointer;
+        }
+        .public-item-name {
+            flex: 1; text-align: left; color: #4a2c00; font-weight: 600;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
     </style>
 
 {% endblock %}
