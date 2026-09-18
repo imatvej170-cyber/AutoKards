@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Редактировать машину — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box">
+        <h2>Редактировать: {{ car[1] }}</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for msg in messages %}
+                    <div class="flash">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="car-preview">
+            <img src="/car_image/{{ car[0] }}" alt="{{ car[1] }}">
+        </div>
+
+        <form method="POST" action="/shop/edit/{{ car[0] }}">
+            <label class="form-label">Название модели</label>
+            <input type="text" name="model" value="{{ car[1] }}" maxlength="60" required class="form-input">
+
+            <label class="form-label">Оценка в звёздах (1–8)</label>
+            <select name="rating" class="form-select" required>
+                {% for n in [8,7,6,5,4,3,2,1] %}
+                    <option value="{{ n }}" {% if car[2] == n %}selected{% endif %}>
+                        {{ '★' * n }} — {{ n }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <label class="form-label">Цена в монетах</label>
+            <input type="number" name="price" min="0" step="10" value="{{ car[3] or 0 }}" required class="form-input">
+
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+
+        <p class="form-link"><a href="/shop">← Назад в магазин</a></p>
+    </div>
+
+    <style>
+        .car-preview {
+            display: flex; justify-content: center; margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            border-radius: 16px; padding: 20px;
+        }
+        .car-preview img { max-width: 200px; max-height: 130px; object-fit: contain; }
+        .form-label {
+            display: block; text-align: left; font-size: 14px; color: #6b3d00;
+            margin-bottom: 6px; margin-top: 12px; font-weight: 600;
+        }
+        .form-select, .form-input {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 15px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-select:focus, .form-input:focus { outline: none; border-color: #ff8c1a; }
+    </style>
+
+{% endblock %}
