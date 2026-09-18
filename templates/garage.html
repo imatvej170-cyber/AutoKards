@@ -101,6 +101,41 @@
         .car-model { font-size: 19px; font-weight: 700; color: #4a2c00; margin-bottom: 10px; }
         .car-stars { font-size: 22px; letter-spacing: 2px; color: #ffd9a6; }
         .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 6px rgba(255, 140, 26, 0.5); }
+
+        .car-card {
+    position: relative;
+}
+.delete-form {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    margin: 0;
+}
+.delete-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: #ff8c1a;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    font-family: inherit;
+    line-height: 1;
+}
+.delete-btn:hover {
+    background: #ff8c1a;
+    color: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(255, 140, 26, 0.4);
+}
     </style>
 
 {% endblock %}
