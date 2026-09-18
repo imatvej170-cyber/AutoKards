@@ -17,7 +17,22 @@
             </div>
             <div class="profile-name">{{ user }}</div>
 
-            <div class="profile-count">🚗 Собрано машин: <strong>{{ cars_count }}</strong></div>
+            <div class="profile-stats">
+                <span class="stat-pill">💰 {{ profile.balance }} монет</span>
+                <span class="stat-pill">🚗 {{ cars_count }} машин</span>
+            </div>
+
+            {% if bonus_ready %}
+                <form method="POST" action="/bonus" class="bonus-form">
+                    <button type="submit" class="btn btn-primary bonus-btn">
+                        🎁 Получить ежедневный бонус (+100)
+                    </button>
+                </form>
+            {% else %}
+                <div class="bonus-wait">
+                    🎁 Следующий бонус через <strong>{{ bonus_left }}</strong>
+                </div>
+            {% endif %}
 
             {% if profile and profile.bio %}
                 <div class="profile-bio">{{ profile.bio }}</div>
@@ -39,7 +54,7 @@
                 <a href="/settings" class="btn btn-primary">⚙ Настроить профиль</a>
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
                 <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
-                <a href="/catalog" class="btn btn-secondary">📖 Каталог</a>
+                <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
                 <a href="/logout" class="btn btn-secondary">Выйти</a>
             </div>
         </div>
@@ -69,13 +84,32 @@
             font-size: 60px; font-weight: 900; color: #fff;
             background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
         }
-        .profile-name { font-size: 34px; font-weight: 900; color: #ff8c1a; margin-bottom: 8px; }
-        .profile-count {
-            font-size: 17px; color: #6b3d00; margin-bottom: 16px;
-            background: rgba(255, 255, 255, 0.7); padding: 8px 20px;
-            border-radius: 30px; border: 1px solid #ffd9a6;
+        .profile-name { font-size: 34px; font-weight: 900; color: #ff8c1a; margin-bottom: 10px; }
+
+        .profile-stats { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
+        .stat-pill {
+            font-size: 16px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px;
+            border-radius: 30px; border: 2px solid #ffd9a6;
+            box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
         }
-        .profile-count strong { color: #ff8c1a; font-size: 20px; }
+
+        .bonus-form { margin-bottom: 18px; }
+        .bonus-btn {
+            padding: 14px 30px; font-size: 17px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.04); }
+        }
+        .bonus-wait {
+            font-size: 15px; color: #6b3d00;
+            background: #fff5e6; padding: 10px 20px; border-radius: 30px;
+            border: 1px dashed #ffd9a6; margin-bottom: 18px;
+        }
+        .bonus-wait strong { color: #ff8c1a; }
+
         .profile-bio {
             max-width: 550px; font-size: 17px; line-height: 1.6; color: #6b3d00;
             background: rgba(255, 255, 255, 0.65); padding: 16px 24px;
@@ -96,7 +130,7 @@
         .profile-fav-card img { width: 90px; height: 60px; object-fit: contain; }
         .profile-fav-name { font-size: 18px; font-weight: 700; color: #4a2c00; }
         .profile-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-        .profile-actions .btn { padding: 12px 24px; font-size: 16px; }
+        .profile-actions .btn { padding: 12px 22px; font-size: 16px; }
     </style>
 
 {% endblock %}
