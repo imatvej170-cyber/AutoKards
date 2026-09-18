@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Админ-настройки — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box settings-box">
+        <h2>⚙ Настройки игры</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for msg in messages %}
+                    <div class="flash">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if discount and discount_car %}
+            <div class="current-discount">
+                🔥 Активная скидка: <strong>{{ discount_car[1] }}</strong>
+                — {{ discount.discount_percent }}%
+            </div>
+        {% else %}
+            <div class="current-discount empty">Скидка дня не активна</div>
+        {% endif %}
+
+        <form method="POST" action="/admin/settings">
+            <h3 class="section">🔥 Скидка дня</h3>
+
+            <label class="check-row">
+                <input type="checkbox" name="discount_enabled" value="1"
+                       {% if settings.discount_enabled == '1' %}checked{% endif %}>
+                Включить скидку дня
+            </label>
+
+            <label class="form-label">Мин. рейтинг (★)</label>
+            <input type="number" name="discount_min_rating" min="1" max="8"
+                   value="{{ settings.discount_min_rating }}" class="form-input">
+
+            <label class="form-label">Макс. рейтинг (★)</label>
+            <input type="number" name="discount_max_rating" min="1" max="8"
+                   value="{{ settings.discount_max_rating }}" class="form-input">
+
+            <label class="form-label">Размер скидки (%)</label>
+            <input type="number" name="discount_percent" min="1" max="99"
+                   value="{{ settings.discount_percent }}" class="form-input">
+
+            <h3 class="section">🎡 Колесо фортуны</h3>
+
+            <label class="check-row">
+                <input type="checkbox" name="wheel_enabled" value="1"
+                       {% if settings.wheel_enabled == '1' %}checked{% endif %}>
+                Включить колесо
+            </label>
+
+            <label class="form-label">Мин. монет за спин</label>
+            <input type="number" name="wheel_coin_min" min="1"
+                   value="{{ settings.wheel_coin_min }}" class="form-input">
+
+            <label class="form-label">Макс. монет за спин</label>
+            <input type="number" name="wheel_coin_max" min="1"
+                   value="{{ settings.wheel_coin_max }}" class="form-input">
+
+            <label class="form-label">Шанс выиграть машину (%)</label>
+            <input type="number" name="wheel_car_chance" min="0" max="100"
+                   value="{{ settings.wheel_car_chance }}" class="form-input">
+
+            <label class="form-label">Мин. рейтинг выигрышной машины (★)</label>
+            <input type="number" name="wheel_car_min_rating" min="1" max="8"
+                   value="{{ settings.wheel_car_min_rating }}" class="form-input">
+
+            <label class="form-label">Макс. рейтинг выигрышной машины (★)</label>
+            <input type="number" name="wheel_car_max_rating" min="1" max="8"
+                   value="{{ settings.wheel_car_max_rating }}" class="form-input">
+
+            <label class="form-label">Перерыв между спинами (часов)</label>
+            <input type="number" name="wheel_cooldown_hours" min="1"
+                   value="{{ settings.wheel_cooldown_hours }}" class="form-input">
+
+            <button type="submit" class="btn btn-primary">Сохранить настройки</button>
+        </form>
+
+        <form method="POST" action="/admin/discount/reroll" style="margin-top:14px;">
+            <button type="submit" class="btn btn-secondary" style="width:100%;">
+                🔄 Пересоздать скидку дня сейчас
+            </button>
+        </form>
+
+        <p class="form-link"><a href="/">← На главную</a></p>
+    </div>
+
+    <style>
+        .settings-box { max-width: 540px; }
+        .section {
+            font-size: 20px; color: #ff8c1a; margin-top: 25px;
+            margin-bottom: 12px; text-align: left;
+        }
+        .form-label {
+            display: block; text-align: left; font-size: 14px;
+            color: #6b3d00; margin-bottom: 6px; margin-top: 10px; font-weight: 600;
+        }
+        .form-input {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 8px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-input:focus { outline: none; border-color: #ff8c1a; }
+        .check-row {
+            display: flex; align-items: center; gap: 10px;
+            text-align: left; font-size: 15px; color: #4a2c00;
+            font-weight: 600; margin-bottom: 6px;
+        }
+        .check-row input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: #ff8c1a;
+        }
+        .current-discount {
+            background: #fff5e6; border: 2px solid #ffd9a6;
+            color: #6b3d00; padding: 12px 18px; border-radius: 12px;
+            font-size: 15px; margin-bottom: 15px;
+        }
+        .current-discount strong { color: #ff8c1a; }
+        .current-discount.empty { color: #b08855; font-style: italic; }
+    </style>
+
+{% endblock %}
