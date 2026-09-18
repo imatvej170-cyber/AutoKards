@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}AutoKards — главная{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    {% if user %}
+        {# --- Если пользователь вошёл --- #}
+        <p class="welcome">Добро пожаловать в гараж, <strong>{{ user }}</strong>!</p>
+        <div class="buttons">
+            <a href="/logout" class="btn btn-secondary">Выйти</a>
+        </div>
+    {% else %}
+        {# --- Если пользователь не вошёл --- #}
+        <div class="buttons">
+            <a href="/register" class="btn btn-primary">Регистрация</a>
+            <a href="/login" class="btn btn-secondary">Войти</a>
+        </div>
+    {% endif %}
+
+    <p class="description">
+        <strong>AutoKards</strong> — это проект, рождённый из искренней любви к автомобилям.
+        Здесь ты сможешь не просто наблюдать, а стать частью мира машин вместе с друзьями.
+        Нажми <strong>«Регистрация»</strong>, если ты здесь впервые, или <strong>«Войти»</strong>,
+        если уже с нами. Добро пожаловать в гараж!
+    </p>
+
+{% endblock %}

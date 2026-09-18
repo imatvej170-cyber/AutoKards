@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Регистрация — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box">
+        <h2>Регистрация</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for msg in messages %}
+                    <div class="flash">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/register">
+            <input type="text" name="username" placeholder="Никнейм" minlength="3" maxlength="20" required autofocus>
+            <input type="password" name="password" placeholder="Пароль" minlength="6" required>
+            <input type="password" name="password2" placeholder="Повтори пароль" minlength="6" required>
+            <button type="submit" class="btn btn-primary">Создать аккаунт</button>
+        </form>
+
+        <p class="form-link">Уже есть аккаунт? <a href="/login">Войти</a></p>
+    </div>
+
+{% endblock %}
