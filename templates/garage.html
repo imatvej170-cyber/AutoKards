@@ -1,14 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Гараж — AutoKards{% endblock %}
+{% block title %}Мой гараж — AutoKards{% endblock %}
 {% block content %}
 
     <h1 class="logo"><a href="/">AutoKards</a></h1>
 
     <div class="garage-header">
-        <h2>Гараж</h2>
-        {% if is_admin %}
-            <a href="/garage/add" class="btn btn-primary btn-small">+ Добавить машину</a>
-        {% endif %}
+        <h2>Мой гараж</h2>
+        <a href="/catalog" class="btn btn-primary btn-small">📖 Каталог машин</a>
     </div>
 
     {% with messages = get_flashed_messages() %}
@@ -19,33 +17,34 @@
         {% endif %}
     {% endwith %}
 
-{% if cars %}
-    <div class="cars-grid">
-        {% for car in cars %}
-            {% set car_id, model, rating = car %}
-           <div class="car-card">
-    {% if is_admin %}
-        <form method="POST" action="/garage/delete/{{ car_id }}" class="delete-form"
-              onsubmit="return confirm('Удалить «{{ model }}» из гаража?');">
-            <button type="submit" class="delete-btn" title="Удалить">✕</button>
-        </form>
-    {% endif %}
-    <div class="car-image">
-        <img src="/car_image/{{ car_id }}" alt="{{ model }}">
-    </div>
-    <div class="car-info">
-        <div class="car-model">{{ model }}</div>
-        <div class="car-stars">
-            {% for i in range(1, 6) %}
-                <span class="star {% if i <= rating %}filled{% endif %}">★</span>
+    {% if cars %}
+        <div class="cars-grid">
+            {% for car in cars %}
+                {% set car_id, model, rating = car %}
+                <div class="car-card">
+                    <form method="POST" action="/garage/remove/{{ car_id }}" class="delete-form"
+                          onsubmit="return confirm('Убрать «{{ model }}» из гаража?');">
+                        <button type="submit" class="delete-btn" title="Убрать из гаража">✕</button>
+                    </form>
+                    <div class="car-image">
+                        <img src="/car_image/{{ car_id }}" alt="{{ model }}">
+                    </div>
+                    <div class="car-info">
+                        <div class="car-model">{{ model }}</div>
+                        <div class="car-stars">
+                            {% for i in range(1, 6) %}
+                                <span class="star {% if i <= rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             {% endfor %}
         </div>
-    </div>
-</div>
-        {% endfor %}
-    </div>
-{% else %}
-        <p class="description">В гараже пока пусто. {% if is_admin %}Добавь первую машину!{% endif %}</p>
+    {% else %}
+        <p class="description">
+            В твоём гараже пока пусто.<br>
+            Загляни в <a href="/catalog" style="color:#ff8c1a;font-weight:700;">каталог машин</a> и открой свою первую тачку!
+        </p>
     {% endif %}
 
     <p class="form-link" style="margin-top: 30px;">
@@ -72,6 +71,7 @@
             margin-bottom: 30px;
         }
         .car-card {
+            position: relative;
             background: rgba(255, 255, 255, 0.9);
             border: 2px solid #ffd9a6;
             border-radius: 20px;
@@ -92,50 +92,42 @@
             justify-content: center;
             padding: 12px;
         }
-        .car-image img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
+        .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .car-info { padding: 15px 18px 20px; text-align: center; }
         .car-model { font-size: 19px; font-weight: 700; color: #4a2c00; margin-bottom: 10px; }
         .car-stars { font-size: 22px; letter-spacing: 2px; color: #ffd9a6; }
         .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 6px rgba(255, 140, 26, 0.5); }
 
-        .car-card {
-    position: relative;
-}
-.delete-form {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 2;
-    margin: 0;
-}
-.delete-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255, 255, 255, 0.9);
-    color: #ff8c1a;
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-    font-family: inherit;
-    line-height: 1;
-}
-.delete-btn:hover {
-    background: #ff8c1a;
-    color: #fff;
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(255, 140, 26, 0.4);
-}
+        .delete-form {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 2;
+            margin: 0;
+        }
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            color: #ff8c1a;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .delete-btn:hover {
+            background: #ff8c1a;
+            color: #fff;
+            transform: scale(1.1);
+        }
     </style>
 
 {% endblock %}
