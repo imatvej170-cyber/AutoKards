@@ -33,6 +33,19 @@
                 </div>
             </div>
         {% endif %}
+         {% if achievements %}
+            {% set unlocked = achievements | selectattr('unlocked') | list %}
+            {% if unlocked %}
+                <div class="profile-ach">
+                    <div class="profile-ach-label">🏆 Достижения</div>
+                    <div class="profile-ach-row">
+                        {% for a in unlocked %}
+                            <span class="ach-badge" title="{{ a.title }} — {{ a.desc }}">{{ a.icon }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
     </div>
 
     <div class="public-section">
