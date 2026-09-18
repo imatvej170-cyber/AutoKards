@@ -15,8 +15,8 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="/garage/add" enctype="multipart/form-data">
-            <input type="text" name="model" placeholder="Название модели (например, Toyota Supra)" maxlength="60" required autofocus>
+        <form method="POST" action="/catalog/add" enctype="multipart/form-data">
+            <input type="text" name="model" placeholder="Название модели (например, Porshe 911)" maxlength="60" required autofocus>
 
             <label class="form-label">Оценка в звёздах</label>
             <select name="rating" class="form-select" required>
@@ -33,7 +33,7 @@
             <button type="submit" class="btn btn-primary">Добавить в гараж</button>
         </form>
 
-        <p class="form-link"><a href="/garage">← Назад в гараж</a></p>
+        <p class="form-link"><a href="/catalog">← Назад в каталог</a></p>
     </div>
 
     <style>
