@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Журнал — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>📜 Журнал</h2>
+        <div class="balance-pill">💰 {{ balance }} монет</div>
+    </div>
+
+    {% if transactions %}
+        <div class="journal-wrap">
+            <table class="journal-table">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Что</th>
+                        <th class="th-amount">Монеты</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                        {% set tx_id, tx_type, amount, car_id, description, created_at = tx %}
+                        <tr>
+                            <td class="td-date">{{ created_at[:16].replace('T', ' ') }}</td>
+                            <td>
+                                <span class="tx-type tx-{{ tx_type }}">
+                                    {% if tx_type == 'bonus' %}🎁
+                                    {% elif tx_type == 'buy' %}🛒
+                                    {% elif tx_type == 'sell' %}💰
+                                    {% elif tx_type == 'wheel_coins' %}🎡
+                                    {% elif tx_type == 'wheel_car' %}🚗
+                                    {% elif tx_type == 'trade' %}🔄
+                                    {% elif tx_type == 'auction' %}🔨
+                                    {% else %}•{% endif %}
+                                </span>
+                                {{ description }}
+                            </td>
+                            <td class="td-amount">
+                                {% if amount > 0 %}<span class="plus">+{{ amount }}</span>
+                                {% elif amount < 0 %}<span class="minus">{{ amount }}</span>
+                                {% else %}—{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="description">Журнал пуст. Купи или продай что-нибудь — записи появятся здесь.</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 34px; color: #ff8c1a; }
+        .balance-pill {
+            font-size: 16px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px; border-radius: 30px;
+            border: 2px solid #ffd9a6;
+        }
+        .journal-wrap {
+            width: 100%; max-width: 850px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+        }
+        .journal-table { width: 100%; border-collapse: collapse; }
+        .journal-table th {
+            background: #ff8c1a; color: #fff; padding: 14px 20px;
+            text-align: left; font-size: 15px; font-weight: 700;
+        }
+        .journal-table .th-amount { text-align: right; }
+        .journal-table td {
+            padding: 14px 20px; border-top: 1px solid #ffe0b3;
+            font-size: 15px; color: #4a2c00;
+        }
+        .journal-table tr:hover { background: #fff8ec; }
+        .td-date { font-size: 13px; color: #8a6538; white-space: nowrap; }
+        .tx-type { font-size: 18px; margin-right: 8px; }
+        .td-amount { text-align: right; font-weight: 900; }
+        .plus { color: #2e7d32; }
+        .minus { color: #c62828; }
+    </style>
+
+{% endblock %}
