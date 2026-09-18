@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Добавить машину — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box">
+        <h2>Новая машина</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for msg in messages %}
+                    <div class="flash">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/garage/add" enctype="multipart/form-data">
+            <input type="text" name="model" placeholder="Название модели (например, Toyota Supra)" maxlength="60" required autofocus>
+
+            <label class="form-label">Оценка в звёздах</label>
+            <select name="rating" class="form-select" required>
+                <option value="5">★★★★★ — 5 звёзд</option>
+                <option value="4">★★★★ — 4 звезды</option>
+                <option value="3" selected>★★★ — 3 звезды</option>
+                <option value="2">★★ — 2 звезды</option>
+                <option value="1">★ — 1 звезда</option>
+            </select>
+
+            <label class="form-label">Картинка (PNG с прозрачным фоном)</label>
+            <input type="file" name="image" accept=".png,.jpg,.jpeg,.webp,.gif" required class="form-file">
+
+            <button type="submit" class="btn btn-primary">Добавить в гараж</button>
+        </form>
+
+        <p class="form-link"><a href="/garage">← Назад в гараж</a></p>
+    </div>
+
+    <style>
+        .form-label {
+            display: block;
+            text-align: left;
+            font-size: 14px;
+            color: #6b3d00;
+            margin-bottom: 6px;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+        .form-select, .form-file {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 2px solid #ffd9a6;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            font-family: inherit;
+            background: #fff;
+            color: #4a2c00;
+        }
+        .form-select:focus, .form-file:focus {
+            outline: none;
+            border-color: #ff8c1a;
+        }
+        .form-file::file-selector-button {
+            background: #ffe0b3;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            color: #6b3d00;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 12px;
+            font-family: inherit;
+        }
+        .form-file::file-selector-button:hover {
+            background: #ffd9a6;
+        }
+    </style>
+
+{% endblock %}
