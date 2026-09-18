@@ -14,13 +14,14 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise RuntimeError('Не найдена переменная DATABASE_URL. Проверь настройки проекта.')
 
-# RelaxDev подсказал: sslmode нужно убрать
 DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=require', '')
 
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 МБ на файл
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
-# Кто админ (можно перечислить несколько через запятую)
+# ============ КТО АДМИН ============
+# Впиши сюда свой ник (в кавычках). Можно несколько через запятую.
 ADMIN_USERNAMES = {'Apple AT'}
+
 
 # ---------- ПОДКЛЮЧЕНИЕ К БАЗЕ ----------
 def get_db():
@@ -77,7 +78,6 @@ def create_user(username, password):
 
 
 def get_all_cars():
-    """Возвращает список (id, model, rating). Картинки грузим отдельно по id."""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT id, model, rating FROM cars ORDER BY id DESC')
@@ -109,8 +109,8 @@ def get_car_image(car_id):
     conn.close()
     return row
 
+
 def delete_car(car_id):
-    """Удаляет машину из базы по id."""
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
@@ -122,6 +122,7 @@ def delete_car(car_id):
 # ---------- ХЕЛПЕРЫ ----------
 def is_admin(username):
     return username in ADMIN_USERNAMES
+
 
 def admin_required(f):
     @wraps(f)
@@ -142,8 +143,9 @@ ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 # ---------- МАРШРУТЫ ----------
 @app.route('/')
 def index():
-    return render_template('index.html', user=session.get('username'),
-                           is_admin=is_admin(session.get('username'))
+    return render_template('index.html',
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -209,9 +211,10 @@ def garage():
         flash('Сначала войди в аккаунт')
         return redirect(url_for('login'))
     cars = get_all_cars()
-    return render_template('garage.html', cars=cars,
+    return render_template('garage.html',
+                           cars=cars,
                            user=session.get('username'),
-                           is_admin=is_admin(session.get('username'))
+                           is_admin=is_admin(session.get('username')))
 
 
 @app.route('/garage/add', methods=['GET', 'POST'])
@@ -244,22 +247,23 @@ def add_car_page():
         flash(f'Машина «{model}» добавлена в гараж!')
         return redirect(url_for('garage'))
 
-    return render_template('add_car.html', user=session.get('username'), is_admin=True)
+    return render_template('add_car.html',
+                           user=session.get('username'),
+                           is_admin=True)
 
 
 @app.route('/car_image/<int:car_id>')
 def car_image(car_id):
-    """Отдаёт картинку машины из базы."""
     row = get_car_image(car_id)
     if not row:
         return '', 404
     image_data, mime = row
     return Response(bytes(image_data), mimetype=mime)
 
+
 @app.route('/garage/delete/<int:car_id>', methods=['POST'])
 @admin_required
 def delete_car_page(car_id):
-    """Удаление машины — только для админа."""
     delete_car(car_id)
     flash('Машина удалена из гаража')
     return redirect(url_for('garage'))
