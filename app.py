@@ -129,7 +129,7 @@ def admin_required(f):
         if 'user_id' not in session:
             flash('Сначала войди в аккаунт')
             return redirect(url_for('login'))
-       if not is_admin(session.get('username')):
+        if not is_admin(session.get('username')):
             flash('Доступ только для администратора')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
