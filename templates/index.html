@@ -18,6 +18,7 @@
             <div class="profile-stats">
                 <span class="stat-pill">💰 {{ profile.balance }} монет</span>
                 <span class="stat-pill">🚗 {{ cars_count }} машин</span>
+                <span class="stat-pill">🏆 {{ achievements_count }} достиж.</span>
             </div>
 
             <div class="bonus-row">
@@ -59,6 +60,7 @@
                 <a href="/garage" class="btn btn-primary">🏁 Гараж</a>
                 <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
+                <a href="/achievements" class="btn btn-secondary">🏆 Достижения ({{ achievements_count }}/{{ total_achievements }})</a>
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
