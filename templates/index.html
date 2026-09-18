@@ -10,9 +10,7 @@
                 {% if profile and profile.avatar_data %}
                     <img class="profile-avatar" src="/avatar/{{ profile.id }}" alt="{{ user }}">
                 {% else %}
-                    <div class="profile-avatar profile-avatar-placeholder">
-                        {{ user[0]|upper }}
-                    </div>
+                    <div class="profile-avatar profile-avatar-placeholder">{{ user[0]|upper }}</div>
                 {% endif %}
             </div>
             <div class="profile-name">{{ user }}</div>
@@ -22,17 +20,23 @@
                 <span class="stat-pill">🚗 {{ cars_count }} машин</span>
             </div>
 
-            {% if bonus_ready %}
-                <form method="POST" action="/bonus" class="bonus-form">
-                    <button type="submit" class="btn btn-primary bonus-btn">
-                        🎁 Получить ежедневный бонус (+100)
-                    </button>
-                </form>
-            {% else %}
-                <div class="bonus-wait">
-                    🎁 Следующий бонус через <strong>{{ bonus_left }}</strong>
-                </div>
-            {% endif %}
+            <div class="bonus-row">
+                {% if bonus_ready %}
+                    <form method="POST" action="/bonus" class="bonus-form">
+                        <button type="submit" class="btn btn-primary bonus-btn">
+                            🎁 Бонус (+100)
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="bonus-wait">🎁 Бонус через <strong>{{ bonus_left }}</strong></div>
+                {% endif %}
+
+                {% if spin_ready %}
+                    <a href="/wheel" class="btn btn-primary wheel-link">🎡 Крутить колесо</a>
+                {% else %}
+                    <div class="bonus-wait">🎡 Колесо через <strong>{{ spin_left }}</strong></div>
+                {% endif %}
+            </div>
 
             {% if profile and profile.bio %}
                 <div class="profile-bio">{{ profile.bio }}</div>
@@ -51,10 +55,14 @@
             {% endif %}
 
             <div class="profile-actions">
-                <a href="/settings" class="btn btn-primary">⚙ Настроить профиль</a>
-                <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
-                <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
+                <a href="/settings" class="btn btn-primary">⚙ Профиль</a>
+                <a href="/garage" class="btn btn-primary">🏁 Гараж</a>
                 <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
+                <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
+                <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
+                {% if is_admin %}
+                    <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
+                {% endif %}
                 <a href="/logout" class="btn btn-secondary">Выйти</a>
             </div>
         </div>
@@ -63,7 +71,6 @@
             <a href="/register" class="btn btn-primary">Регистрация</a>
             <a href="/login" class="btn btn-secondary">Войти</a>
         </div>
-
         <p class="description">
             <strong>AutoKards</strong> — это проект, рождённый из искренней любви к автомобилям.
             Здесь ты сможешь не просто наблюдать, а стать частью мира машин вместе с друзьями.
@@ -85,31 +92,26 @@
             background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
         }
         .profile-name { font-size: 34px; font-weight: 900; color: #ff8c1a; margin-bottom: 10px; }
-
         .profile-stats { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
         .stat-pill {
             font-size: 16px; font-weight: 700; color: #6b3d00;
-            background: #fff; padding: 10px 22px;
-            border-radius: 30px; border: 2px solid #ffd9a6;
-            box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
+            background: #fff; padding: 10px 22px; border-radius: 30px;
+            border: 2px solid #ffd9a6; box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
         }
-
-        .bonus-form { margin-bottom: 18px; }
-        .bonus-btn {
-            padding: 14px 30px; font-size: 17px;
-            animation: pulse 2s infinite;
+        .bonus-row {
+            display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+            margin-bottom: 18px;
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50%      { transform: scale(1.04); }
-        }
+        .bonus-form { margin: 0; }
+        .bonus-btn { padding: 14px 26px; font-size: 16px; animation: pulse 2s infinite; }
+        .wheel-link { padding: 14px 26px; font-size: 16px; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
         .bonus-wait {
-            font-size: 15px; color: #6b3d00;
-            background: #fff5e6; padding: 10px 20px; border-radius: 30px;
-            border: 1px dashed #ffd9a6; margin-bottom: 18px;
+            font-size: 14px; color: #6b3d00; background: #fff5e6;
+            padding: 12px 20px; border-radius: 30px;
+            border: 1px dashed #ffd9a6;
         }
         .bonus-wait strong { color: #ff8c1a; }
-
         .profile-bio {
             max-width: 550px; font-size: 17px; line-height: 1.6; color: #6b3d00;
             background: rgba(255, 255, 255, 0.65); padding: 16px 24px;
@@ -129,8 +131,8 @@
         }
         .profile-fav-card img { width: 90px; height: 60px; object-fit: contain; }
         .profile-fav-name { font-size: 18px; font-weight: 700; color: #4a2c00; }
-        .profile-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-        .profile-actions .btn { padding: 12px 22px; font-size: 16px; }
+        .profile-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .profile-actions .btn { padding: 11px 20px; font-size: 15px; }
     </style>
 
 {% endblock %}
