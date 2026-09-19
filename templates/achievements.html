@@ -11,6 +11,7 @@
             <div class="progress-fill" style="width: {{ (unlocked_count * 100 / total) | round(1) }}%;"></div>
         </div>
         <div class="progress-text">Открыто {{ unlocked_count }} из {{ total }}</div>
+        <div class="reward-text">💰 Заработано: {{ earned_reward }} / {{ total_reward }} монет</div>
     </div>
 
     <div class="ach-grid">
@@ -19,6 +20,7 @@
                 <div class="ach-icon">{{ a.icon if a.unlocked else '🔒' }}</div>
                 <div class="ach-title">{{ a.title }}</div>
                 <div class="ach-desc">{{ a.desc }}</div>
+                <div class="ach-reward">💰 {{ a.reward }}</div>
                 {% if a.unlocked %}
                     <div class="ach-status">✓ Получено</div>
                 {% endif %}
@@ -44,6 +46,10 @@
             text-align: center; margin-top: 8px;
             font-size: 15px; font-weight: 700; color: #6b3d00;
         }
+        .reward-text {
+            text-align: center; margin-top: 4px;
+            font-size: 14px; font-weight: 700; color: #2e7d32;
+        }
         .ach-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -63,14 +69,16 @@
         .ach-card.unlocked:hover { transform: translateY(-4px); }
         .ach-card.locked { opacity: 0.55; }
         .ach-icon { font-size: 44px; margin-bottom: 10px; }
-        .ach-title {
-            font-size: 17px; font-weight: 900; color: #4a2c00;
-            margin-bottom: 6px;
-        }
+        .ach-title { font-size: 17px; font-weight: 900; color: #4a2c00; margin-bottom: 6px; }
         .ach-card.unlocked .ach-title { color: #ff8c1a; }
         .ach-desc { font-size: 13px; color: #6b3d00; line-height: 1.5; flex: 1; }
+        .ach-reward {
+            margin-top: 10px; font-size: 15px; font-weight: 900;
+            color: #2e7d32;
+        }
+        .ach-card.locked .ach-reward { color: #8a6538; }
         .ach-status {
-            margin-top: 12px; font-size: 12px; font-weight: 700;
+            margin-top: 8px; font-size: 12px; font-weight: 700;
             color: #2e7d32; letter-spacing: 0.5px;
         }
     </style>
