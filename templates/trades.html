@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Обмены — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>🔄 Обмены</h2>
+        <div class="balance-pill">💰 {{ balance }} монет</div>
+        <a href="/trades/new" class="btn btn-primary btn-small">+ Новый обмен</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <h3 class="section-title">📥 Входящие ({{ incoming|length }})</h3>
+    {% if incoming %}
+        <div class="trades-list">
+            {% for t in incoming %}
+                <div class="trade-card incoming">
+                    <div class="trade-head">
+                        <span class="trade-from">От: <strong>{{ t.from_username }}</strong></span>
+                        <span class="trade-status status-pending">Ожидает</span>
+                    </div>
+                    <div class="trade-body">
+                        <div class="trade-side">
+                            <div class="trade-side-label">Он отдаёт:</div>
+                            <div class="trade-car">
+                                <img src="/car_image/{{ t.from_car[0] }}" alt="{{ t.from_car[1] }}">
+                                <div>{{ t.from_car[1] }}</div>
+                            </div>
+                            <div class="trade-coins">💰 {{ t.from_coins }}</div>
+                        </div>
+                        {% if t.message %}
+                            <div class="trade-message">«{{ t.message }}»</div>
+                        {% endif %}
+                    </div>
+                    <a href="/trades/{{ t.id }}" class="btn btn-primary btn-tiny">Открыть →</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Входящих предложений нет.</p>
+    {% endif %}
+
+    <h3 class="section-title">📤 Исходящие ({{ outgoing|length }})</h3>
+    {% if outgoing %}
+        <div class="trades-list">
+            {% for t in outgoing %}
+                <div class="trade-card outgoing">
+                    <div class="trade-head">
+                        <span class="trade-from">Кому: <strong>{{ t.to_username }}</strong></span>
+                        <span class="trade-status status-pending">Ожидает</span>
+                    </div>
+                    <div class="trade-body">
+                        <div class="trade-side">
+                            <div class="trade-side-label">Ты отдаёшь:</div>
+                            <div class="trade-car">
+                                <img src="/car_image/{{ t.from_car[0] }}" alt="{{ t.from_car[1] }}">
+                                <div>{{ t.from_car[1] }}</div>
+                            </div>
+                            <div class="trade-coins">💰 {{ t.from_coins }}</div>
+                        </div>
+                    </div>
+                    <a href="/trades/{{ t.id }}" class="btn btn-secondary btn-tiny">Открыть →</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Исходящих предложений нет.</p>
+    {% endif %}
+
+    <h3 class="section-title">📜 История</h3>
+    {% if history %}
+        <div class="trades-list">
+            {% for t in history %}
+                <div class="trade-card history">
+                    <div class="trade-head">
+                        <span class="trade-from">
+                            {% if t.from_user_id == my_id %}
+                                Ты → {{ t.to_username }}
+                            {% else %}
+                                {{ t.from_username }} → Ты
+                            {% endif %}
+                        </span>
+                        <span class="trade-status
+                            {% if t.status == 'completed' %}status-completed
+                            {% elif t.status == 'rejected' %}status-rejected
+                            {% else %}status-cancelled{% endif %}">
+                            {% if t.status == 'completed' %}✓ Выполнен
+                            {% elif t.status == 'rejected' %}✕ Отклонён
+                            {% else %}⊘ Отменён{% endif %}
+                        </span>
+                    </div>
+                    <div class="trade-body-small">
+                        <span>{{ t.from_car[1] }} ⇄ {% if t.to_car %}{{ t.to_car[1] }}{% else %}—{% endif %}</span>
+                    </div>
+                    <a href="/trades/{{ t.id }}" class="btn btn-secondary btn-tiny">Посмотреть</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">История пуста.</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 34px; color: #ff8c1a; }
+        .balance-pill {
+            font-size: 16px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px; border-radius: 30px;
+            border: 2px solid #ffd9a6;
+        }
+        .btn-small { padding: 10px 22px; font-size: 16px; }
+        .btn-tiny { padding: 8px 18px; font-size: 14px; }
+        .section-title {
+            font-size: 22px; color: #ff8c1a; font-weight: 900;
+            margin: 25px 0 15px; text-align: center;
+        }
+        .trades-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px; width: 100%; max-width: 1100px;
+        }
+        .trade-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 18px;
+            padding: 18px; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.12);
+        }
+        .trade-card.incoming { border-color: #ff8c1a; box-shadow: 0 6px 20px rgba(255, 140, 26, 0.3); }
+        .trade-head { display: flex; justify-content: space-between; align-items: center; }
+        .trade-from { font-size: 15px; color: #4a2c00; }
+        .trade-from strong { color: #ff8c1a; }
+        .trade-status {
+            font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .status-cancelled { background: #e2e3e5; color: #383d41; }
+        .trade-body { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .trade-body-small { font-size: 14px; color: #6b3d00; text-align: center; }
+        .trade-side { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .trade-side-label { font-size: 12px; color: #b08855; font-weight: 700; }
+        .trade-car { display: flex; flex-direction: column; align-items: center; }
+        .trade-car img { width: 130px; height: 80px; object-fit: contain; }
+        .trade-car div { font-size: 15px; font-weight: 700; color: #4a2c00; }
+        .trade-coins { font-size: 15px; font-weight: 900; color: #ff8c1a; }
+        .trade-message {
+            font-size: 14px; color: #6b3d00; font-style: italic;
+            background: #fff8ec; padding: 8px 14px; border-radius: 10px;
+            border: 1px dashed #ffd9a6; text-align: center; max-width: 100%;
+            word-break: break-word;
+        }
+    </style>
+
+{% endblock %}
