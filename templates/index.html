@@ -31,12 +31,9 @@
                 {% else %}
                     <div class="bonus-wait">🎁 Бонус через <strong>{{ bonus_left }}</strong></div>
                 {% endif %}
-
-                {% if spin_ready %}
-                    <a href="/wheel" class="btn btn-primary wheel-link">🎡 Крутить колесо</a>
-                {% else %}
-                    <div class="bonus-wait">🎡 Колесо через <strong>{{ spin_left }}</strong></div>
-                {% endif %}
+                
+                <a href="/wheel" class="btn btn-primary wheel-link">🎡 Колесо фортуны</a>
+                
             </div>
 
             {% if profile and profile.bio %}
@@ -61,6 +58,7 @@
                 <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения ({{ achievements_count }}/{{ total_achievements }})</a>
+                <a href="/trades" class="btn btn-primary">🔄 Обмены{% if incoming_trades_count %} ({{ incoming_trades_count }}){% endif %}</a>
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
