@@ -417,19 +417,82 @@ def count_incoming_trades(user_id):
 
 
 def accept_trade(trade_id, user_id, to_car_id, to_coins):
-    """Принимает обмен. Получатель указывает свою машину и монеты."""
+    """Принимает обмен. to_car_id может быть None (не даю машину)."""
     t = get_trade(trade_id)
     if not t: return False, 'Обмен не найден'
     if t['to_user_id'] != user_id: return False, 'Это не твой обмен'
     if t['status'] != 'pending': return False, 'Обмен уже обработан'
     if to_coins < 0: return False, 'Монеты не могут быть отрицательными'
-    if not has_car(user_id, to_car_id): return False, 'У тебя нет этой машины'
+
+    # Проверяем монеты обеих сторон
     if get_balance(user_id) < to_coins:
         return False, f'У тебя только {get_balance(user_id)} монет'
-    if not has_car(t['from_user_id'], t['from_car_id']):
-        return False, 'У отправителя уже нет этой машины'
     if get_balance(t['from_user_id']) < t['from_coins']:
         return False, 'У отправителя не хватает монет'
+
+    # Проверяем машину отправителя
+    if not has_car(t['from_user_id'], t['from_car_id']):
+        return False, 'У отправителя уже нет этой машины'
+
+    # Проверяем, нет ли уже такой машины у получателя
+    if has_car(user_id, t['from_car_id']):
+        return False, 'У тебя уже есть эта машина — обмен не имеет смысла'
+
+    # Если получатель даёт машину — тоже проверяем
+    if to_car_id:
+        if not has_car(user_id, to_car_id):
+            return False, 'У тебя нет этой машины'
+        if has_car(t['from_user_id'], to_car_id):
+            return False, 'У отправителя уже есть эта машина — обмен не имеет смысла'
+
+    conn = get_db(); c = conn.cursor()
+
+    # Забираем машину отправителя (она переходит получателю)
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
+    c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
+                 VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+              (user_id, t['from_car_id'], datetime.now().isoformat()))
+    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
+    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
+
+    # Если получатель отдаёт машину — она переходит отправителю
+    if to_car_id:
+        c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
+        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
+                     VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+                  (t['from_user_id'], to_car_id, datetime.now().isoformat()))
+        c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
+        c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
+                  (user_id, to_car_id))
+
+    # Переводим монеты (разница)
+    diff = t['from_coins'] - to_coins
+    if diff > 0:
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s',
+                  (diff, t['from_user_id']))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                  (diff, user_id))
+    elif diff < 0:
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                  (-diff, t['from_user_id']))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s',
+                  (-diff, user_id))
+
+    c.execute('''UPDATE trades SET to_car_id = %s, to_coins = %s,
+                 status = 'completed', resolved_at = %s WHERE id = %s''',
+              (to_car_id, to_coins, datetime.now().isoformat(), trade_id))
+    conn.commit(); c.close(); conn.close()
+
+    other_name = get_username_by_id(user_id)
+    my_name = get_username_by_id(t['from_user_id'])
+    log_transaction(t['from_user_id'], 'trade', -diff if diff > 0 else -diff if diff < 0 else 0,
+                    t['from_car_id'], f'Обмен с {other_name}')
+    log_transaction(user_id, 'trade', diff if diff > 0 else (abs(diff) if diff < 0 else 0),
+                    to_car_id, f'Обмен с {my_name}')
+    return True, 'Обмен выполнен!'
 
     conn = get_db(); c = conn.cursor()
     # Забираем машины у обоих
@@ -1201,15 +1264,15 @@ def trade_view(trade_id):
 @app.route('/trades/<int:trade_id>/accept', methods=['POST'])
 @login_required
 def trade_accept(trade_id):
-    to_car_id = request.form.get('to_car_id', '')
+    to_car_raw = request.form.get('to_car_id', '').strip()
     to_coins = request.form.get('to_coins', '0')
-    if not to_car_id.isdigit():
-        flash('Выбери свою машину'); return redirect(url_for('trade_view', trade_id=trade_id))
+    to_car_id = int(to_car_raw) if to_car_raw.isdigit() else None
     try:
         to_coins = int(to_coins or 0)
     except ValueError:
-        flash('Монеты должны быть числом'); return redirect(url_for('trade_view', trade_id=trade_id))
-    ok, msg = accept_trade(trade_id, session['user_id'], int(to_car_id), to_coins)
+        flash('Монеты должны быть числом')
+        return redirect(url_for('trade_view', trade_id=trade_id))
+    ok, msg = accept_trade(trade_id, session['user_id'], to_car_id, to_coins)
     flash(msg)
     return redirect(url_for('trades_page'))
 
