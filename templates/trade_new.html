@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Новый обмен — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box" style="max-width: 560px;">
+        <h2>🔄 Новый обмен</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        {% if my_cars %}
+            <form method="POST" action="/trades/new">
+                <label class="form-label">Ник игрока, которому предлагаешь</label>
+                <input type="text" name="to_username" placeholder="Например: imatvej"
+                       maxlength="20" required autofocus class="form-input">
+
+                <label class="form-label">Какую свою машину отдаёшь</label>
+                <select name="from_car_id" class="form-select" required>
+                    <option value="">— Выбери машину —</option>
+                    {% for car in my_cars %}
+                        {% set car_id, model, rating, price = car %}
+                        <option value="{{ car_id }}">{{ model }} ({{ rating }}★)</option>
+                    {% endfor %}
+                </select>
+
+                <label class="form-label">Сколько монет доплачиваешь (0, если не надо)</label>
+                <input type="number" name="from_coins" min="0" max="{{ balance }}"
+                       value="0" class="form-input">
+                <p class="hint">У тебя {{ balance }} монет</p>
+
+                <label class="form-label">Сообщение (до 200 символов)</label>
+                <textarea name="message" maxlength="200" rows="3" class="form-textarea"
+                          placeholder="Например: Дарю тебе свою машину, отправь мне одну монету в ответ :)"></textarea>
+
+                <button type="submit" class="btn btn-primary">Отправить предложение</button>
+            </form>
+        {% else %}
+            <p class="no-cars-hint">
+                У тебя нет машин, чтобы предлагать обмен.
+                <a href="/shop">Купи первую в магазине →</a>
+            </p>
+        {% endif %}
+
+        <p class="form-link"><a href="/trades">← К обменам</a></p>
+    </div>
+
+    <style>
+        .form-label {
+            display: block; text-align: left; font-size: 14px;
+            color: #6b3d00; margin-bottom: 6px; margin-top: 14px; font-weight: 700;
+        }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 4px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-textarea { resize: vertical; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none; border-color: #ff8c1a;
+        }
+        .hint { font-size: 12px; color: #b08855; text-align: left; margin: 0 0 8px 4px; }
+        .no-cars-hint {
+            font-size: 15px; color: #b08855; text-align: center;
+            padding: 20px; background: #fff5e6; border-radius: 12px;
+            border: 1px dashed #ffd9a6;
+        }
+        .no-cars-hint a { color: #ff8c1a; font-weight: 700; text-decoration: none; }
+        .no-cars-hint a:hover { text-decoration: underline; }
+    </style>
+
+{% endblock %}
