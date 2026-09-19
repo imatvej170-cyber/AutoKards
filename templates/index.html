@@ -31,9 +31,8 @@
                 {% else %}
                     <div class="bonus-wait">🎁 Бонус через <strong>{{ bonus_left }}</strong></div>
                 {% endif %}
-                
-                <a href="/wheel" class="btn btn-primary wheel-link">🎡 Колесо фортуны</a>
-                
+
+                <a href="/wheel" class="btn btn-primary wheel-link">🎡 Колесо</a>
             </div>
 
             {% if profile and profile.bio %}
@@ -52,14 +51,16 @@
                 </div>
             {% endif %}
 
+            {# ↓↓↓ БЛОК КНОПОК — profile-actions ↓↓↓ #}
             <div class="profile-actions">
                 <a href="/settings" class="btn btn-primary">⚙ Профиль</a>
-                <a href="/garage" class="btn btn-primary">🏁 Гараж</a>
-                <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
-                <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
-                <a href="/achievements" class="btn btn-secondary">🏆 Достижения ({{ achievements_count }}/{{ total_achievements }})</a>
-                <a href="/trades" class="btn btn-primary">🔄 Обмены{% if incoming_trades_count %} ({{ incoming_trades_count }}){% endif %}</a>
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
+                <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
+                <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
+                <a href="/races" class="btn btn-primary">🏎️ Гонки{% if active_races_count %} ({{ active_races_count }}){% endif %}</a>
+                <a href="/trades" class="btn btn-primary">🔄 Обмены{% if incoming_trades_count %} ({{ incoming_trades_count }}){% endif %}</a>
+                <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
+                <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
                 {% endif %}
@@ -94,8 +95,8 @@
         .profile-name { font-size: 34px; font-weight: 900; color: #ff8c1a; margin-bottom: 10px; }
         .profile-stats { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
         .stat-pill {
-            font-size: 16px; font-weight: 700; color: #6b3d00;
-            background: #fff; padding: 10px 22px; border-radius: 30px;
+            font-size: 15px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 8px 20px; border-radius: 30px;
             border: 2px solid #ffd9a6; box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
         }
         .bonus-row {
@@ -131,8 +132,8 @@
         }
         .profile-fav-card img { width: 90px; height: 60px; object-fit: contain; }
         .profile-fav-name { font-size: 18px; font-weight: 700; color: #4a2c00; }
-        .profile-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-        .profile-actions .btn { padding: 11px 20px; font-size: 15px; }
+        .profile-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
+        .profile-actions .btn { padding: 11px 22px; font-size: 15px; }
     </style>
 
 {% endblock %}
