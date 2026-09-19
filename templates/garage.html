@@ -8,15 +8,17 @@
         <h2>Мой гараж</h2>
         <div class="balance-pill">💰 {{ balance }} монет</div>
         <a href="/shop" class="btn btn-primary btn-small">🛒 В магазин</a>
+        <a href="/compare" class="btn btn-secondary btn-small">⚖️ Сравнить</a>
         <a href="/journal" class="btn btn-secondary btn-small">📜 Журнал</a>
     </div>
 
+    <div class="filter-bar">
+        <a href="/garage?filter=all" class="filter-chip {% if filter == 'all' %}active{% endif %}">🚗 Все ({{ total_count }})</a>
+        <a href="/garage?filter=fav" class="filter-chip {% if filter == 'fav' %}active{% endif %}">⭐ Избранные ({{ fav_ids|length }})</a>
+    </div>
+
     {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            {% for msg in messages %}
-                <div class="flash">{{ msg }}</div>
-            {% endfor %}
-        {% endif %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     {% if cars %}
@@ -24,7 +26,14 @@
             {% for car in cars %}
                 {% set car_id, model, rating, price = car %}
                 {% set refund = (price * 0.7) | int %}
+                {% set is_fav = car_id in fav_ids %}
                 <div class="car-card">
+                    <form method="POST" action="/garage/favorite/{{ car_id }}" class="fav-form">
+                        <button type="submit" class="fav-btn {% if is_fav %}active{% endif %}"
+                                title="{% if is_fav %}Убрать из избранного{% else %}Добавить в избранное{% endif %}">
+                            {% if is_fav %}⭐{% else %}☆{% endif %}
+                        </button>
+                    </form>
                     <form method="POST" action="/garage/remove/{{ car_id }}" class="delete-form"
                           onsubmit="return confirm('Продать «{{ model }}» за {{ refund }} монет?');">
                         <button type="submit" class="delete-btn" title="Продать за {{ refund }}">💰</button>
@@ -35,9 +44,7 @@
                         </div>
                     </a>
                     <div class="car-info">
-                        <div class="car-model">
-                            <a href="/car/{{ car_id }}">{{ model }}</a>
-                        </div>
+                        <div class="car-model"><a href="/car/{{ car_id }}">{{ model }}</a></div>
                         <div class="car-stars">
                             {% for i in range(1, 9) %}
                                 <span class="star {% if i <= rating %}filled{% endif %}">★</span>
@@ -50,32 +57,45 @@
         </div>
     {% else %}
         <p class="description">
-            В твоём гараже пока пусто.<br>
-            Загляни в <a href="/shop" style="color:#ff8c1a;font-weight:700;">магазин</a> и купи свою первую тачку!
+            {% if filter == 'fav' %}В избранном пока нет машин.{% else %}В твоём гараже пока пусто.{% endif %}<br>
+            {% if filter == 'fav' %}Отмечай машины звёздочкой ⭐, чтобы они появились здесь.{% else %}Загляни в <a href="/shop" style="color:#ff8c1a;font-weight:700;">магазин</a>!{% endif %}
         </p>
     {% endif %}
 
-    <p class="form-link" style="margin-top: 30px;">
-        <a href="/">← На главную</a>
-    </p>
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
 
     <style>
         .garage-header {
             display: flex; align-items: center; gap: 18px;
-            margin-bottom: 30px; flex-wrap: wrap; justify-content: center;
+            margin-bottom: 18px; flex-wrap: wrap; justify-content: center;
         }
         .garage-header h2 { font-size: 36px; color: #ff8c1a; }
         .balance-pill {
             font-size: 17px; font-weight: 700; color: #6b3d00;
-            background: #fff; padding: 10px 22px;
-            border-radius: 30px; border: 2px solid #ffd9a6;
-            box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
+            background: #fff; padding: 10px 22px; border-radius: 30px;
+            border: 2px solid #ffd9a6;
         }
-        .btn-small { padding: 10px 22px; font-size: 16px; }
+        .btn-small { padding: 10px 22px; font-size: 15px; }
+
+        .filter-bar {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            justify-content: center; margin-bottom: 22px;
+        }
+        .filter-chip {
+            padding: 10px 20px; border-radius: 30px;
+            background: #fff; color: #6b3d00;
+            text-decoration: none; font-weight: 700; font-size: 14px;
+            border: 2px solid #ffd9a6;
+            transition: all 0.2s ease;
+        }
+        .filter-chip:hover { background: #fff5e6; border-color: #ff8c1a; }
+        .filter-chip.active {
+            background: #ff8c1a; color: #fff; border-color: #ff8c1a;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.4);
+        }
 
         .cars-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 25px; width: 100%; max-width: 1100px; margin-bottom: 30px;
         }
         .car-card {
@@ -96,10 +116,6 @@
             background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
             height: 150px; display: flex; align-items: center;
             justify-content: center; padding: 12px;
-            transition: background 0.3s ease;
-        }
-        .car-image-link:hover .car-image {
-            background: linear-gradient(135deg, #ffe9c7 0%, #ffd9a6 100%);
         }
         .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .car-info { padding: 15px 18px 20px; text-align: center; }
@@ -114,6 +130,19 @@
             border-radius: 20px; display: inline-block;
         }
 
+        .fav-form { position: absolute; top: 8px; left: 8px; z-index: 2; margin: 0; }
+        .fav-btn {
+            width: 34px; height: 34px; border-radius: 50%;
+            border: none; background: rgba(255, 255, 255, 0.95);
+            font-size: 18px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease; font-family: inherit; line-height: 1;
+            color: #ffd9a6;
+        }
+        .fav-btn.active { color: #ff8c1a; }
+        .fav-btn:hover { transform: scale(1.15); background: #fff; }
+
         .delete-form { position: absolute; top: 8px; right: 8px; z-index: 2; margin: 0; }
         .delete-btn {
             width: 34px; height: 34px; border-radius: 50%;
@@ -123,10 +152,7 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             transition: all 0.2s ease; font-family: inherit; line-height: 1;
         }
-        .delete-btn:hover {
-            background: #fff; transform: scale(1.12);
-            box-shadow: 0 4px 12px rgba(255, 200, 0, 0.5);
-        }
+        .delete-btn:hover { background: #fff; transform: scale(1.12); box-shadow: 0 4px 12px rgba(255, 200, 0, 0.5); }
     </style>
 
 {% endblock %}
