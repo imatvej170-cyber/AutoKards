@@ -1389,7 +1389,7 @@ def car_image(car_id):
     if not row: return '', 404
     return Response(bytes(row[0]), mimetype=row[1])
 
-  @app.route('/car/<int:car_id>')
+@app.route('/car/<int:car_id>')
 def car_detail(car_id):
     car = get_car_full(car_id)
     if not car:
