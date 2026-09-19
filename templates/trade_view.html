@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Обмен #{{ trade.id }} — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">🔄 Обмен #{{ trade.id }}</h2>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="view-status">
+        Статус:
+        <span class="badge
+            {% if trade.status == 'pending' %}badge-pending
+            {% elif trade.status == 'completed' %}badge-completed
+            {% elif trade.status == 'rejected' %}badge-rejected
+            {% else %}badge-cancelled{% endif %}">
+            {% if trade.status == 'pending' %}⏳ Ожидает ответа
+            {% elif trade.status == 'completed' %}✓ Выполнен
+            {% elif trade.status == 'rejected' %}✕ Отклонён
+            {% else %}⊘ Отменён{% endif %}
+        </span>
+    </div>
+
+    <div class="trade-sides">
+        <div class="side from-side">
+            <div class="side-title">{{ trade.from_username }} отдаёт</div>
+            <div class="side-car">
+                <img src="/car_image/{{ trade.from_car[0] }}" alt="{{ trade.from_car[1] }}">
+                <div class="side-model">{{ trade.from_car[1] }}</div>
+                <div class="side-stars">
+                    {% for i in range(1, 9) %}
+                        <span class="star {% if i <= trade.from_car[2] %}filled{% endif %}">★</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="side-coins">💰 {{ trade.from_coins }} монет</div>
+        </div>
+
+        <div class="exchange-arrow">⇄</div>
+
+        <div class="side to-side">
+            <div class="side-title">
+                {% if trade.to_car %}
+                    {{ trade.to_username }} отдаёт
+                {% else %}
+                    {{ trade.to_username }} выберет
+                {% endif %}
+            </div>
+            {% if trade.to_car %}
+                <div class="side-car">
+                    <img src="/car_image/{{ trade.to_car[0] }}" alt="{{ trade.to_car[1] }}">
+                    <div class="side-model">{{ trade.to_car[1] }}</div>
+                    <div class="side-stars">
+                        {% for i in range(1, 9) %}
+                            <span class="star {% if i <= trade.to_car[2] %}filled{% endif %}">★</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="side-coins">💰 {{ trade.to_coins }} монет</div>
+            {% elif trade.status == 'pending' and trade.to_user_id == my_id %}
+                <div class="side-car side-car-empty">Пока не выбрано</div>
+            {% else %}
+                <div class="side-car side-car-empty">—</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if trade.message %}
+        <div class="message-box">
+            <div class="message-label">💬 Сообщение от {{ trade.from_username }}:</div>
+            <div class="message-text">{{ trade.message }}</div>
+        </div>
+    {% endif %}
+
+    {% if trade.status == 'pending' and trade.to_user_id == my_id %}
+        <div class="action-box">
+            <h3 class="action-title">Что ты отдашь взамен?</h3>
+            {% if my_cars %}
+                <form method="POST" action="/trades/{{ trade.id }}/accept">
+                    <label class="form-label">Выбери свою машину</label>
+                    <select name="to_car_id" class="form-select" required>
+                        <option value="">— Выбери машину —</option>
+                        {% for car in my_cars %}
+                            {% set car_id, model, rating, price = car %}
+                            <option value="{{ car_id }}">{{ model }} ({{ rating }}★)</option>
+                        {% endfor %}
+                    </select>
+
+                    <label class="form-label">Сколько своих монет отдаёшь</label>
+                    <div class="slider-wrap">
+                        <input type="range" name="to_coins" min="0" max="{{ balance }}"
+                               value="0" class="slider" id="coinsSlider"
+                               oninput="document.getElementById('coinsValue').textContent = this.value;">
+                        <div class="slider-value">💰 <span id="coinsValue">0</span> из {{ balance }}</div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button type="submit" class="btn btn-primary">✓ Принять и обменять</button>
+                    </div>
+                </form>
+                <form method="POST" action="/trades/{{ trade.id }}/reject" style="margin-top:12px;">
+                    <button type="submit" class="btn btn-secondary" style="width:100%;">✕ Отклонить</button>
+                </form>
+            {% else %}
+                <p class="description">У тебя нет машин, чтобы сделать встречное предложение.</p>
+                <form method="POST" action="/trades/{{ trade.id }}/reject">
+                    <button type="submit" class="btn btn-secondary">✕ Отклонить</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if trade.status == 'pending' and trade.from_user_id == my_id %}
+        <div class="action-box">
+            <p class="waiting-text">⏳ Ждём ответа от {{ trade.to_username }}…</p>
+            <form method="POST" action="/trades/{{ trade.id }}/cancel">
+                <button type="submit" class="btn btn-secondary">⊘ Отменить предложение</button>
+            </form>
+        </div>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/trades">← К обменам</a></p>
+
+    <style>
+        .page-title { font-size: 32px; color: #ff8c1a; margin-bottom: 15px; text-align: center; }
+        .view-status { text-align: center; margin-bottom: 25px; font-size: 15px; color: #6b3d00; }
+        .badge {
+            display: inline-block; padding: 6px 16px; border-radius: 20px;
+            font-weight: 700; font-size: 13px;
+        }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-completed { background: #d4edda; color: #155724; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+        .badge-cancelled { background: #e2e3e5; color: #383d41; }
+
+        .trade-sides {
+            display: flex; align-items: center; gap: 25px;
+            flex-wrap: wrap; justify-content: center; margin-bottom: 25px;
+        }
+        .side {
+            background: rgba(255, 255, 255, 0.9); border: 2px solid #ffd9a6;
+            border-radius: 18px; padding: 18px 22px; min-width: 240px;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.12);
+        }
+        .from-side { border-color: #ff8c1a; }
+        .side-title { font-size: 15px; font-weight: 700; color: #ff8c1a; text-align: center; }
+        .side-car { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .side-car img { width: 160px; height: 100px; object-fit: contain; }
+        .side-car-empty { color: #b08855; font-style: italic; font-size: 14px; padding: 40px 0; }
+        .side-model { font-size: 17px; font-weight: 900; color: #4a2c00; }
+        .side-stars { font-size: 16px; letter-spacing: 1px; color: #ffd9a6; }
+        .side-stars .star.filled { color: #ff8c1a; }
+        .side-coins { font-size: 16px; font-weight: 900; color: #ff8c1a; }
+        .exchange-arrow { font-size: 42px; color: #ff8c1a; }
+
+        .message-box {
+            background: #fff8ec; border: 2px dashed #ffd9a6;
+            padding: 14px 22px; border-radius: 14px;
+            max-width: 600px; margin: 0 auto 25px;
+        }
+        .message-label { font-size: 13px; color: #b08855; margin-bottom: 6px; font-weight: 700; }
+        .message-text { font-size: 16px; color: #4a2c00; font-style: italic; word-break: break-word; }
+
+        .action-box {
+            background: rgba(255, 255, 255, 0.9); border: 2px solid #ffd9a6;
+            border-radius: 18px; padding: 22px 28px; max-width: 480px;
+            margin: 0 auto; box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+        }
+        .action-title { font-size: 20px; color: #ff8c1a; margin-bottom: 15px; text-align: center; }
+        .form-label {
+            display: block; font-size: 14px; color: #6b3d00;
+            margin-bottom: 6px; margin-top: 12px; font-weight: 700; text-align: left;
+        }
+        .form-select {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 8px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-select:focus { outline: none; border-color: #ff8c1a; }
+        .slider-wrap { margin: 10px 0 15px; }
+        .slider {
+            width: 100%; height: 8px; border-radius: 5px;
+            background: #ffe0b3; outline: none;
+            -webkit-appearance: none; appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: #ff8c1a; cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 140, 26, 0.5);
+        }
+        .slider::-moz-range-thumb {
+            width: 24px; height: 24px; border-radius: 50%;
+            background: #ff8c1a; cursor: pointer; border: none;
+        }
+        .slider-value {
+            text-align: center; margin-top: 8px;
+            font-size: 16px; font-weight: 700; color: #6b3d00;
+        }
+        .slider-value span { color: #ff8c1a; font-size: 18px; }
+        .action-buttons { display: flex; gap: 10px; }
+        .waiting-text { text-align: center; font-size: 15px; color: #6b3d00; margin-bottom: 15px; }
+    </style>
+
+{% endblock %}
