@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Сравнение машин — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">⚖️ Сравнение машин</h2>
+
+    <form method="GET" action="/compare" class="compare-form">
+        <div class="select-group">
+            <label class="form-label">Машина №1</label>
+            <select name="c1" class="form-select" onchange="this.form.submit()">
+                <option value="">— Выбери —</option>
+                {% for c in all_cars %}
+                    <option value="{{ c[0] }}" {% if car1 and car1.id == c[0] %}selected{% endif %}>
+                        {{ c[1] }} ({{ c[2] }}★)
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="vs-block">VS</div>
+
+        <div class="select-group">
+            <label class="form-label">Машина №2</label>
+            <select name="c2" class="form-select" onchange="this.form.submit()">
+                <option value="">— Выбери —</option>
+                {% for c in all_cars %}
+                    <option value="{{ c[0] }}" {% if car2 and car2.id == c[0] %}selected{% endif %}>
+                        {{ c[1] }} ({{ c[2] }}★)
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    {% if car1 and car2 %}
+        <div class="compare-grid">
+            {# ---- Машина 1 ---- #}
+            <div class="compare-col">
+                <div class="compare-image">
+                    <img src="/car_image/{{ car1.id }}" alt="{{ car1.model }}">
+                </div>
+                <div class="compare-name">{{ car1.model }}</div>
+                <div class="compare-stars">
+                    {% for i in range(1, 9) %}
+                        <span class="star {% if i <= car1.rating %}filled{% endif %}">★</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# ---- VS ---- #}
+            <div class="vs-col">VS</div>
+
+            {# ---- Машина 2 ---- #}
+            <div class="compare-col">
+                <div class="compare-image">
+                    <img src="/car_image/{{ car2.id }}" alt="{{ car2.model }}">
+                </div>
+                <div class="compare-name">{{ car2.model }}</div>
+                <div class="compare-stars">
+                    {% for i in range(1, 9) %}
+                        <span class="star {% if i <= car2.rating %}filled{% endif %}">★</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {# ---- Таблица сравнения ---- #}
+        <div class="specs-compare">
+            {% set rows = [
+                ('⭐ Звёзды', car1.rating, car2.rating, ''),
+                ('💰 Цена', car1.price, car2.price, ' монет'),
+                ('🐎 Л.с.', car1.horsepower or 0, car2.horsepower or 0, ' л.с.'),
+                ('⏱️ Разгон', car1.acceleration or 999, car2.acceleration or 999, ' с'),
+                ('🚀 Макс. скорость', car1.top_speed or 0, car2.top_speed or 0, ' км/ч'),
+            ] %}
+
+            {% for label, v1, v2, unit in rows %}
+                <div class="spec-row">
+                    <div class="spec-val {% if (label.startswith('⭐') and v1 > v2) or (label.startswith('💰') and v1 < v2) or (label.startswith('🐎') and v1 > v2) or (label.startswith('⏱️') and v1 < v2) or (label.startswith('🚀') and v1 > v2) %}winner{% endif %}">
+                        {{ v1 }}{{ unit }}
+                        {% if (label.startswith('⭐') and v1 > v2) or (label.startswith('💰') and v1 < v2) or (label.startswith('🐎') and v1 > v2) or (label.startswith('⏱️') and v1 < v2) or (label.startswith('🚀') and v1 > v2) %}
+                            🏆
+                        {% endif %}
+                    </div>
+                    <div class="spec-label">{{ label }}</div>
+                    <div class="spec-val {% if (label.startswith('⭐') and v2 > v1) or (label.startswith('💰') and v2 < v1) or (label.startswith('🐎') and v2 > v1) or (label.startswith('⏱️') and v2 < v1) or (label.startswith('🚀') and v2 > v1) %}winner{% endif %}">
+                        {{ v2 }}{{ unit }}
+                        {% if (label.startswith('⭐') and v2 > v1) or (label.startswith('💰') and v2 < v1) or (label.startswith('🐎') and v2 > v1) or (label.startswith('⏱️') and v2 < v1) or (label.startswith('🚀') and v2 > v1) %}
+                            🏆
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% elif car1 or car2 %}
+        <p class="description">Выбери вторую машину для сравнения.</p>
+    {% else %}
+        <p class="description">Выбери две машины выше, чтобы увидеть их характеристики бок о бок.</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .page-title { font-size: 32px; color: #ff8c1a; margin-bottom: 25px; text-align: center; }
+        .compare-form {
+            display: flex; gap: 20px; align-items: center; justify-content: center;
+            flex-wrap: wrap; margin-bottom: 30px;
+        }
+        .select-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label {
+            font-size: 13px; font-weight: 700; color: #6b3d00;
+            text-align: left; letter-spacing: 0.5px;
+        }
+        .form-select {
+            padding: 12px 18px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            background: #fff; color: #4a2c00;
+            font-family: inherit; min-width: 260px;
+        }
+        .form-select:focus { outline: none; border-color: #ff8c1a; }
+        .vs-block { font-size: 24px; font-weight: 900; color: #ff8c1a; }
+
+        .compare-grid {
+            display: flex; gap: 30px; align-items: center;
+            flex-wrap: wrap; justify-content: center; margin-bottom: 30px;
+        }
+        .compare-col {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 20px;
+            padding: 20px; min-width: 240px; max-width: 300px;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+        }
+        .compare-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            border-radius: 14px; padding: 12px;
+            width: 100%; height: 140px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .compare-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .compare-name { font-size: 18px; font-weight: 900; color: #4a2c00; text-align: center; }
+        .compare-stars { font-size: 18px; letter-spacing: 1px; color: #ffd9a6; }
+        .compare-stars .star.filled { color: #ff8c1a; }
+        .vs-col { font-size: 32px; font-weight: 900; color: #ff8c1a; }
+
+        .specs-compare {
+            width: 100%; max-width: 700px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 20px;
+            padding: 10px; margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+        }
+        .spec-row {
+            display: grid; grid-template-columns: 1fr auto 1fr;
+            align-items: center; gap: 15px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #ffe0b3;
+        }
+        .spec-row:last-child { border-bottom: none; }
+        .spec-label {
+            font-size: 14px; font-weight: 700; color: #6b3d00;
+            text-align: center; white-space: nowrap;
+            background: #fff8ec; padding: 6px 14px; border-radius: 20px;
+        }
+        .spec-val {
+            font-size: 17px; font-weight: 900; color: #6b3d00;
+            text-align: center;
+            padding: 8px 12px; border-radius: 10px;
+        }
+        .spec-val.winner {
+            color: #2e7d32;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border: 1px solid #4caf50;
+        }
+    </style>
+
+{% endblock %}
