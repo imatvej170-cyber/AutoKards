@@ -14,8 +14,14 @@
         {% if my_cars %}
             <form method="POST" action="/trades/new">
                 <label class="form-label">Ник игрока, которому предлагаешь</label>
-                <input type="text" name="to_username" placeholder="Например: imatvej"
-                       maxlength="20" required autofocus class="form-input">
+                <input type="text" name="to_username" placeholder="Например: AppleAT"
+                    maxlength="20" required autofocus class="form-input"
+                    value="{{ to_prefill or '' }}" list="friends-list">
+                <datalist id="friends-list">
+                    {% for f in friends %}
+                    <option value="{{ f.username }}"></option>
+                    {% endfor %}
+                </datalist>
 
                 <label class="form-label">Какую свою машину отдаёшь</label>
                 <select name="from_car_id" class="form-select" required>
