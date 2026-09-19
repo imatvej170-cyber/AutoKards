@@ -122,6 +122,20 @@ def init_db():
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, key TEXT NOT NULL,
         unlocked_at TEXT NOT NULL, UNIQUE(user_id, key)
     )''')
+  
+      c.execute('''CREATE TABLE IF NOT EXISTS trades (
+        id SERIAL PRIMARY KEY,
+        from_user_id INTEGER NOT NULL,
+        to_user_id INTEGER NOT NULL,
+        from_car_id INTEGER NOT NULL,
+        from_coins INTEGER NOT NULL DEFAULT 0,
+        to_car_id INTEGER,
+        to_coins INTEGER NOT NULL DEFAULT 0,
+        message TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        resolved_at TEXT
+    )''')
 
     c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
     c.execute('UPDATE cars SET price = 500 WHERE price IS NULL')
@@ -783,6 +797,7 @@ def index():
     bonus_ready = False; bonus_left = ''
     spin_ready = False; spin_left = ''
     achievements_count = 0
+    incoming_trades_count = 0
     if 'user_id' in session:
         flash_new_achievements(session['user_id'])
         profile = get_user_profile(session['user_id'])
@@ -794,6 +809,7 @@ def index():
         spin_ready, secs2 = can_spin(session['user_id'])
         if not spin_ready: spin_left = format_time_left(secs2)
         achievements_count = len(get_unlocked_keys(session['user_id']))
+        incoming_trades_count = count_incoming_trades(session['user_id'])
     return render_template('index.html',
                            user=session.get('username'), profile=profile,
                            favorite_car=favorite_car, cars_count=cars_count,
@@ -801,6 +817,7 @@ def index():
                            spin_ready=spin_ready, spin_left=spin_left,
                            achievements_count=achievements_count,
                            total_achievements=len(ACHIEVEMENTS),
+                           incoming_trades_count=incoming_trades_count,
                            is_admin=is_admin(session.get('username')))
 
 
