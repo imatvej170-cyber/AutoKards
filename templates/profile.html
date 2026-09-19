@@ -55,11 +55,14 @@
                 {% for car in public_cars %}
                     {% set car_id, model, rating, price = car %}
                     <div class="car-card">
-                        <div class="car-image">
-                            <img src="/car_image/{{ car_id }}" alt="{{ model }}">
-                        </div>
+                        <a href="/car/{{ car_id }}" class="car-image-link">
+                            <div class="car-image">
+                                <img src="/car_image/{{ car_id }}" alt="{{ model }}">
+                            </div>
+                        </a>
+                        <div class="car-model"><a href="/car/{{ car_id }}">{{ model }}</a></div>
                         <div class="car-info">
-                            <div class="car-model">{{ model }}</div>
+                            <div class="car-model"><a href="/car/{{ car.id }}">{{ car.model }}</a></div>
                             <div class="car-stars">
                                 {% for i in range(1, 9) %}
                                     <span class="star {% if i <= rating %}filled{% endif %}">★</span>
@@ -151,6 +154,10 @@
         .car-model { font-size: 18px; font-weight: 700; color: #4a2c00; margin-bottom: 8px; }
         .car-stars { font-size: 20px; letter-spacing: 2px; color: #ffd9a6; }
         .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 6px rgba(255, 140, 26, 0.5); }
+
+        .car-image-link { text-decoration: none; display: block; }
+        .car-model a { color: inherit; text-decoration: none; transition: color 0.2s; }
+        .car-model a:hover { color: #ff8c1a; }
     </style>
 
 {% endblock %}
