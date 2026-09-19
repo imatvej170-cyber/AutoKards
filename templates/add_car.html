@@ -4,19 +4,16 @@
 
     <h1 class="logo"><a href="/">AutoKards</a></h1>
 
-    <div class="form-box">
+    <div class="form-box" style="max-width: 520px;">
         <h2>Новая машина</h2>
 
         {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for msg in messages %}
-                    <div class="flash">{{ msg }}</div>
-                {% endfor %}
-            {% endif %}
+            {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
         {% endwith %}
 
         <form method="POST" action="/shop/add" enctype="multipart/form-data">
-            <input type="text" name="model" placeholder="Название модели" maxlength="60" required autofocus>
+            <label class="form-label">Название модели</label>
+            <input type="text" name="model" placeholder="Например: Toyota Supra" maxlength="60" required autofocus class="form-input">
 
             <label class="form-label">Оценка в звёздах (1–8)</label>
             <select name="rating" class="form-select" required>
@@ -33,6 +30,15 @@
             <label class="form-label">Цена в монетах</label>
             <input type="number" name="price" min="0" step="10" value="500" required class="form-input">
 
+            <label class="form-label">🐎 Лошадиные силы</label>
+            <input type="number" name="horsepower" min="0" placeholder="Например: 450" class="form-input">
+
+            <label class="form-label">⏱️ Разгон 0–100 км/ч (в секундах)</label>
+            <input type="number" name="acceleration" min="0" step="0.1" placeholder="Например: 3.5" class="form-input">
+
+            <label class="form-label">🚀 Макс. скорость (км/ч)</label>
+            <input type="number" name="top_speed" min="0" placeholder="Например: 320" class="form-input">
+
             <label class="form-label">Картинка (PNG с прозрачным фоном)</label>
             <input type="file" name="image" accept=".png,.jpg,.jpeg,.webp,.gif" required class="form-file">
 
@@ -45,11 +51,11 @@
     <style>
         .form-label {
             display: block; text-align: left; font-size: 14px; color: #6b3d00;
-            margin-bottom: 6px; margin-top: 8px; font-weight: 600;
+            margin-bottom: 6px; margin-top: 10px; font-weight: 600;
         }
         .form-select, .form-file, .form-input {
             width: 100%; padding: 12px 16px; font-size: 16px;
-            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 15px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 6px;
             font-family: inherit; background: #fff; color: #4a2c00;
         }
         .form-select:focus, .form-file:focus, .form-input:focus {
