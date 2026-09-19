@@ -49,6 +49,10 @@
                 {% if owned %}
                     <span class="owned-badge">✓ В твоём гараже</span>
                 {% endif %}
+                <a href="/compare?c1={{ car.id }}" class="btn btn-primary">⚖️ Сравнить</a>
+                <a href="javascript:history.back()" class="btn btn-secondary">← Назад</a>
+            </div>
+                {% endif %}
                 <a href="javascript:history.back()" class="btn btn-secondary">← Назад</a>
             </div>
         </div>
