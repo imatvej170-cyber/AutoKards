@@ -30,7 +30,7 @@ RACE_TIMEOUT_MIN = 15
 RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8: 1600}
 
 # ============ АДМИНЫ ============
-ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
+ADMIN_USERNAMES = {'AppleAT'}  # ← замени на свой ник
 
 # ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ ============
 DEFAULT_SETTINGS = {
@@ -239,6 +239,13 @@ def get_user_avatar(user_id):
     c.execute('SELECT avatar_data, avatar_mime FROM users WHERE id = %s', (user_id,))
     row = c.fetchone(); c.close(); conn.close()
     return row
+
+
+def count_users():
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM users')
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
 
 
 # ---------- БАЛАНС ----------
@@ -996,6 +1003,42 @@ def count_active_challenges():
     return r[0] if r else 0
 
 
+# ---------- РЕЙТИНГ ----------
+def get_leaderboard(sort_by='cars', limit=50):
+    conn = get_db(); c = conn.cursor()
+    if sort_by == 'balance':
+        c.execute('''SELECT u.id, u.username, COALESCE(u.balance, 0) as val,
+                     (u.avatar_data IS NOT NULL)
+                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+    elif sort_by == 'races':
+        c.execute('''SELECT u.id, u.username,
+                     (SELECT COUNT(*) FROM transactions t
+                      WHERE t.user_id = u.id AND t.type = 'race_win') as val,
+                     (u.avatar_data IS NOT NULL)
+                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+    elif sort_by == 'achievements':
+        c.execute('''SELECT u.id, u.username,
+                     (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) as val,
+                     (u.avatar_data IS NOT NULL)
+                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+    else:
+        c.execute('''SELECT u.id, u.username,
+                     (SELECT COUNT(*) FROM user_cars uc WHERE uc.user_id = u.id) as val,
+                     (u.avatar_data IS NOT NULL)
+                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+    rows = c.fetchall(); c.close(); conn.close()
+    result = []
+    for i, row in enumerate(rows, start=1):
+        result.append({
+            'rank': i,
+            'id': row[0],
+            'username': row[1],
+            'value': row[2] or 0,
+            'has_avatar': row[3],
+        })
+    return result
+
+
 # ---------- ПУБЛИЧНЫЙ ГАРАЖ ----------
 def get_public_ids(user_id):
     conn = get_db(); c = conn.cursor()
@@ -1223,9 +1266,16 @@ def shop():
         discount = get_active_discount()
         balance = get_balance(session['user_id'])
         settings = {k: get_setting(k) for k in DEFAULT_SETTINGS}
+        sort = request.args.get('sort', 'new')
+
+        conn = get_db(); c = conn.cursor()
+        c.execute('SELECT id, model, rating, price, horsepower FROM cars ORDER BY id DESC')
+        rows = c.fetchall()
+        c.close(); conn.close()
+
         cars = []
-        for car in get_catalog():
-            cid, model, rating, price = car
+        for row in rows:
+            cid, model, rating, price, hp = row
             price = price or 0
             final_price = price
             has_disc = False
@@ -1234,9 +1284,22 @@ def shop():
                 has_disc = True
             cars.append({'id': cid, 'model': model, 'rating': rating, 'price': price,
                          'final_price': final_price, 'has_discount': has_disc,
+                         'horsepower': hp or 0,
                          'owned': has_car(session['user_id'], cid)})
+
+        if sort == 'price_asc':
+            cars.sort(key=lambda x: x['final_price'])
+        elif sort == 'price_desc':
+            cars.sort(key=lambda x: x['final_price'], reverse=True)
+        elif sort == 'rating_desc':
+            cars.sort(key=lambda x: x['rating'], reverse=True)
+        elif sort == 'rating_asc':
+            cars.sort(key=lambda x: x['rating'])
+        elif sort == 'hp_desc':
+            cars.sort(key=lambda x: x['horsepower'], reverse=True)
+
         return render_template('shop.html', cars=cars, balance=balance, discount=discount,
-                               settings=settings,
+                               settings=settings, sort=sort,
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
@@ -1585,6 +1648,31 @@ def race_result(challenge_id):
     winner_id = r['winner_id']
     won = (winner_id == session['user_id']) if winner_id else None
     return render_template('race_result.html', race=r, won=won,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+# ---------- РЕЙТИНГ ----------
+@app.route('/rating')
+def rating_page():
+    sort = request.args.get('sort', 'cars')
+    if sort not in ('cars', 'balance', 'races', 'achievements'):
+        sort = 'cars'
+    leaders = get_leaderboard(sort_by=sort, limit=50)
+    total_users = count_users()
+    my_rank = None
+    my_value = 0
+    if 'user_id' in session:
+        full_list = get_leaderboard(sort_by=sort, limit=1000)
+        for entry in full_list:
+            if entry['id'] == session['user_id']:
+                my_rank = entry['rank']
+                my_value = entry['value']
+                break
+    return render_template('rating.html', leaders=leaders, sort=sort,
+                           total_users=total_users,
+                           my_rank=my_rank, my_value=my_value,
+                           my_id=session.get('user_id'),
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
