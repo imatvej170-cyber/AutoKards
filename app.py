@@ -34,31 +34,21 @@ RACE_TIMEOUT_MIN = 15
 RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8: 1600}
 
 # ============ АДМИНЫ ============
-ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
+ADMIN_USERNAMES = {'AppleAT'}
 
 # ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ ============
 DEFAULT_SETTINGS = {
-    'discount_enabled': '1',
-    'discount_min_rating': '1',
-    'discount_max_rating': '3',
+    'discount_enabled': '1', 'discount_min_rating': '1', 'discount_max_rating': '3',
     'discount_percent': '50',
-    'wheel_enabled': '1',
-    'wheel_coin_min': '30',
-    'wheel_coin_max': '150',
-    'wheel_car_chance': '5',
-    'wheel_car_min_rating': '1',
-    'wheel_car_max_rating': '4',
+    'wheel_enabled': '1', 'wheel_coin_min': '30', 'wheel_coin_max': '150',
+    'wheel_car_chance': '5', 'wheel_car_min_rating': '1', 'wheel_car_max_rating': '4',
     'wheel_cooldown_hours': '24',
-    'paid_wheel_enabled': '1',
-    'paid_wheel_price': '1000',
-    'paid_wheel_coin_min': '100',
-    'paid_wheel_coin_max': '600',
-    'paid_wheel_car_chance': '15',
-    'paid_wheel_car_min_rating': '5',
-    'paid_wheel_car_max_rating': '8',
+    'paid_wheel_enabled': '1', 'paid_wheel_price': '1000',
+    'paid_wheel_coin_min': '100', 'paid_wheel_coin_max': '600',
+    'paid_wheel_car_chance': '15', 'paid_wheel_car_min_rating': '5', 'paid_wheel_car_max_rating': '8',
 }
 
-# ============ ДОСТИЖЕНИЯ (с наградами) ============
+# ============ ДОСТИЖЕНИЯ ============
 ACHIEVEMENTS = [
     {'key': 'first_car',   'icon': '🚗', 'title': 'Первая ласточка',  'desc': 'Получить первую машину в гараж', 'reward': 100},
     {'key': 'cars_5',      'icon': '🏎️', 'title': 'Коллекционер',     'desc': 'Собрать 5 машин',                'reward': 250},
@@ -78,6 +68,8 @@ ACHIEVEMENTS = [
     {'key': 'eight_star',  'icon': '🌟', 'title': 'Легенда',          'desc': 'Владеть машиной с 8★',           'reward': 2000},
     {'key': 'premium',     'icon': '💎', 'title': 'VIP',              'desc': 'Крутить премиум-колесо',         'reward': 200},
     {'key': 'big_spender', 'icon': '🤑', 'title': 'Транжира',         'desc': 'Купить 10 машин',               'reward': 500},
+    {'key': 'first_friend','icon': '🤝', 'title': 'Не один',          'desc': 'Добавить первого друга',         'reward': 150},
+    {'key': 'friends_5',   'icon': '👥', 'title': 'Компания',         'desc': 'Собрать 5 друзей',               'reward': 500},
 ]
 
 
@@ -160,6 +152,14 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS wishlist (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
         created_at TEXT NOT NULL, UNIQUE(user_id, car_id)
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS friendships (
+        id SERIAL PRIMARY KEY,
+        from_user_id INTEGER NOT NULL,
+        to_user_id INTEGER NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        resolved_at TEXT
     )''')
 
     c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
@@ -300,6 +300,169 @@ def count_tx_like(user_id, pattern):
     return r[0] if r else 0
 
 
+# ---------- ДРУЗЬЯ ----------
+def get_friend_status(user_a, user_b):
+    """None / 'pending_out' / 'pending_in' / 'accepted' / 'self'"""
+    if user_a == user_b:
+        return 'self'
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT from_user_id, status FROM friendships
+                 WHERE (from_user_id = %s AND to_user_id = %s)
+                    OR (from_user_id = %s AND to_user_id = %s)''',
+              (user_a, user_b, user_b, user_a))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row:
+        return None
+    from_id, status = row
+    if status == 'accepted':
+        return 'accepted'
+    if status == 'pending':
+        return 'pending_out' if from_id == user_a else 'pending_in'
+    return None
+
+
+def send_friend_request(from_id, to_username):
+    to_user = get_user(to_username)
+    if not to_user:
+        return False, 'Игрок с таким ником не найден'
+    to_id = to_user[0]
+    if to_id == from_id:
+        return False, 'Нельзя добавить себя в друзья'
+    status = get_friend_status(from_id, to_id)
+    if status == 'accepted':
+        return False, 'Вы уже друзья'
+    if status == 'pending_out':
+        return False, 'Заявка уже отправлена'
+    if status == 'pending_in':
+        return False, 'Этот игрок уже отправил тебе заявку — прими её в списке друзей'
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO friendships (from_user_id, to_user_id, status, created_at)
+                 VALUES (%s, %s, 'pending', %s)''',
+              (from_id, to_id, datetime.now().isoformat()))
+    conn.commit(); c.close(); conn.close()
+    return True, f'Заявка отправлена игроку {to_username}'
+
+
+def accept_friend_request(request_id, user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT to_user_id, status FROM friendships WHERE id = %s', (request_id,))
+    row = c.fetchone()
+    if not row: c.close(); conn.close(); return False, 'Заявка не найдена'
+    if row[0] != user_id: c.close(); conn.close(); return False, 'Это не твоя заявка'
+    if row[1] != 'pending': c.close(); conn.close(); return False, 'Заявка уже обработана'
+    c.execute("UPDATE friendships SET status = 'accepted', resolved_at = %s WHERE id = %s",
+              (datetime.now().isoformat(), request_id))
+    conn.commit(); c.close(); conn.close()
+    return True, 'Теперь вы друзья!'
+
+
+def reject_friend_request(request_id, user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT to_user_id, status FROM friendships WHERE id = %s', (request_id,))
+    row = c.fetchone()
+    if not row: c.close(); conn.close(); return False, 'Заявка не найдена'
+    if row[0] != user_id: c.close(); conn.close(); return False, 'Это не твоя заявка'
+    if row[1] != 'pending': c.close(); conn.close(); return False, 'Заявка уже обработана'
+    c.execute('DELETE FROM friendships WHERE id = %s', (request_id,))
+    conn.commit(); c.close(); conn.close()
+    return True, 'Заявка отклонена'
+
+
+def cancel_friend_request(request_id, user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT from_user_id, status FROM friendships WHERE id = %s', (request_id,))
+    row = c.fetchone()
+    if not row: c.close(); conn.close(); return False, 'Заявка не найдена'
+    if row[0] != user_id: c.close(); conn.close(); return False, 'Это не твоя заявка'
+    if row[1] != 'pending': c.close(); conn.close(); return False, 'Заявка уже обработана'
+    c.execute('DELETE FROM friendships WHERE id = %s', (request_id,))
+    conn.commit(); c.close(); conn.close()
+    return True, 'Заявка отменена'
+
+
+def remove_friend(user_id, friend_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''DELETE FROM friendships
+                 WHERE status = 'accepted'
+                   AND ((from_user_id = %s AND to_user_id = %s)
+                     OR (from_user_id = %s AND to_user_id = %s))''',
+              (user_id, friend_id, friend_id, user_id))
+    conn.commit(); c.close(); conn.close()
+    return True, 'Удалено из друзей'
+
+
+def get_friends(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT u.id, u.username, (u.avatar_data IS NOT NULL),
+                        COALESCE(u.balance, 0), COALESCE(u.bio, '')
+                 FROM friendships f
+                 JOIN users u ON (u.id = f.from_user_id AND f.to_user_id = %s)
+                              OR (u.id = f.to_user_id AND f.from_user_id = %s)
+                 WHERE f.status = 'accepted' AND u.id != %s
+                 ORDER BY u.username''',
+              (user_id, user_id, user_id))
+    rows = c.fetchall(); c.close(); conn.close()
+    result = []
+    for r in rows:
+        result.append({
+            'id': r[0], 'username': r[1], 'has_avatar': r[2],
+            'balance': r[3], 'bio': r[4],
+            'cars_count': count_user_cars(r[0]),
+        })
+    return result
+
+
+def get_incoming_requests(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT f.id, u.id, u.username, (u.avatar_data IS NOT NULL), f.created_at
+                 FROM friendships f
+                 JOIN users u ON u.id = f.from_user_id
+                 WHERE f.to_user_id = %s AND f.status = 'pending'
+                 ORDER BY f.id DESC''', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'user_id': r[1], 'username': r[2],
+             'has_avatar': r[3], 'created_at': r[4]} for r in rows]
+
+
+def get_outgoing_requests(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT f.id, u.id, u.username, (u.avatar_data IS NOT NULL), f.created_at
+                 FROM friendships f
+                 JOIN users u ON u.id = f.to_user_id
+                 WHERE f.from_user_id = %s AND f.status = 'pending'
+                 ORDER BY f.id DESC''', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'user_id': r[1], 'username': r[2],
+             'has_avatar': r[3], 'created_at': r[4]} for r in rows]
+
+
+def count_incoming_requests(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM friendships WHERE to_user_id = %s AND status = 'pending'",
+              (user_id,))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def count_friends(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COUNT(*) FROM friendships
+                 WHERE status = 'accepted'
+                   AND (from_user_id = %s OR to_user_id = %s)''', (user_id, user_id))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def search_users(query, exclude_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, username, (avatar_data IS NOT NULL)
+                 FROM users WHERE username ILIKE %s AND id != %s
+                 ORDER BY username LIMIT 20''',
+              (query + '%', exclude_id))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'username': r[1], 'has_avatar': r[2]} for r in rows]
+
+
 # ---------- ДОСТИЖЕНИЯ ----------
 def get_unlocked_keys(user_id):
     conn = get_db(); c = conn.cursor()
@@ -309,7 +472,6 @@ def get_unlocked_keys(user_id):
 
 
 def unlock_achievement(user_id, key):
-    """Возвращает True, если достижение было новым (и начисляет награду)."""
     conn = get_db(); c = conn.cursor()
     c.execute('INSERT INTO user_achievements (user_id, key, unlocked_at) VALUES (%s, %s, %s) '
               'ON CONFLICT (user_id, key) DO NOTHING RETURNING id',
@@ -318,7 +480,6 @@ def unlock_achievement(user_id, key):
     conn.commit(); c.close(); conn.close()
     if not row:
         return False, 0
-    # Начисляем награду
     ach = next((a for a in ACHIEVEMENTS if a['key'] == key), None)
     reward = ach['reward'] if ach else 0
     if reward > 0:
@@ -339,6 +500,7 @@ def check_achievements(user_id):
     wheel_cars = count_tx(user_id, 'wheel_car') + count_tx(user_id, 'paid_wheel_car')
     buys = count_tx(user_id, 'buy')
     max_rating = get_max_car_rating(user_id)
+    friends = count_friends(user_id)
 
     checks = {
         'first_car':   cars_count >= 1,
@@ -359,6 +521,8 @@ def check_achievements(user_id):
         'eight_star':  max_rating >= 8,
         'premium':     paid_spins >= 1,
         'big_spender': buys >= 10,
+        'first_friend': friends >= 1,
+        'friends_5':   friends >= 5,
     }
     for key, cond in checks.items():
         if key not in already and cond:
@@ -409,7 +573,6 @@ def can_claim_bonus(user_id):
 
 
 def get_bonus_preview(user_id):
-    """Возвращает (streak_после_получения, размер_бонуса)."""
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT last_bonus_at, login_streak FROM users WHERE id = %s', (user_id,))
     row = c.fetchone(); c.close(); conn.close()
@@ -429,7 +592,6 @@ def get_bonus_preview(user_id):
 
 
 def claim_bonus(user_id):
-    """Возвращает (bonus_amount, streak)."""
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT last_bonus_at, login_streak FROM users WHERE id = %s', (user_id,))
     row = c.fetchone()
@@ -594,7 +756,7 @@ def sell_car(user_id, car_id):
     return True, f'«{car[1]}» продана за {refund} монет', refund
 
 
-# ---------- ИЗБРАННОЕ ----------
+# ---------- ИЗБРАННОЕ / ВИШЛИСТ ----------
 def toggle_favorite(user_id, car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT 1 FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
@@ -617,7 +779,6 @@ def get_favorite_ids(user_id):
     return {r[0] for r in rows}
 
 
-# ---------- ВИШЛИСТ ----------
 def toggle_wishlist(user_id, car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT 1 FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
@@ -1220,6 +1381,8 @@ def index():
     incoming_trades_count = 0
     active_races_count = 0
     wishlist_count = 0
+    friends_count = 0
+    incoming_friend_requests = 0
     streak = 0; next_bonus = 0
     if 'user_id' in session:
         flash_new_achievements(session['user_id'])
@@ -1236,6 +1399,8 @@ def index():
         incoming_trades_count = count_incoming_trades(session['user_id'])
         active_races_count = count_active_challenges()
         wishlist_count = len(get_wishlist_ids(session['user_id']))
+        friends_count = count_friends(session['user_id'])
+        incoming_friend_requests = count_incoming_requests(session['user_id'])
     return render_template('index.html',
                            user=session.get('username'), profile=profile,
                            favorite_car=favorite_car, cars_count=cars_count,
@@ -1246,6 +1411,8 @@ def index():
                            incoming_trades_count=incoming_trades_count,
                            active_races_count=active_races_count,
                            wishlist_count=wishlist_count,
+                           friends_count=friends_count,
+                           incoming_friend_requests=incoming_friend_requests,
                            streak=streak, next_bonus=next_bonus,
                            is_admin=is_admin(session.get('username')))
 
@@ -1346,17 +1513,95 @@ def profile_page(username):
     import traceback
     try:
         user_row = get_user(username)
-        if not user_row: flash('Игрока нет'); return redirect(url_for('index'))
+        if not user_row:
+            flash('Игрока нет'); return redirect(url_for('index'))
         profile = get_user_profile(user_row[0])
         favorite_car = get_car_info(profile['favorite_car_id']) if profile['favorite_car_id'] else None
+        # Статус дружбы
+        fstatus = None
+        if 'user_id' in session and session['user_id'] != user_row[0]:
+            fstatus = get_friend_status(session['user_id'], user_row[0])
+        # Найти id заявки, если это входящая
+        incoming_req_id = None
+        if fstatus == 'pending_in':
+            incoming = get_incoming_requests(session['user_id'])
+            for r in incoming:
+                if r['user_id'] == user_row[0]:
+                    incoming_req_id = r['id']; break
         return render_template('profile.html', profile=profile, favorite_car=favorite_car,
                                public_cars=get_public_cars(user_row[0]),
                                cars_count=count_user_cars(user_row[0]),
+                               friends_count=count_friends(user_row[0]),
                                achievements=get_achievements_for_user(user_row[0]),
+                               friend_status=fstatus, incoming_req_id=incoming_req_id,
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
         return '<h2 style="color:red;">Ошибка в /profile:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
+
+
+# ---------- ДРУЗЬЯ ----------
+@app.route('/friends')
+@login_required
+def friends_page():
+    user_id = session['user_id']
+    friends = get_friends(user_id)
+    incoming = get_incoming_requests(user_id)
+    outgoing = get_outgoing_requests(user_id)
+    search_query = request.args.get('q', '').strip()
+    search_results = []
+    if search_query:
+        search_results = search_users(search_query, user_id)
+        for r in search_results:
+            r['status'] = get_friend_status(user_id, r['id'])
+    return render_template('friends.html',
+                           friends=friends, incoming=incoming, outgoing=outgoing,
+                           search_query=search_query, search_results=search_results,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/friends/request', methods=['POST'])
+@login_required
+def friends_request():
+    username = request.form.get('username', '').strip()
+    if not username:
+        flash('Впиши ник игрока'); return redirect(url_for('friends_page'))
+    ok, msg = send_friend_request(session['user_id'], username)
+    flash(msg)
+    return redirect(request.referrer or url_for('friends_page'))
+
+
+@app.route('/friends/accept/<int:req_id>', methods=['POST'])
+@login_required
+def friends_accept(req_id):
+    ok, msg = accept_friend_request(req_id, session['user_id'])
+    flash(msg)
+    return redirect(url_for('friends_page'))
+
+
+@app.route('/friends/reject/<int:req_id>', methods=['POST'])
+@login_required
+def friends_reject(req_id):
+    ok, msg = reject_friend_request(req_id, session['user_id'])
+    flash(msg)
+    return redirect(url_for('friends_page'))
+
+
+@app.route('/friends/cancel/<int:req_id>', methods=['POST'])
+@login_required
+def friends_cancel(req_id):
+    ok, msg = cancel_friend_request(req_id, session['user_id'])
+    flash(msg)
+    return redirect(url_for('friends_page'))
+
+
+@app.route('/friends/remove/<int:friend_id>', methods=['POST'])
+@login_required
+def friends_remove(friend_id):
+    ok, msg = remove_friend(session['user_id'], friend_id)
+    flash(msg)
+    return redirect(url_for('friends_page'))
 
 
 # ---------- ГАРАЖ ----------
@@ -1697,8 +1942,12 @@ def trade_new():
             flash('Предложение отправлено!')
             return redirect(url_for('trades_page'))
         flash(result); return redirect(url_for('trade_new'))
+    # Если пришли из профиля друга с ?to=username — предзаполним
+    to_prefill = request.args.get('to', '')
+    friends = get_friends(session['user_id'])
     return render_template('trade_new.html', my_cars=get_user_cars(session['user_id']),
                            balance=get_balance(session['user_id']),
+                           to_prefill=to_prefill, friends=friends,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
