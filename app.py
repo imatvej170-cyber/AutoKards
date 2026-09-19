@@ -24,7 +24,7 @@ DAILY_BONUS = 100
 SELL_RATE = 0.7
 BONUS_COOLDOWN = 86400
 
-ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
+ADMIN_USERNAMES = {'AppleAT'}
 
 DEFAULT_SETTINGS = {
     'discount_enabled': '1',
@@ -310,6 +310,178 @@ def get_max_car_rating(user_id):
                  JOIN user_cars uc ON uc.car_id = c.id WHERE uc.user_id = %s''', (user_id,))
     r = c.fetchone(); c.close(); conn.close()
     return r[0] if r and r[0] else 0
+
+# ---------- ОБМЕНЫ ----------
+def get_username_by_id(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT username FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    return row[0] if row else '???'
+
+
+def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
+    to_user = get_user(to_username)
+    if not to_user:
+        return False, 'Игрок с таким ником не найден'
+    to_user_id = to_user[0]
+    if to_user_id == from_user_id:
+        return False, 'Нельзя предложить обмен самому себе'
+    if not has_car(from_user_id, from_car_id):
+        return False, 'У тебя нет этой машины'
+    if from_coins < 0:
+        return False, 'Монеты не могут быть отрицательными'
+    if get_balance(from_user_id) < from_coins:
+        return False, f'Не хватает монет. У тебя {get_balance(from_user_id)}'
+    message = (message or '')[:200]
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO trades
+                 (from_user_id, to_user_id, from_car_id, from_coins, message, status, created_at)
+                 VALUES (%s, %s, %s, %s, %s, 'pending', %s) RETURNING id''',
+              (from_user_id, to_user_id, from_car_id, from_coins, message,
+               datetime.now().isoformat()))
+    trade_id = c.fetchone()[0]
+    conn.commit(); c.close(); conn.close()
+    return True, trade_id
+
+
+def get_trade(trade_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, from_user_id, to_user_id, from_car_id, from_coins,
+                        to_car_id, to_coins, message, status, created_at, resolved_at
+                 FROM trades WHERE id = %s''', (trade_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row: return None
+    return {'id': row[0], 'from_user_id': row[1], 'to_user_id': row[2],
+            'from_car_id': row[3], 'from_coins': row[4] or 0,
+            'to_car_id': row[5], 'to_coins': row[6] or 0,
+            'message': row[7], 'status': row[8],
+            'created_at': row[9], 'resolved_at': row[10]}
+
+
+def get_trade_full(trade_id):
+    t = get_trade(trade_id)
+    if not t: return None
+    t['from_username'] = get_username_by_id(t['from_user_id'])
+    t['to_username'] = get_username_by_id(t['to_user_id'])
+    t['from_car'] = get_car_info(t['from_car_id'])
+    t['to_car'] = get_car_info(t['to_car_id']) if t['to_car_id'] else None
+    return t
+
+
+def get_incoming_trades(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id FROM trades WHERE to_user_id = %s AND status = 'pending'
+                 ORDER BY id DESC''', (user_id,))
+    ids = [r[0] for r in c.fetchall()]; c.close(); conn.close()
+    return [get_trade_full(i) for i in ids]
+
+
+def get_outgoing_trades(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id FROM trades WHERE from_user_id = %s
+                 ORDER BY id DESC LIMIT 50''', (user_id,))
+    ids = [r[0] for r in c.fetchall()]; c.close(); conn.close()
+    return [get_trade_full(i) for i in ids]
+
+
+def get_trade_history(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id FROM trades
+                 WHERE (from_user_id = %s OR to_user_id = %s)
+                   AND status IN ('completed', 'rejected', 'cancelled')
+                 ORDER BY id DESC LIMIT 50''', (user_id, user_id))
+    ids = [r[0] for r in c.fetchall()]; c.close(); conn.close()
+    return [get_trade_full(i) for i in ids]
+
+
+def count_incoming_trades(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COUNT(*) FROM trades WHERE to_user_id = %s AND status = 'pending' ''',
+              (user_id,))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def accept_trade(trade_id, user_id, to_car_id, to_coins):
+    """Принимает обмен. Получатель указывает свою машину и монеты."""
+    t = get_trade(trade_id)
+    if not t: return False, 'Обмен не найден'
+    if t['to_user_id'] != user_id: return False, 'Это не твой обмен'
+    if t['status'] != 'pending': return False, 'Обмен уже обработан'
+    if to_coins < 0: return False, 'Монеты не могут быть отрицательными'
+    if not has_car(user_id, to_car_id): return False, 'У тебя нет этой машины'
+    if get_balance(user_id) < to_coins:
+        return False, f'У тебя только {get_balance(user_id)} монет'
+    if not has_car(t['from_user_id'], t['from_car_id']):
+        return False, 'У отправителя уже нет этой машины'
+    if get_balance(t['from_user_id']) < t['from_coins']:
+        return False, 'У отправителя не хватает монет'
+
+    conn = get_db(); c = conn.cursor()
+    # Забираем машины у обоих
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
+    # Отдаём друг другу
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
+              (user_id, t['from_car_id'], datetime.now().isoformat()))
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
+              (t['from_user_id'], to_car_id, datetime.now().isoformat()))
+    # Чистим публичные галереи и любимые
+    c.execute('''DELETE FROM public_cars WHERE (user_id = %s AND car_id = %s)
+                 OR (user_id = %s AND car_id = %s)''',
+              (t['from_user_id'], t['from_car_id'], user_id, to_car_id))
+    c.execute('''UPDATE users SET favorite_car_id = NULL
+                 WHERE (id = %s AND favorite_car_id = %s) OR (id = %s AND favorite_car_id = %s)''',
+              (t['from_user_id'], t['from_car_id'], user_id, to_car_id))
+    # Монеты: разница идёт от получателя отправителю (или наоборот)
+    diff = t['from_coins'] - to_coins  # >0 — отправитель доплачивает, <0 — получатель доплачивает
+    if diff > 0:
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s',
+                  (diff, t['from_user_id']))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                  (diff, user_id))
+    elif diff < 0:
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                  (-diff, t['from_user_id']))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s',
+                  (-diff, user_id))
+    c.execute('''UPDATE trades SET to_car_id = %s, to_coins = %s,
+                 status = 'completed', resolved_at = %s WHERE id = %s''',
+              (to_car_id, to_coins, datetime.now().isoformat(), trade_id))
+    conn.commit(); c.close(); conn.close()
+
+    other_name = get_username_by_id(user_id)
+    my_name = get_username_by_id(t['from_user_id'])
+    log_transaction(t['from_user_id'], 'trade', -diff if diff > 0 else -diff if diff < 0 else 0,
+                    t['from_car_id'], f'Обмен с {other_name}')
+    log_transaction(user_id, 'trade', diff if diff > 0 else (abs(diff) if diff < 0 else 0),
+                    to_car_id, f'Обмен с {my_name}')
+    return True, 'Обмен выполнен!'
+
+
+def reject_trade(trade_id, user_id):
+    t = get_trade(trade_id)
+    if not t: return False, 'Не найден'
+    if t['to_user_id'] != user_id: return False, 'Это не твой обмен'
+    if t['status'] != 'pending': return False, 'Уже обработан'
+    conn = get_db(); c = conn.cursor()
+    c.execute("UPDATE trades SET status = 'rejected', resolved_at = %s WHERE id = %s",
+              (datetime.now().isoformat(), trade_id))
+    conn.commit(); c.close(); conn.close()
+    return True, 'Обмен отклонён'
+
+
+def cancel_trade(trade_id, user_id):
+    t = get_trade(trade_id)
+    if not t: return False, 'Не найден'
+    if t['from_user_id'] != user_id: return False, 'Это не твой обмен'
+    if t['status'] != 'pending': return False, 'Уже обработан'
+    conn = get_db(); c = conn.cursor()
+    c.execute("UPDATE trades SET status = 'cancelled', resolved_at = %s WHERE id = %s",
+              (datetime.now().isoformat(), trade_id))
+    conn.commit(); c.close(); conn.close()
+    return True, 'Обмен отменён'
 
 
 def get_achievements_for_user(user_id):
@@ -915,6 +1087,94 @@ def achievements_page():
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
+# ---------- ОБМЕНЫ ----------
+@app.route('/trades')
+@login_required
+def trades_page():
+    incoming = get_incoming_trades(session['user_id'])
+    outgoing = [t for t in get_outgoing_trades(session['user_id']) if t['status'] == 'pending']
+    history = get_trade_history(session['user_id'])
+    return render_template('trades.html',
+                           incoming=incoming, outgoing=outgoing, history=history,
+                           balance=get_balance(session['user_id']),
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/trades/new', methods=['GET', 'POST'])
+@login_required
+def trade_new():
+    if request.method == 'POST':
+        to_username = request.form.get('to_username', '').strip()
+        from_car_id = request.form.get('from_car_id', '')
+        from_coins = request.form.get('from_coins', '0')
+        message = request.form.get('message', '').strip()
+        if not to_username:
+            flash('Впиши ник игрока'); return redirect(url_for('trade_new'))
+        if not from_car_id.isdigit():
+            flash('Выбери свою машину'); return redirect(url_for('trade_new'))
+        try:
+            from_coins = int(from_coins or 0)
+        except ValueError:
+            flash('Монеты должны быть числом'); return redirect(url_for('trade_new'))
+        ok, result = create_trade(session['user_id'], to_username, int(from_car_id),
+                                  from_coins, message)
+        if ok:
+            flash('Предложение отправлено!')
+            return redirect(url_for('trades_page'))
+        flash(result); return redirect(url_for('trade_new'))
+    my_cars = get_user_cars(session['user_id'])
+    balance = get_balance(session['user_id'])
+    return render_template('trade_new.html', my_cars=my_cars, balance=balance,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/trades/<int:trade_id>')
+@login_required
+def trade_view(trade_id):
+    t = get_trade_full(trade_id)
+    if not t:
+        flash('Обмен не найден'); return redirect(url_for('trades_page'))
+    if t['from_user_id'] != session['user_id'] and t['to_user_id'] != session['user_id']:
+        flash('Это не твой обмен'); return redirect(url_for('trades_page'))
+    my_cars = get_user_cars(session['user_id']) if t['to_user_id'] == session['user_id'] else []
+    balance = get_balance(session['user_id'])
+    return render_template('trade_view.html', trade=t, my_cars=my_cars, balance=balance,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/trades/<int:trade_id>/accept', methods=['POST'])
+@login_required
+def trade_accept(trade_id):
+    to_car_id = request.form.get('to_car_id', '')
+    to_coins = request.form.get('to_coins', '0')
+    if not to_car_id.isdigit():
+        flash('Выбери свою машину'); return redirect(url_for('trade_view', trade_id=trade_id))
+    try:
+        to_coins = int(to_coins or 0)
+    except ValueError:
+        flash('Монеты должны быть числом'); return redirect(url_for('trade_view', trade_id=trade_id))
+    ok, msg = accept_trade(trade_id, session['user_id'], int(to_car_id), to_coins)
+    flash(msg)
+    return redirect(url_for('trades_page'))
+
+
+@app.route('/trades/<int:trade_id>/reject', methods=['POST'])
+@login_required
+def trade_reject(trade_id):
+    ok, msg = reject_trade(trade_id, session['user_id'])
+    flash(msg)
+    return redirect(url_for('trades_page'))
+
+
+@app.route('/trades/<int:trade_id>/cancel', methods=['POST'])
+@login_required
+def trade_cancel(trade_id):
+    ok, msg = cancel_trade(trade_id, session['user_id'])
+    flash(msg)
+    return redirect(url_for('trades_page'))
 
 # ---------- АДМИН-НАСТРОЙКИ ----------
 @app.route('/admin/settings', methods=['GET', 'POST'])
