@@ -945,24 +945,30 @@ def remove_from_garage(car_id):
 @app.route('/shop')
 @login_required
 def shop():
-    ensure_discount()
-    discount = get_active_discount()
-    balance = get_balance(session['user_id'])
-    cars = []
-    for car in get_catalog():
-        cid, model, rating, price = car
-        price = price or 0
-        final_price = price
-        has_disc = False
-        if discount and discount['car_id'] == cid:
-            final_price = int(price * (100 - discount['discount_percent']) / 100)
-            has_disc = True
-        cars.append({'id': cid, 'model': model, 'rating': rating, 'price': price,
-                     'final_price': final_price, 'has_discount': has_disc,
-                     'owned': has_car(session['user_id'], cid)})
-    return render_template('shop.html', cars=cars, balance=balance, discount=discount,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
+    try:
+        ensure_discount()
+        discount = get_active_discount()
+        balance = get_balance(session['user_id'])
+        settings = {k: get_setting(k) for k in DEFAULT_SETTINGS}
+        cars = []
+        for car in get_catalog():
+            cid, model, rating, price = car
+            price = price or 0
+            final_price = price
+            has_disc = False
+            if discount and discount['car_id'] == cid:
+                final_price = int(price * (100 - discount['discount_percent']) / 100)
+                has_disc = True
+            cars.append({'id': cid, 'model': model, 'rating': rating, 'price': price,
+                         'final_price': final_price, 'has_discount': has_disc,
+                         'owned': has_car(session['user_id'], cid)})
+        return render_template('shop.html', cars=cars, balance=balance, discount=discount,
+                               settings=settings,
+                               user=session.get('username'),
+                               is_admin=is_admin(session.get('username')))
+    except Exception:
+        import traceback
+        return '<h2 style="color:red;">Ошибка в /shop:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
 @app.route('/shop/buy/<int:car_id>', methods=['POST'])
@@ -1219,11 +1225,18 @@ def admin_settings():
 @app.route('/admin/discount/reroll', methods=['POST'])
 @admin_required
 def admin_reroll_discount():
-    conn = get_db(); c = conn.cursor()
-    c.execute('DELETE FROM daily_discount'); conn.commit(); c.close(); conn.close()
-    r = roll_new_discount()
-    flash(f'Новая скидка: «{r["model"]}» — {r["discount_percent"]}%' if r else 'Не удалось')
-    return redirect(url_for('admin_settings'))
+    try:
+        conn = get_db(); c = conn.cursor()
+        c.execute('DELETE FROM daily_discount'); conn.commit(); c.close(); conn.close()
+        r = roll_new_discount()
+        if r:
+            flash(f'Новая скидка: «{r["model"]}» — {r["discount_percent"]}%')
+        else:
+            flash('Не удалось выбрать машину. Проверь диапазон рейтинга в настройках.')
+        return redirect(url_for('admin_settings'))
+    except Exception:
+        import traceback
+        return '<h2 style="color:red;">Ошибка в /admin/discount/reroll:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
 # ---------- КАРТИНКИ ----------
