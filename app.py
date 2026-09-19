@@ -1183,18 +1183,21 @@ def trade_new():
 @app.route('/trades/<int:trade_id>')
 @login_required
 def trade_view(trade_id):
-    t = get_trade_full(trade_id)
-    if not t:
-        flash('Обмен не найден'); return redirect(url_for('trades_page'))
-    if t['from_user_id'] != session['user_id'] and t['to_user_id'] != session['user_id']:
-        flash('Это не твой обмен'); return redirect(url_for('trades_page'))
-    my_cars = get_user_cars(session['user_id']) if t['to_user_id'] == session['user_id'] else []
-    balance = get_balance(session['user_id'])
-    return render_template('trade_view.html', trade=t, my_cars=my_cars, balance=balance,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
-
-
+    import traceback
+    try:
+        t = get_trade_full(trade_id)
+        if not t:
+            flash('Обмен не найден'); return redirect(url_for('trades_page'))
+        if t['from_user_id'] != session['user_id'] and t['to_user_id'] != session['user_id']:
+            flash('Это не твой обмен'); return redirect(url_for('trades_page'))
+        my_cars = get_user_cars(session['user_id']) if t['to_user_id'] == session['user_id'] else []
+        balance = get_balance(session['user_id'])
+        return render_template('trade_view.html', trade=t, my_cars=my_cars, balance=balance,
+                               my_id=session['user_id'],
+                               user=session.get('username'),
+                               is_admin=is_admin(session.get('username')))
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /trades/<id>:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 @app.route('/trades/<int:trade_id>/accept', methods=['POST'])
 @login_required
 def trade_accept(trade_id):
