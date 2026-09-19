@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Результат гонки — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    {% if won is none %}
+        <h2 class="page-title">🏁 Гонка отменена</h2>
+    {% elif won %}
+        <h2 class="page-title win-title">🏆 ПОБЕДА!</h2>
+    {% else %}
+        <h2 class="page-title lose-title">😞 Поражение</h2>
+    {% endif %}
+
+    <div class="race-result">
+        <div class="result-side {% if race.winner_id == race.user_id %}winner{% endif %}">
+            <div class="result-name">{{ race.author }}</div>
+            <img src="/car_image/{{ race.author_car.id }}" alt="{{ race.author_car.model }}">
+            <div class="result-model">{{ race.author_car.model }}</div>
+            <div class="result-specs">
+                {% if race.author_car.horsepower %}🐎 {{ race.author_car.horsepower }} л.с.{% endif %}
+                {% if race.author_car.acceleration %}⏱️ {{ race.author_car.acceleration }} с{% endif %}
+                {% if race.author_car.top_speed %}🚀 {{ race.author_car.top_speed }} км/ч{% endif %}
+            </div>
+            {% if race.winner_id == race.user_id %}<div class="winner-badge">🏆 Победитель</div>{% endif %}
+        </div>
+
+        <div class="vs-arrow">VS</div>
+
+        <div class="result-side {% if race.winner_id == race.opponent_id %}winner{% endif %}">
+            <div class="result-name">{{ race.opponent }}</div>
+            <img src="/car_image/{{ race.opponent_car.id }}" alt="{{ race.opponent_car.model }}">
+            <div class="result-model">{{ race.opponent_car.model }}</div>
+            <div class="result-specs">
+                {% if race.opponent_car.horsepower %}🐎 {{ race.opponent_car.horsepower }} л.с.{% endif %}
+                {% if race.opponent_car.acceleration %}⏱️ {{ race.opponent_car.acceleration }} с{% endif %}
+                {% if race.opponent_car.top_speed %}🚀 {{ race.opponent_car.top_speed }} км/ч{% endif %}
+            </div>
+            {% if race.winner_id == race.opponent_id %}<div class="winner-badge">🏆 Победитель</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="result-summary">
+        💰 Банк: {{ race.bet * 2 }} монет — победителю!
+    </div>
+
+    <p class="form-link" style="margin-top: 30px;">
+        <a href="/races">← К гонкам</a> · <a href="/">На главную</a>
+    </p>
+
+    <style>
+        .page-title { font-size: 40px; margin-bottom: 25px; text-align: center; }
+        .win-title { color: #2e7d32; }
+        .lose-title { color: #c62828; }
+        .race-result {
+            display: flex; gap: 30px; align-items: center;
+            flex-wrap: wrap; justify-content: center;
+            margin-bottom: 25px;
+        }
+        .result-side {
+            background: rgba(255, 255, 255, 0.9);
+            border: 3px solid #ffd9a6; border-radius: 20px;
+            padding: 20px; min-width: 260px;
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+        }
+        .result-side.winner {
+            border-color: #ffc107;
+            box-shadow: 0 12px 35px rgba(255, 193, 7, 0.5);
+            background: linear-gradient(160deg, #fffdf0 0%, #fff3cd 100%);
+        }
+        .result-name { font-size: 18px; font-weight: 900; color: #ff8c1a; }
+        .result-side img { width: 180px; height: 110px; object-fit: contain; }
+        .result-model { font-size: 17px; font-weight: 700; color: #4a2c00; }
+        .result-specs {
+            font-size: 13px; color: #6b3d00; text-align: center;
+            line-height: 1.7;
+        }
+        .winner-badge {
+            margin-top: 8px; font-size: 14px; font-weight: 900;
+            color: #856404; background: #fff3cd;
+            padding: 6px 16px; border-radius: 20px;
+        }
+        .vs-arrow { font-size: 36px; font-weight: 900; color: #ff8c1a; }
+        .result-summary {
+            font-size: 18px; color: #4a2c00; text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 14px 26px; border-radius: 30px;
+            border: 2px solid #ffd9a6; font-weight: 700;
+            max-width: 500px; margin: 0 auto;
+        }
+    </style>
+
+{% endblock %}
