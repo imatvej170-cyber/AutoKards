@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Гонки — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>🏁 Гонки</h2>
+        <div class="balance-pill">💰 {{ balance }} монет</div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {# ===== СОЗДАТЬ ВЫЗОВ ===== #}
+    <div class="create-block">
+        <h3 class="section-title">🏎️ Создать вызов</h3>
+        {% if my_cars %}
+            <form method="POST" action="/races/create" class="race-form">
+                <label class="form-label">Выбери свою машину</label>
+                <select name="car_id" class="form-select" required>
+                    <option value="">— Выбери машину —</option>
+                    {% for car in my_cars %}
+                        {% set car_id, model, rating, price = car %}
+                        <option value="{{ car_id }}">{{ model }} ({{ rating }}★) — мин. ставка {{ rating * rating * 25 }}</option>
+                    {% endfor %}
+                </select>
+
+                <label class="form-label">Ставка (монет)</label>
+                <input type="number" name="bet" min="25" step="25" value="100" required class="form-input">
+                <p class="hint">Чем выше звёзды машины — тем выше минимальная ставка. Победитель забирает весь банк (×2).</p>
+
+                <label class="check-row">
+                    <input type="checkbox" name="offer_car" value="1">
+                    Готов поставить машину на кон (если соперник тоже — проигравший отдаёт авто)
+                </label>
+
+                <button type="submit" class="btn btn-primary">🔍 Искать соперника</button>
+            </form>
+        {% else %}
+            <p class="no-cars-hint">У тебя нет машин. <a href="/shop">Купи первую →</a></p>
+        {% endif %}
+    </div>
+
+    {# ===== МОИ АКТИВНЫЕ ВЫЗОВЫ ===== #}
+    {% if my_challenges %}
+        <h3 class="section-title">⏳ Мои активные вызовы ({{ my_challenges|length }})</h3>
+        <div class="races-list">
+            {% for ch in my_challenges %}
+                <div class="race-card my-race">
+                    <div class="race-head">
+                        <span>Твой вызов</span>
+                        <span class="race-bet">💰 {{ ch.bet }}</span>
+                    </div>
+                    <div class="race-car">
+                        <img src="/car_image/{{ ch.car.id }}" alt="{{ ch.car.model }}">
+                        <div class="race-model">{{ ch.car.model }}</div>
+                        <div class="race-mini-stars">
+                            {% for i in range(1, 9) %}
+                                <span class="star {% if i <= ch.car.rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                        {% if ch.offer_car %}<div class="offer-tag">🚗 Машина на кону</div>{% endif %}
+                    </div>
+                    <form method="POST" action="/races/cancel/{{ ch.id }}">
+                        <button type="submit" class="btn btn-secondary btn-tiny">Отменить</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# ===== ЧУЖИЕ ВЫЗОВЫ ===== #}
+    <h3 class="section-title">🔥 Открытые вызовы ({{ other_challenges|length }})</h3>
+    {% if other_challenges %}
+        <div class="races-list">
+            {% for ch in other_challenges %}
+                <div class="race-card">
+                    <div class="race-head">
+                        <span>От <strong>{{ ch.username }}</strong></span>
+                        <span class="race-bet">💰 {{ ch.bet }}</span>
+                    </div>
+                    <div class="race-car">
+                        <img src="/car_image/{{ ch.car.id }}" alt="{{ ch.car.model }}">
+                        <div class="race-model">{{ ch.car.model }}</div>
+                        <div class="race-mini-stars">
+                            {% for i in range(1, 9) %}
+                                <span class="star {% if i <= ch.car.rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                        {% if ch.offer_car %}<div class="offer-tag">🚗 Машина на кону</div>{% endif %}
+                    </div>
+                    {% if balance < ch.bet %}
+                        <p class="hint">Нужно {{ ch.bet }} монет</p>
+                    {% else %}
+                        <form method="POST" action="/races/join/{{ ch.id }}" class="join-form">
+                            <select name="car_id" class="form-select" required>
+                                <option value="">— Твоя машина —</option>
+                                {% for car in my_cars %}
+                                    {% set car_id, model, rating, price = car %}
+                                    <option value="{{ car_id }}">{{ model }} ({{ rating }}★)</option>
+                                {% endfor %}
+                            </select>
+                            {% if ch.offer_car %}
+                                <label class="check-row">
+                                    <input type="checkbox" name="offer_car" value="1">
+                                    Согласен поставить свою машину
+                                </label>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary btn-tiny">🏁 Принять вызов</button>
+                        </form>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Открытых вызовов нет. Создай свой — вдруг кто-то примет!</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 34px; color: #ff8c1a; }
+        .balance-pill {
+            font-size: 16px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px; border-radius: 30px;
+            border: 2px solid #ffd9a6;
+        }
+        .section-title {
+            font-size: 22px; color: #ff8c1a; font-weight: 900;
+            margin: 25px 0 15px; text-align: center;
+        }
+        .create-block {
+            background: rgba(255, 255, 255, 0.9); border: 2px solid #ffd9a6;
+            border-radius: 20px; padding: 22px; max-width: 500px;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+        }
+        .race-form { display: flex; flex-direction: column; }
+        .form-label {
+            font-size: 14px; color: #6b3d00; font-weight: 700;
+            margin-bottom: 6px; margin-top: 12px; text-align: left;
+        }
+        .form-input, .form-select {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px; margin-bottom: 6px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: #ff8c1a; }
+        .hint { font-size: 12px; color: #8a6538; text-align: left; margin: 4px 0 12px 0; }
+        .check-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            font-size: 14px; color: #4a2c00; font-weight: 600;
+            margin: 10px 0; text-align: left;
+        }
+        .check-row input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: #ff8c1a; margin-top: 2px;
+        }
+        .no-cars-hint {
+            font-size: 15px; color: #b08855; text-align: center;
+            padding: 20px; background: #fff5e6; border-radius: 12px;
+            border: 1px dashed #ffd9a6;
+        }
+        .no-cars-hint a { color: #ff8c1a; font-weight: 700; }
+
+        .races-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px; width: 100%; max-width: 1100px;
+        }
+        .race-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 18px;
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.12);
+        }
+        .race-card.my-race { border-color: #ff8c1a; box-shadow: 0 6px 20px rgba(255, 140, 26, 0.3); }
+        .race-head {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 14px; color: #4a2c00;
+        }
+        .race-head strong { color: #ff8c1a; }
+        .race-bet { font-weight: 900; color: #ff8c1a; font-size: 16px; }
+        .race-car {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .race-car img { width: 150px; height: 90px; object-fit: contain; }
+        .race-model { font-size: 16px; font-weight: 900; color: #4a2c00; }
+        .race-mini-stars { font-size: 14px; letter-spacing: 1px; color: #ffd9a6; }
+        .race-mini-stars .star.filled { color: #ff8c1a; }
+        .offer-tag {
+            font-size: 12px; background: #fff3cd; color: #856404;
+            padding: 4px 12px; border-radius: 20px; font-weight: 700;
+        }
+        .btn-tiny { padding: 10px 20px; font-size: 14px; }
+        .join-form { display: flex; flex-direction: column; gap: 6px; }
+    </style>
+
+{% endblock %}
