@@ -57,7 +57,7 @@
                 </p>
                 <div class="public-list">
                     {% for car in my_cars %}
-                        {% set car_id, model, rating = car %}
+                        {% set car_id, model, rating, price = car %}
                         <label class="public-item">
                             <input type="checkbox" name="public_cars" value="{{ car_id }}"
                                    {% if car_id in public_ids %}checked{% endif %}>
