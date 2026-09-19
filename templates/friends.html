@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Друзья — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>👥 Друзья</h2>
+        <a href="/trades/new" class="btn btn-primary btn-small">🔄 Новый обмен</a>
+        <a href="/races" class="btn btn-secondary btn-small">🏁 Гонки</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {# ===== ПОИСК ===== #}
+    <div class="search-block">
+        <h3 class="section-title">🔍 Найти игрока</h3>
+        <form method="GET" action="/friends" class="search-form">
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Введи ник..."
+                   maxlength="20" class="form-input" autocomplete="off">
+            <button type="submit" class="btn btn-primary">Искать</button>
+        </form>
+
+        {% if search_results %}
+            <div class="users-list">
+                {% for u in search_results %}
+                    <div class="user-row">
+                        <div class="user-avatar">
+                            {% if u.has_avatar %}
+                                <img src="/avatar/{{ u.id }}" alt="{{ u.username }}">
+                            {% else %}
+                                <div class="user-avatar-letter">{{ u.username[0]|upper }}</div>
+                            {% endif %}
+                        </div>
+                        <a href="/profile/{{ u.username }}" class="user-name">{{ u.username }}</a>
+                        <div class="user-action">
+                            {% if u.status == 'accepted' %}
+                                <span class="friend-badge">✓ Друзья</span>
+                            {% elif u.status == 'pending_out' %}
+                                <span class="pending-badge">⏳ Заявка отправлена</span>
+                            {% elif u.status == 'pending_in' %}
+                                <span class="pending-badge">📥 Ждёт ответа</span>
+                            {% else %}
+                                <form method="POST" action="/friends/request">
+                                    <input type="hidden" name="username" value="{{ u.username }}">
+                                    <button type="submit" class="btn btn-primary btn-tiny">+ В друзья</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif search_query %}
+            <p class="description">Никого не найдено по запросу «{{ search_query }}».</p>
+        {% endif %}
+    </div>
+
+    {# ===== ВХОДЯЩИЕ ЗАЯВКИ ===== #}
+    {% if incoming %}
+        <h3 class="section-title">📥 Входящие заявки ({{ incoming|length }})</h3>
+        <div class="users-list">
+            {% for r in incoming %}
+                <div class="user-row incoming-row">
+                    <div class="user-avatar">
+                        {% if r.has_avatar %}
+                            <img src="/avatar/{{ r.user_id }}" alt="{{ r.username }}">
+                        {% else %}
+                            <div class="user-avatar-letter">{{ r.username[0]|upper }}</div>
+                        {% endif %}
+                    </div>
+                    <a href="/profile/{{ r.username }}" class="user-name">{{ r.username }}</a>
+                    <div class="user-action">
+                        <form method="POST" action="/friends/accept/{{ r.id }}" style="display:inline;">
+                            <button type="submit" class="btn btn-primary btn-tiny">✓ Принять</button>
+                        </form>
+                        <form method="POST" action="/friends/reject/{{ r.id }}" style="display:inline;">
+                            <button type="submit" class="btn btn-secondary btn-tiny">✕ Отклонить</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# ===== ИСХОДЯЩИЕ ===== #}
+    {% if outgoing %}
+        <h3 class="section-title">📤 Мои заявки ({{ outgoing|length }})</h3>
+        <div class="users-list">
+            {% for r in outgoing %}
+                <div class="user-row">
+                    <div class="user-avatar">
+                        {% if r.has_avatar %}
+                            <img src="/avatar/{{ r.user_id }}" alt="{{ r.username }}">
+                        {% else %}
+                            <div class="user-avatar-letter">{{ r.username[0]|upper }}</div>
+                        {% endif %}
+                    </div>
+                    <a href="/profile/{{ r.username }}" class="user-name">{{ r.username }}</a>
+                    <div class="user-action">
+                        <span class="pending-badge">⏳ Ожидает</span>
+                        <form method="POST" action="/friends/cancel/{{ r.id }}" style="display:inline;">
+                            <button type="submit" class="btn btn-secondary btn-tiny">Отменить</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# ===== ДРУЗЬЯ ===== #}
+    <h3 class="section-title">🤝 Мои друзья ({{ friends|length }})</h3>
+    {% if friends %}
+        <div class="friends-grid">
+            {% for f in friends %}
+                <div class="friend-card">
+                    <div class="friend-avatar">
+                        {% if f.has_avatar %}
+                            <img src="/avatar/{{ f.id }}" alt="{{ f.username }}">
+                        {% else %}
+                            <div class="friend-avatar-letter">{{ f.username[0]|upper }}</div>
+                        {% endif %}
+                    </div>
+                    <a href="/profile/{{ f.username }}" class="friend-name">{{ f.username }}</a>
+                    <div class="friend-stats">
+                        🚗 {{ f.cars_count }} · 💰 {{ f.balance }}
+                    </div>
+                    {% if f.bio %}
+                        <div class="friend-bio">{{ f.bio }}</div>
+                    {% endif %}
+                    <div class="friend-actions">
+                        <a href="/trades/new?to={{ f.username }}" class="btn btn-primary btn-tiny">🔄 Обмен</a>
+                        <a href="/races" class="btn btn-secondary btn-tiny">🏁 Гонка</a>
+                    </div>
+                    <form method="POST" action="/friends/remove/{{ f.id }}" class="remove-form"
+                          onsubmit="return confirm('Удалить {{ f.username }} из друзей?');">
+                        <button type="submit" class="remove-btn" title="Удалить из друзей">✕</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">У тебя пока нет друзей. Найди их через поиск выше!</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 34px; color: #ff8c1a; }
+        .btn-small { padding: 10px 22px; font-size: 15px; }
+        .btn-tiny { padding: 8px 16px; font-size: 13px; }
+
+        .section-title {
+            font-size: 22px; color: #ff8c1a; font-weight: 900;
+            margin: 25px 0 15px; text-align: center;
+        }
+
+        .search-block {
+            background: rgba(255, 255, 255, 0.85); border: 2px solid #ffd9a6;
+            border-radius: 20px; padding: 20px 25px; max-width: 700px;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+            margin-bottom: 25px;
+        }
+        .search-form { display: flex; gap: 10px; margin-bottom: 15px; }
+        .form-input {
+            flex: 1; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-input:focus { outline: none; border-color: #ff8c1a; }
+
+        .users-list {
+            display: flex; flex-direction: column; gap: 10px;
+            width: 100%; max-width: 700px;
+        }
+        .user-row {
+            display: flex; align-items: center; gap: 14px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 14px;
+            padding: 12px 18px;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.1);
+        }
+        .user-row.incoming-row { border-color: #ff8c1a; box-shadow: 0 6px 18px rgba(255, 140, 26, 0.25); }
+        .user-avatar { width: 46px; height: 46px; flex-shrink: 0; }
+        .user-avatar img {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; border: 2px solid #ff8c1a;
+        }
+        .user-avatar-letter {
+            width: 100%; height: 100%; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            color: #fff; font-weight: 900; font-size: 20px;
+            border: 2px solid #ff8c1a;
+        }
+        .user-name {
+            flex: 1; font-size: 16px; font-weight: 700;
+            color: #4a2c00; text-decoration: none;
+        }
+        .user-name:hover { color: #ff8c1a; }
+        .user-action { display: flex; gap: 8px; align-items: center; }
+        .friend-badge {
+            background: #e8f5e9; color: #2e7d32;
+            padding: 6px 14px; border-radius: 20px;
+            font-size: 13px; font-weight: 700;
+        }
+        .pending-badge {
+            background: #fff3cd; color: #856404;
+            padding: 6px 14px; border-radius: 20px;
+            font-size: 13px; font-weight: 700;
+        }
+
+        .friends-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px; width: 100%; max-width: 1100px;
+        }
+        .friend-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 18px;
+            padding: 20px; display: flex; flex-direction: column; align-items: center;
+            gap: 10px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.12);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .friend-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 28px rgba(255, 140, 26, 0.25);
+            border-color: #ff8c1a;
+        }
+        .friend-avatar { width: 70px; height: 70px; }
+        .friend-avatar img {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; border: 3px solid #ff8c1a;
+        }
+        .friend-avatar-letter {
+            width: 100%; height: 100%; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            color: #fff; font-weight: 900; font-size: 28px;
+            border: 3px solid #ff8c1a;
+        }
+        .friend-name {
+            font-size: 18px; font-weight: 900; color: #ff8c1a;
+            text-decoration: none;
+        }
+        .friend-name:hover { text-decoration: underline; }
+        .friend-stats { font-size: 13px; color: #6b3d00; font-weight: 700; }
+        .friend-bio {
+            font-size: 13px; color: #6b3d00; text-align: center;
+            font-style: italic; line-height: 1.4;
+            max-height: 60px; overflow: hidden;
+        }
+        .friend-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+        .remove-form { position: absolute; top: 8px; right: 8px; margin: 0; }
+        .remove-btn {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: none; background: rgba(255, 255, 255, 0.95);
+            color: #ff8c1a; font-size: 14px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease; font-family: inherit;
+        }
+        .remove-btn:hover { background: #ff8c1a; color: #fff; transform: scale(1.1); }
+    </style>
+
+{% endblock %}
