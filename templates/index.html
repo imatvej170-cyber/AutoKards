@@ -25,11 +25,14 @@
                 {% if bonus_ready %}
                     <form method="POST" action="/bonus" class="bonus-form">
                         <button type="submit" class="btn btn-primary bonus-btn">
-                            🎁 Бонус (+100)
+                            🎁 Бонус (+{{ next_bonus }}){% if streak > 1 %} · серия {{ streak }}{% endif %}
                         </button>
                     </form>
                 {% else %}
-                    <div class="bonus-wait">🎁 Бонус через <strong>{{ bonus_left }}</strong></div>
+                    <div class="bonus-wait">
+                        🔥 Серия: <strong>{{ streak }}</strong> · След. бонус: <strong>{{ next_bonus }} 💰</strong>
+                        · через <strong>{{ bonus_left }}</strong>
+                    </div>
                 {% endif %}
 
                 <a href="/wheel" class="btn btn-primary wheel-link">🎡 Колесо</a>
@@ -51,19 +54,18 @@
                 </div>
             {% endif %}
 
-            {# ===== КНОПКИ ===== #}
             <div class="profile-actions">
                 <a href="/settings" class="btn btn-primary">⚙ Профиль</a>
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
                 <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
                 <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
-                <a href="/compare" class="btn btn-secondary">⚖️ Сравнить</a>
                 <a href="/races" class="btn btn-primary">🏎️ Гонки{% if active_races_count %} ({{ active_races_count }}){% endif %}</a>
+                <a href="/rating" class="btn btn-primary">🏆 Рейтинг</a>
                 <a href="/trades" class="btn btn-primary">🔄 Обмены{% if incoming_trades_count %} ({{ incoming_trades_count }}){% endif %}</a>
+                <a href="/shop/wishlist" class="btn btn-secondary">❤ Желаемое{% if wishlist_count %} ({{ wishlist_count }}){% endif %}</a>
+                <a href="/compare" class="btn btn-secondary">⚖️ Сравнить</a>
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
-                <a href="/rating" class="btn btn-primary">🏆 Рейтинг</a>
-                <a href="/shop/wishlist" class="btn btn-secondary">❤ Желаемое{% if wishlist_count %} ({{ wishlist_count }}){% endif %}</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
                 {% endif %}
@@ -136,7 +138,7 @@
         .profile-fav-card img { width: 90px; height: 60px; object-fit: contain; }
         .profile-fav-name { font-size: 18px; font-weight: 700; color: #4a2c00; }
         .profile-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
-        .profile-actions .btn { padding: 11px 22px; font-size: 15px; }
+        .profile-actions .btn { padding: 11px 20px; font-size: 14px; }
     </style>
 
 {% endblock %}
