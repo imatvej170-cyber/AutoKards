@@ -57,11 +57,13 @@
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
                 <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
                 <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
+                <a href="/compare" class="btn btn-secondary">⚖️ Сравнить</a>
                 <a href="/races" class="btn btn-primary">🏎️ Гонки{% if active_races_count %} ({{ active_races_count }}){% endif %}</a>
                 <a href="/trades" class="btn btn-primary">🔄 Обмены{% if incoming_trades_count %} ({{ incoming_trades_count }}){% endif %}</a>
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
                 <a href="/rating" class="btn btn-primary">🏆 Рейтинг</a>
+                <a href="/shop/wishlist" class="btn btn-secondary">❤ Желаемое{% if wishlist_count %} ({{ wishlist_count }}){% endif %}</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
                 {% endif %}
