@@ -1136,14 +1136,19 @@ def achievements_page():
 @app.route('/trades')
 @login_required
 def trades_page():
-    incoming = get_incoming_trades(session['user_id'])
-    outgoing = [t for t in get_outgoing_trades(session['user_id']) if t['status'] == 'pending']
-    history = get_trade_history(session['user_id'])
-    return render_template('trades.html',
-                           incoming=incoming, outgoing=outgoing, history=history,
-                           balance=get_balance(session['user_id']),
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
+    import traceback
+    try:
+        incoming = get_incoming_trades(session['user_id'])
+        outgoing = [t for t in get_outgoing_trades(session['user_id']) if t['status'] == 'pending']
+        history = get_trade_history(session['user_id'])
+        return render_template('trades.html',
+                               incoming=incoming, outgoing=outgoing, history=history,
+                               balance=get_balance(session['user_id']),
+                               my_id=session['user_id'],
+                               user=session.get('username'),
+                               is_admin=is_admin(session.get('username')))
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /trades:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
 @app.route('/trades/new', methods=['GET', 'POST'])
