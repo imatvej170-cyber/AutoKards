@@ -123,7 +123,7 @@ def init_db():
         unlocked_at TEXT NOT NULL, UNIQUE(user_id, key)
     )''')
   
-      c.execute('''CREATE TABLE IF NOT EXISTS trades (
+    c.execute('''CREATE TABLE IF NOT EXISTS trades (
         id SERIAL PRIMARY KEY,
         from_user_id INTEGER NOT NULL,
         to_user_id INTEGER NOT NULL,
