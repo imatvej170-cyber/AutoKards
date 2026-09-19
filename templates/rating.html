@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Рейтинг игроков — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">🏆 Рейтинг игроков</h2>
+
+    <div class="total-users">Всего игроков: <strong>{{ total_users }}</strong></div>
+
+    {# ===== ВЫБОР КАТЕГОРИИ ===== #}
+    <div class="tabs-bar">
+        <a href="/rating?sort=cars"         class="tab {% if sort == 'cars' %}active{% endif %}">🚗 По машинам</a>
+        <a href="/rating?sort=balance"      class="tab {% if sort == 'balance' %}active{% endif %}">💰 По монетам</a>
+        <a href="/rating?sort=races"        class="tab {% if sort == 'races' %}active{% endif %}">🏁 По победам</a>
+        <a href="/rating?sort=achievements" class="tab {% if sort == 'achievements' %}active{% endif %}">🏆 По достижениям</a>
+    </div>
+
+    {# ===== МОЯ ПОЗИЦИЯ ===== #}
+    {% if my_rank %}
+        <div class="my-rank">
+            Твоя позиция: <strong>#{{ my_rank }}</strong>
+            · {% if sort == 'cars' %}🚗 {{ my_value }} машин
+            {% elif sort == 'balance' %}💰 {{ my_value }} монет
+            {% elif sort == 'races' %}🏁 {{ my_value }} побед
+            {% else %}🏆 {{ my_value }} достижений{% endif %}
+        </div>
+    {% endif %}
+
+    {% if leaders %}
+        <div class="leaderboard">
+            {% for p in leaders %}
+                <div class="leader-row {% if p.id == my_id %}me{% endif %}">
+                    <div class="leader-rank rank-{{ p.rank if p.rank <= 3 else 'normal' }}">
+                        {% if p.rank == 1 %}🥇
+                        {% elif p.rank == 2 %}🥈
+                        {% elif p.rank == 3 %}🥉
+                        {% else %}{{ p.rank }}{% endif %}
+                    </div>
+                    <div class="leader-avatar">
+                        {% if p.has_avatar %}
+                            <img src="/avatar/{{ p.id }}" alt="{{ p.username }}">
+                        {% else %}
+                            <div class="leader-avatar-letter">{{ p.username[0]|upper }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="leader-name">
+                        <a href="/profile/{{ p.username }}">{{ p.username }}</a>
+                    </div>
+                    <div class="leader-value">
+                        {% if sort == 'cars' %}🚗 {{ p.value }}
+                        {% elif sort == 'balance' %}💰 {{ p.value }}
+                        {% elif sort == 'races' %}🏁 {{ p.value }}
+                        {% else %}🏆 {{ p.value }}{% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Пока нет игроков для рейтинга.</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .page-title { font-size: 34px; color: #ff8c1a; margin-bottom: 12px; text-align: center; }
+        .total-users {
+            font-size: 15px; color: #6b3d00; text-align: center;
+            margin-bottom: 22px;
+        }
+        .total-users strong { color: #ff8c1a; font-size: 18px; }
+
+        .tabs-bar {
+            display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 22px; border-radius: 30px;
+            background: #fff; color: #6b3d00;
+            text-decoration: none; font-size: 15px; font-weight: 700;
+            border: 2px solid #ffd9a6;
+            transition: all 0.2s ease;
+        }
+        .tab:hover { background: #fff5e6; border-color: #ff8c1a; }
+        .tab.active {
+            background: #ff8c1a; color: #fff; border-color: #ff8c1a;
+            box-shadow: 0 6px 18px rgba(255, 140, 26, 0.4);
+        }
+
+        .my-rank {
+            background: linear-gradient(135deg, #fff8ec 0%, #ffe9c7 100%);
+            border: 2px solid #ff8c1a; border-radius: 20px;
+            padding: 12px 26px; font-size: 15px; color: #6b3d00;
+            text-align: center; margin-bottom: 22px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.2);
+        }
+        .my-rank strong { color: #ff8c1a; font-size: 20px; }
+
+        .leaderboard {
+            width: 100%; max-width: 750px;
+            display: flex; flex-direction: column; gap: 10px;
+            margin-bottom: 20px;
+        }
+        .leader-row {
+            display: flex; align-items: center; gap: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 16px;
+            padding: 12px 20px;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .leader-row:hover {
+            transform: translateX(4px);
+            box-shadow: 0 6px 18px rgba(255, 140, 26, 0.2);
+        }
+        .leader-row.me {
+            border-color: #ff8c1a; background: linear-gradient(135deg, #fff8ec 0%, #ffe9c7 100%);
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.35);
+        }
+
+        .leader-rank {
+            width: 50px; height: 50px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; font-weight: 900;
+            border-radius: 50%;
+            background: #fff5e6;
+            color: #6b3d00;
+            border: 2px solid #ffd9a6;
+        }
+        .leader-rank.rank-1 {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            border-color: #d4af37; color: #6b3d00;
+            font-size: 26px;
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+        }
+        .leader-rank.rank-2 {
+            background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
+            border-color: #a8a8a8;
+            font-size: 26px;
+            box-shadow: 0 4px 12px rgba(192, 192, 192, 0.5);
+        }
+        .leader-rank.rank-3 {
+            background: linear-gradient(135deg, #cd7f32 0%, #e8a96a 100%);
+            border-color: #a05a1c; color: #fff;
+            font-size: 26px;
+            box-shadow: 0 4px 12px rgba(205, 127, 50, 0.5);
+        }
+
+        .leader-avatar {
+            width: 46px; height: 46px; flex-shrink: 0;
+        }
+        .leader-avatar img {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; border: 2px solid #ff8c1a;
+        }
+        .leader-avatar-letter {
+            width: 100%; height: 100%; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            color: #fff; font-weight: 900; font-size: 20px;
+            border: 2px solid #ff8c1a;
+        }
+
+        .leader-name {
+            flex: 1; font-size: 17px; font-weight: 700;
+        }
+        .leader-name a {
+            color: #4a2c00; text-decoration: none; transition: color 0.2s;
+        }
+        .leader-name a:hover { color: #ff8c1a; }
+        .leader-row.me .leader-name a { color: #ff8c1a; font-weight: 900; }
+
+        .leader-value {
+            font-size: 17px; font-weight: 900; color: #ff8c1a;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 500px) {
+            .leader-rank { width: 40px; height: 40px; font-size: 16px; }
+            .leader-rank.rank-1, .leader-rank.rank-2, .leader-rank.rank-3 { font-size: 20px; }
+            .leader-avatar { width: 38px; height: 38px; }
+            .leader-name { font-size: 15px; }
+            .leader-value { font-size: 15px; }
+        }
+    </style>
+
+{% endblock %}
