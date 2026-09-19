@@ -97,6 +97,9 @@ def init_db():
         image_data BYTEA NOT NULL, image_mime TEXT NOT NULL, created_at TEXT NOT NULL
     )''')
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS price INTEGER')
+    c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS horsepower INTEGER')
+    c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS acceleration REAL')
+    c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS top_speed INTEGER')
 
     c.execute('''CREATE TABLE IF NOT EXISTS user_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
@@ -613,18 +616,22 @@ def get_catalog_by_rating(min_r, max_r):
     return rows
 
 
-def add_car(model, rating, price, data, mime):
+def add_car(model, rating, price, horsepower, acceleration, top_speed, data, mime):
     conn = get_db(); c = conn.cursor()
-    c.execute('INSERT INTO cars (model, rating, price, image_data, image_mime, created_at) '
-              'VALUES (%s, %s, %s, %s, %s, %s)',
-              (model, rating, price, psycopg2.Binary(data), mime, datetime.now().isoformat()))
+    c.execute('''INSERT INTO cars (model, rating, price, horsepower, acceleration, top_speed,
+                                   image_data, image_mime, created_at)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+              (model, rating, price, horsepower, acceleration, top_speed,
+               psycopg2.Binary(data), mime, datetime.now().isoformat()))
     conn.commit(); c.close(); conn.close()
 
 
-def update_car(car_id, model, rating, price):
+def update_car(car_id, model, rating, price, horsepower, acceleration, top_speed):
     conn = get_db(); c = conn.cursor()
-    c.execute('UPDATE cars SET model = %s, rating = %s, price = %s WHERE id = %s',
-              (model, rating, price, car_id))
+    c.execute('''UPDATE cars SET model = %s, rating = %s, price = %s,
+                 horsepower = %s, acceleration = %s, top_speed = %s
+                 WHERE id = %s''',
+              (model, rating, price, horsepower, acceleration, top_speed, car_id))
     conn.commit(); c.close(); conn.close()
 
 
@@ -640,6 +647,16 @@ def get_car_info(car_id):
     c.execute('SELECT id, model, rating, price FROM cars WHERE id = %s', (car_id,))
     row = c.fetchone(); c.close(); conn.close()
     return row
+
+
+def get_car_full(car_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, model, rating, price, horsepower, acceleration, top_speed
+                 FROM cars WHERE id = %s''', (car_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row: return None
+    return {'id': row[0], 'model': row[1], 'rating': row[2], 'price': row[3] or 0,
+            'horsepower': row[4], 'acceleration': row[5], 'top_speed': row[6]}
 
 
 def delete_car_from_catalog(car_id):
@@ -1071,19 +1088,37 @@ def add_car_page():
         model = request.form.get('model', '').strip()
         rating = request.form.get('rating', '3')
         price = request.form.get('price', '500')
+        hp = request.form.get('horsepower', '').strip()
+        accel = request.form.get('acceleration', '').strip()
+        top = request.form.get('top_speed', '').strip()
         file = request.files.get('image')
-        if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
+
+        if not model:
+            flash('Впиши название'); return redirect(url_for('add_car_page'))
         try:
             rating = int(rating)
             if rating < 1 or rating > 8: raise ValueError
-        except: flash('Оценка 1–8'); return redirect(url_for('add_car_page'))
+        except ValueError:
+            flash('Оценка 1–8'); return redirect(url_for('add_car_page'))
         try:
             price = int(price)
             if price < 0: raise ValueError
-        except: flash('Цена >= 0'); return redirect(url_for('add_car_page'))
-        if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
-        if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
-        add_car(model, rating, price, file.read(), file.mimetype)
+        except ValueError:
+            flash('Цена — число >= 0'); return redirect(url_for('add_car_page'))
+
+        hp = int(hp) if hp.isdigit() else None
+        top = int(top) if top.isdigit() else None
+        try:
+            accel = float(accel) if accel else None
+        except ValueError:
+            accel = None
+
+        if not file or file.filename == '':
+            flash('Выбери картинку'); return redirect(url_for('add_car_page'))
+        if file.mimetype not in ALLOWED_MIME:
+            flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
+
+        add_car(model, rating, price, hp, accel, top, file.read(), file.mimetype)
         flash(f'«{model}» добавлена!')
         return redirect(url_for('shop'))
     return render_template('add_car.html', user=session.get('username'), is_admin=True)
@@ -1092,23 +1127,38 @@ def add_car_page():
 @app.route('/shop/edit/<int:car_id>', methods=['GET', 'POST'])
 @admin_required
 def edit_car_page(car_id):
-    car = get_car_info(car_id)
+    car = get_car_full(car_id)
     if not car: flash('Нет машины'); return redirect(url_for('shop'))
     if request.method == 'POST':
         model = request.form.get('model', '').strip()
         rating = request.form.get('rating', '3')
         price = request.form.get('price', '500')
+        hp = request.form.get('horsepower', '').strip()
+        accel = request.form.get('acceleration', '').strip()
+        top = request.form.get('top_speed', '').strip()
+
         if not model: flash('Впиши название'); return redirect(url_for('edit_car_page', car_id=car_id))
         try:
             rating = int(rating)
             if rating < 1 or rating > 8: raise ValueError
-        except: flash('Оценка 1–8'); return redirect(url_for('edit_car_page', car_id=car_id))
+        except ValueError:
+            flash('Оценка 1–8'); return redirect(url_for('edit_car_page', car_id=car_id))
         try:
             price = int(price)
             if price < 0: raise ValueError
-        except: flash('Цена >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
-        update_car(car_id, model, rating, price)
-        flash('Обновлено'); return redirect(url_for('shop'))
+        except ValueError:
+            flash('Цена — число >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
+
+        hp = int(hp) if hp.isdigit() else None
+        top = int(top) if top.isdigit() else None
+        try:
+            accel = float(accel) if accel else None
+        except ValueError:
+            accel = None
+
+        update_car(car_id, model, rating, price, hp, accel, top)
+        flash('Машина обновлена')
+        return redirect(url_for('shop'))
     return render_template('edit_car.html', car=car, user=session.get('username'), is_admin=True)
 
 
@@ -1339,6 +1389,18 @@ def car_image(car_id):
     if not row: return '', 404
     return Response(bytes(row[0]), mimetype=row[1])
 
+  @app.route('/car/<int:car_id>')
+def car_detail(car_id):
+    car = get_car_full(car_id)
+    if not car:
+        flash('Машина не найдена')
+        return redirect(url_for('index'))
+    owned = False
+    if 'user_id' in session:
+        owned = has_car(session['user_id'], car_id)
+    return render_template('car_detail.html', car=car, owned=owned,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
 
 # ---------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (для шаблонов) ----------
 def get_public_ids(user_id):
