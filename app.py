@@ -23,6 +23,10 @@ START_BALANCE = 500
 DAILY_BONUS = 100
 SELL_RATE = 0.7
 BONUS_COOLDOWN = 86400
+BONUS_STREAK_MAX = 30
+BONUS_STREAK_STEP = 25
+BONUS_STREAK_MAX_AMOUNT = 500
+STREAK_BREAK_HOURS = 48
 
 # ============ ГОНКИ ============
 RACE_LUCK_CHANCE = 20
@@ -32,13 +36,12 @@ RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8:
 # ============ АДМИНЫ ============
 ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
 
-# ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ (обновлённый баланс колеса) ============
+# ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ ============
 DEFAULT_SETTINGS = {
     'discount_enabled': '1',
     'discount_min_rating': '1',
     'discount_max_rating': '3',
     'discount_percent': '50',
-    # Бесплатное колесо — теперь скромнее
     'wheel_enabled': '1',
     'wheel_coin_min': '30',
     'wheel_coin_max': '150',
@@ -46,7 +49,6 @@ DEFAULT_SETTINGS = {
     'wheel_car_min_rating': '1',
     'wheel_car_max_rating': '4',
     'wheel_cooldown_hours': '24',
-    # Премиум-колесо — дороже и щедрее по шансу машины, но монет меньше
     'paid_wheel_enabled': '1',
     'paid_wheel_price': '1000',
     'paid_wheel_coin_min': '100',
@@ -56,26 +58,26 @@ DEFAULT_SETTINGS = {
     'paid_wheel_car_max_rating': '8',
 }
 
-# ============ ДОСТИЖЕНИЯ ============
+# ============ ДОСТИЖЕНИЯ (с наградами) ============
 ACHIEVEMENTS = [
-    {'key': 'first_car',   'icon': '🚗', 'title': 'Первая ласточка',  'desc': 'Получить первую машину в гараж'},
-    {'key': 'cars_5',      'icon': '🏎️', 'title': 'Коллекционер',     'desc': 'Собрать 5 машин'},
-    {'key': 'cars_10',     'icon': '🏁', 'title': 'Автолюбитель',     'desc': 'Собрать 10 машин'},
-    {'key': 'cars_25',     'icon': '🏛️', 'title': 'Автомузей',        'desc': 'Собрать 25 машин'},
-    {'key': 'cars_50',     'icon': '👑', 'title': 'Мега-коллекция',   'desc': 'Собрать 50 машин'},
-    {'key': 'rich_1000',   'icon': '💰', 'title': 'Богач',            'desc': 'Накопить 1000 монет'},
-    {'key': 'rich_5000',   'icon': '💎', 'title': 'Миллионер',        'desc': 'Накопить 5000 монет'},
-    {'key': 'rich_10000',  'icon': '🏦', 'title': 'Банкир',           'desc': 'Накопить 10 000 монет'},
-    {'key': 'first_sell',  'icon': '💵', 'title': 'Первый обмен',     'desc': 'Продать первую машину'},
-    {'key': 'bonus_3',     'icon': '🎁', 'title': 'Бонус-охотник',    'desc': 'Забрать бонус 3 раза'},
-    {'key': 'bonus_7',     'icon': '📅', 'title': 'Верный игрок',     'desc': 'Забрать бонус 7 раз'},
-    {'key': 'spin_5',      'icon': '🎡', 'title': 'Колесник',         'desc': 'Покрутить колесо 5 раз'},
-    {'key': 'spin_20',     'icon': '🎰', 'title': 'Азартный',         'desc': 'Покрутить колесо 20 раз'},
-    {'key': 'lucky_car',   'icon': '🍀', 'title': 'Счастливчик',      'desc': 'Выиграть машину в колесе'},
-    {'key': 'five_star',   'icon': '⭐', 'title': 'Пятизвёздочный',   'desc': 'Владеть машиной с 5★ или выше'},
-    {'key': 'eight_star',  'icon': '🌟', 'title': 'Легенда',          'desc': 'Владеть машиной с 8★'},
-    {'key': 'premium',     'icon': '💎', 'title': 'VIP',              'desc': 'Крутить премиум-колесо'},
-    {'key': 'big_spender', 'icon': '🤑', 'title': 'Транжира',         'desc': 'Купить 10 машин'},
+    {'key': 'first_car',   'icon': '🚗', 'title': 'Первая ласточка',  'desc': 'Получить первую машину в гараж', 'reward': 100},
+    {'key': 'cars_5',      'icon': '🏎️', 'title': 'Коллекционер',     'desc': 'Собрать 5 машин',                'reward': 250},
+    {'key': 'cars_10',     'icon': '🏁', 'title': 'Автолюбитель',     'desc': 'Собрать 10 машин',               'reward': 500},
+    {'key': 'cars_25',     'icon': '🏛️', 'title': 'Автомузей',        'desc': 'Собрать 25 машин',               'reward': 1000},
+    {'key': 'cars_50',     'icon': '👑', 'title': 'Мега-коллекция',   'desc': 'Собрать 50 машин',               'reward': 2500},
+    {'key': 'rich_1000',   'icon': '💰', 'title': 'Богач',            'desc': 'Накопить 1000 монет',            'reward': 100},
+    {'key': 'rich_5000',   'icon': '💎', 'title': 'Миллионер',        'desc': 'Накопить 5000 монет',            'reward': 500},
+    {'key': 'rich_10000',  'icon': '🏦', 'title': 'Банкир',           'desc': 'Накопить 10 000 монет',          'reward': 1000},
+    {'key': 'first_sell',  'icon': '💵', 'title': 'Первый обмен',     'desc': 'Продать первую машину',          'reward': 100},
+    {'key': 'bonus_3',     'icon': '🎁', 'title': 'Бонус-охотник',    'desc': 'Забрать бонус 3 раза',           'reward': 200},
+    {'key': 'bonus_7',     'icon': '📅', 'title': 'Верный игрок',     'desc': 'Забрать бонус 7 раз',            'reward': 500},
+    {'key': 'spin_5',      'icon': '🎡', 'title': 'Колесник',         'desc': 'Покрутить колесо 5 раз',         'reward': 200},
+    {'key': 'spin_20',     'icon': '🎰', 'title': 'Азартный',         'desc': 'Покрутить колесо 20 раз',        'reward': 800},
+    {'key': 'lucky_car',   'icon': '🍀', 'title': 'Счастливчик',      'desc': 'Выиграть машину в колесе',       'reward': 300},
+    {'key': 'five_star',   'icon': '⭐', 'title': 'Пятизвёздочный',   'desc': 'Владеть машиной с 5★ или выше',  'reward': 300},
+    {'key': 'eight_star',  'icon': '🌟', 'title': 'Легенда',          'desc': 'Владеть машиной с 8★',           'reward': 2000},
+    {'key': 'premium',     'icon': '💎', 'title': 'VIP',              'desc': 'Крутить премиум-колесо',         'reward': 200},
+    {'key': 'big_spender', 'icon': '🤑', 'title': 'Транжира',         'desc': 'Купить 10 машин',               'reward': 500},
 ]
 
 
@@ -98,6 +100,7 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INTEGER')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_bonus_at TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_spin_at TEXT')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_streak INTEGER DEFAULT 0')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
@@ -134,31 +137,22 @@ def init_db():
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS trades (
         id SERIAL PRIMARY KEY,
-        from_user_id INTEGER NOT NULL,
-        to_user_id INTEGER NOT NULL,
-        from_car_id INTEGER NOT NULL,
-        from_coins INTEGER NOT NULL DEFAULT 0,
-        to_car_id INTEGER,
-        to_coins INTEGER NOT NULL DEFAULT 0,
-        message TEXT,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-        created_at TEXT NOT NULL,
-        resolved_at TEXT
+        from_user_id INTEGER NOT NULL, to_user_id INTEGER NOT NULL,
+        from_car_id INTEGER NOT NULL, from_coins INTEGER NOT NULL DEFAULT 0,
+        to_car_id INTEGER, to_coins INTEGER NOT NULL DEFAULT 0,
+        message TEXT, status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL, resolved_at TEXT
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS race_challenges (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        car_id INTEGER NOT NULL,
-        bet INTEGER NOT NULL,
-        offer_car BOOLEAN NOT NULL DEFAULT FALSE,
+        user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
+        bet INTEGER NOT NULL, offer_car BOOLEAN NOT NULL DEFAULT FALSE,
+        hide_car BOOLEAN NOT NULL DEFAULT FALSE,
         status VARCHAR(20) NOT NULL DEFAULT 'open',
-        opponent_id INTEGER,
-        opponent_car_id INTEGER,
-        winner_id INTEGER,
-        created_at TEXT NOT NULL,
-        completed_at TEXT
+        opponent_id INTEGER, opponent_car_id INTEGER, winner_id INTEGER,
+        created_at TEXT NOT NULL, completed_at TEXT
     )''')
-    # НОВОЕ: избранное и вишлист
+    c.execute('ALTER TABLE race_challenges ADD COLUMN IF NOT EXISTS hide_car BOOLEAN DEFAULT FALSE')
     c.execute('''CREATE TABLE IF NOT EXISTS favorite_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
         created_at TEXT NOT NULL, UNIQUE(user_id, car_id)
@@ -172,22 +166,6 @@ def init_db():
     c.execute('UPDATE cars SET price = 500 WHERE price IS NULL')
     for k, v in DEFAULT_SETTINGS.items():
         c.execute('INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING', (k, v))
-
-    # Одноразовое обновление баланса колеса до новой версии
-    c.execute("SELECT value FROM settings WHERE key = 'settings_version'")
-    row = c.fetchone()
-    if not row:
-        c.execute("UPDATE settings SET value = '30' WHERE key = 'wheel_coin_min'")
-        c.execute("UPDATE settings SET value = '150' WHERE key = 'wheel_coin_max'")
-        c.execute("UPDATE settings SET value = '5' WHERE key = 'wheel_car_chance'")
-        c.execute("UPDATE settings SET value = '4' WHERE key = 'wheel_car_max_rating'")
-        c.execute("UPDATE settings SET value = '1000' WHERE key = 'paid_wheel_price'")
-        c.execute("UPDATE settings SET value = '100' WHERE key = 'paid_wheel_coin_min'")
-        c.execute("UPDATE settings SET value = '600' WHERE key = 'paid_wheel_coin_max'")
-        c.execute("UPDATE settings SET value = '15' WHERE key = 'paid_wheel_car_chance'")
-        c.execute("UPDATE settings SET value = '5' WHERE key = 'paid_wheel_car_min_rating'")
-        c.execute("INSERT INTO settings (key, value) VALUES ('settings_version', '2') "
-                  "ON CONFLICT (key) DO UPDATE SET value = '2'")
 
     conn.commit()
     c.close()
@@ -226,8 +204,8 @@ def get_user(username):
 
 def create_user(username, password):
     conn = get_db(); c = conn.cursor()
-    c.execute('INSERT INTO users (username, password_hash, created_at, balance) '
-              'VALUES (%s, %s, %s, %s)',
+    c.execute('INSERT INTO users (username, password_hash, created_at, balance, login_streak) '
+              'VALUES (%s, %s, %s, %s, 0)',
               (username, generate_password_hash(password), datetime.now().isoformat(), START_BALANCE))
     conn.commit(); c.close(); conn.close()
 
@@ -241,12 +219,13 @@ def get_username_by_id(user_id):
 
 def get_user_profile(user_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id, balance
+    c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id, balance, login_streak
                  FROM users WHERE id = %s''', (user_id,))
     row = c.fetchone(); c.close(); conn.close()
     if not row: return None
     return {'id': row[0], 'username': row[1], 'avatar_data': row[2], 'avatar_mime': row[3],
-            'bio': row[4], 'favorite_car_id': row[5], 'balance': row[6] or 0}
+            'bio': row[4], 'favorite_car_id': row[5], 'balance': row[6] or 0,
+            'login_streak': row[7] or 0}
 
 
 def update_profile(user_id, bio, fav):
@@ -330,11 +309,22 @@ def get_unlocked_keys(user_id):
 
 
 def unlock_achievement(user_id, key):
+    """Возвращает True, если достижение было новым (и начисляет награду)."""
     conn = get_db(); c = conn.cursor()
     c.execute('INSERT INTO user_achievements (user_id, key, unlocked_at) VALUES (%s, %s, %s) '
-              'ON CONFLICT (user_id, key) DO NOTHING',
+              'ON CONFLICT (user_id, key) DO NOTHING RETURNING id',
               (user_id, key, datetime.now().isoformat()))
+    row = c.fetchone()
     conn.commit(); c.close(); conn.close()
+    if not row:
+        return False, 0
+    # Начисляем награду
+    ach = next((a for a in ACHIEVEMENTS if a['key'] == key), None)
+    reward = ach['reward'] if ach else 0
+    if reward > 0:
+        add_coins(user_id, reward)
+        log_transaction(user_id, 'ach_reward', reward, None, f'Награда за «{ach["title"]}»')
+    return True, reward
 
 
 def check_achievements(user_id):
@@ -372,8 +362,9 @@ def check_achievements(user_id):
     }
     for key, cond in checks.items():
         if key not in already and cond:
-            unlock_achievement(user_id, key)
-            new_ones.append(key)
+            is_new, reward = unlock_achievement(user_id, key)
+            if is_new:
+                new_ones.append((key, reward))
     return new_ones
 
 
@@ -395,13 +386,16 @@ def get_achievements_for_user(user_id):
 
 def flash_new_achievements(user_id):
     new = check_achievements(user_id)
-    for key in new:
+    for key, reward in new:
         for a in ACHIEVEMENTS:
             if a['key'] == key:
-                flash(f'{a["icon"]} Достижение: «{a["title"]}» — {a["desc"]}')
+                text = f'{a["icon"]} Достижение: «{a["title"]}»'
+                if reward:
+                    text += f' · +{reward} 💰'
+                flash(text)
 
 
-# ---------- БОНУС ----------
+# ---------- БОНУС / STREAK ----------
 def can_claim_bonus(user_id):
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT last_bonus_at FROM users WHERE id = %s', (user_id,))
@@ -414,12 +408,48 @@ def can_claim_bonus(user_id):
     return False, int(BONUS_COOLDOWN - diff)
 
 
-def claim_bonus(user_id):
+def get_bonus_preview(user_id):
+    """Возвращает (streak_после_получения, размер_бонуса)."""
     conn = get_db(); c = conn.cursor()
-    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s, last_bonus_at = %s WHERE id = %s',
-              (DAILY_BONUS, datetime.now().isoformat(), user_id))
+    c.execute('SELECT last_bonus_at, login_streak FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row or not row[0]:
+        return 1, DAILY_BONUS
+    try:
+        last = datetime.fromisoformat(row[0])
+    except (ValueError, TypeError):
+        return 1, DAILY_BONUS
+    diff_hours = (datetime.now() - last).total_seconds() / 3600
+    if diff_hours <= STREAK_BREAK_HOURS:
+        streak = min((row[1] or 0) + 1, BONUS_STREAK_MAX)
+    else:
+        streak = 1
+    amount = min(DAILY_BONUS + (streak - 1) * BONUS_STREAK_STEP, BONUS_STREAK_MAX_AMOUNT)
+    return streak, amount
+
+
+def claim_bonus(user_id):
+    """Возвращает (bonus_amount, streak)."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT last_bonus_at, login_streak FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone()
+    streak = 1
+    if row and row[0]:
+        try:
+            last = datetime.fromisoformat(row[0])
+            diff_hours = (datetime.now() - last).total_seconds() / 3600
+            if diff_hours <= STREAK_BREAK_HOURS:
+                streak = min((row[1] or 0) + 1, BONUS_STREAK_MAX)
+        except (ValueError, TypeError):
+            pass
+    amount = min(DAILY_BONUS + (streak - 1) * BONUS_STREAK_STEP, BONUS_STREAK_MAX_AMOUNT)
+
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s, last_bonus_at = %s, '
+              'login_streak = %s WHERE id = %s',
+              (amount, datetime.now().isoformat(), streak, user_id))
     conn.commit(); c.close(); conn.close()
-    log_transaction(user_id, 'bonus', DAILY_BONUS, None, 'Ежедневный бонус')
+    log_transaction(user_id, 'bonus', amount, None, f'Ежедневный бонус (серия {streak})')
+    return amount, streak
 
 
 def format_time_left(seconds):
@@ -540,7 +570,6 @@ def buy_car(user_id, car_id):
     c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s', (final_price, user_id))
     c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
               (user_id, car_id, datetime.now().isoformat()))
-    # Убираем из вишлиста после покупки
     c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     conn.commit(); c.close(); conn.close()
     desc = f'Покупка: {car[1]}' + (' (со скидкой дня)' if was_disc else '')
@@ -567,7 +596,6 @@ def sell_car(user_id, car_id):
 
 # ---------- ИЗБРАННОЕ ----------
 def toggle_favorite(user_id, car_id):
-    """Возвращает True, если добавили; False, если убрали."""
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT 1 FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     exists = c.fetchone()
@@ -613,7 +641,6 @@ def get_wishlist_ids(user_id):
 
 
 def get_wishlist_cars(user_id):
-    """Возвращает список dict-ов машин из вишлиста."""
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT c.id, c.model, c.rating, c.price, w.created_at
                  FROM cars c JOIN wishlist w ON w.car_id = c.id
@@ -941,7 +968,7 @@ def cleanup_expired_challenges():
     c.close(); conn.close()
 
 
-def create_race_challenge(user_id, car_id, bet, offer_car):
+def create_race_challenge(user_id, car_id, bet, offer_car, hide_car):
     car = get_car_full(car_id)
     if not car: return False, 'Машина не найдена'
     if not has_car(user_id, car_id): return False, 'У тебя нет этой машины'
@@ -950,9 +977,9 @@ def create_race_challenge(user_id, car_id, bet, offer_car):
     if get_balance(user_id) < bet: return False, f'Не хватает монет. У тебя {get_balance(user_id)}'
     conn = get_db(); c = conn.cursor()
     c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s', (bet, user_id))
-    c.execute('''INSERT INTO race_challenges (user_id, car_id, bet, offer_car, status, created_at)
-                 VALUES (%s, %s, %s, %s, 'open', %s) RETURNING id''',
-              (user_id, car_id, bet, offer_car, datetime.now().isoformat()))
+    c.execute('''INSERT INTO race_challenges (user_id, car_id, bet, offer_car, hide_car, status, created_at)
+                 VALUES (%s, %s, %s, %s, %s, 'open', %s) RETURNING id''',
+              (user_id, car_id, bet, offer_car, hide_car, datetime.now().isoformat()))
     rid = c.fetchone()[0]
     conn.commit(); c.close(); conn.close()
     log_transaction(user_id, 'race_bet', -bet, car_id, 'Ставка на гонку')
@@ -963,24 +990,26 @@ def get_open_challenges(exclude_user_id=None):
     cleanup_expired_challenges()
     conn = get_db(); c = conn.cursor()
     if exclude_user_id:
-        c.execute("SELECT id, user_id, car_id, bet, offer_car FROM race_challenges "
+        c.execute("SELECT id, user_id, car_id, bet, offer_car, hide_car FROM race_challenges "
                   "WHERE status = 'open' AND user_id != %s ORDER BY id DESC", (exclude_user_id,))
     else:
-        c.execute("SELECT id, user_id, car_id, bet, offer_car FROM race_challenges "
+        c.execute("SELECT id, user_id, car_id, bet, offer_car, hide_car FROM race_challenges "
                   "WHERE status = 'open' ORDER BY id DESC")
     rows = c.fetchall(); c.close(); conn.close()
     return [{'id': r[0], 'user_id': r[1], 'username': get_username_by_id(r[1]),
-             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4]} for r in rows]
+             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4],
+             'hide_car': bool(r[5])} for r in rows]
 
 
 def get_user_challenges(user_id):
     cleanup_expired_challenges()
     conn = get_db(); c = conn.cursor()
-    c.execute("SELECT id, user_id, car_id, bet, offer_car FROM race_challenges "
+    c.execute("SELECT id, user_id, car_id, bet, offer_car, hide_car FROM race_challenges "
               "WHERE status = 'open' AND user_id = %s ORDER BY id DESC", (user_id,))
     rows = c.fetchall(); c.close(); conn.close()
     return [{'id': r[0], 'user_id': r[1], 'username': get_username_by_id(r[1]),
-             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4]} for r in rows]
+             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4],
+             'hide_car': bool(r[5])} for r in rows]
 
 
 def cancel_race_challenge(challenge_id, user_id):
@@ -1064,28 +1093,27 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
                     'Гонка: победа' if winner_id == user_id else 'Гонка: поражение')
 
     return True, 'Гонка завершена!', {
-        'winner_id': winner_id,
-        'challenge_id': challenge_id,
+        'winner_id': winner_id, 'challenge_id': challenge_id,
         'car_transferred': car_transferred,
     }
 
 
 def get_race(challenge_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, user_id, car_id, bet, offer_car, status,
+    c.execute('''SELECT id, user_id, car_id, bet, offer_car, hide_car, status,
                         opponent_id, opponent_car_id, winner_id, created_at, completed_at
                  FROM race_challenges WHERE id = %s''', (challenge_id,))
     row = c.fetchone(); c.close(); conn.close()
     if not row: return None
     return {
         'id': row[0], 'user_id': row[1], 'car_id': row[2], 'bet': row[3],
-        'offer_car': row[4], 'status': row[5], 'opponent_id': row[6],
-        'opponent_car_id': row[7], 'winner_id': row[8],
-        'created_at': row[9], 'completed_at': row[10],
+        'offer_car': row[4], 'hide_car': bool(row[5]), 'status': row[6],
+        'opponent_id': row[7], 'opponent_car_id': row[8], 'winner_id': row[9],
+        'created_at': row[10], 'completed_at': row[11],
         'author': get_username_by_id(row[1]),
         'author_car': get_car_full(row[2]),
-        'opponent': get_username_by_id(row[6]) if row[6] else None,
-        'opponent_car': get_car_full(row[7]) if row[7] else None,
+        'opponent': get_username_by_id(row[7]) if row[7] else None,
+        'opponent_car': get_car_full(row[8]) if row[8] else None,
     }
 
 
@@ -1123,10 +1151,8 @@ def get_leaderboard(sort_by='cars', limit=50):
     rows = c.fetchall(); c.close(); conn.close()
     result = []
     for i, row in enumerate(rows, start=1):
-        result.append({
-            'rank': i, 'id': row[0], 'username': row[1],
-            'value': row[2] or 0, 'has_avatar': row[3],
-        })
+        result.append({'rank': i, 'id': row[0], 'username': row[1],
+                       'value': row[2] or 0, 'has_avatar': row[3]})
     return result
 
 
@@ -1194,6 +1220,7 @@ def index():
     incoming_trades_count = 0
     active_races_count = 0
     wishlist_count = 0
+    streak = 0; next_bonus = 0
     if 'user_id' in session:
         flash_new_achievements(session['user_id'])
         profile = get_user_profile(session['user_id'])
@@ -1202,6 +1229,7 @@ def index():
         cars_count = count_user_cars(session['user_id'])
         bonus_ready, secs = can_claim_bonus(session['user_id'])
         if not bonus_ready: bonus_left = format_time_left(secs)
+        streak, next_bonus = get_bonus_preview(session['user_id'])
         spin_ready, secs2 = can_spin(session['user_id'])
         if not spin_ready: spin_left = format_time_left(secs2)
         achievements_count = len(get_unlocked_keys(session['user_id']))
@@ -1218,6 +1246,7 @@ def index():
                            incoming_trades_count=incoming_trades_count,
                            active_races_count=active_races_count,
                            wishlist_count=wishlist_count,
+                           streak=streak, next_bonus=next_bonus,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -1226,8 +1255,8 @@ def index():
 def bonus():
     ready, _ = can_claim_bonus(session['user_id'])
     if ready:
-        claim_bonus(session['user_id'])
-        flash(f'🎁 Ежедневный бонус: +{DAILY_BONUS} монет!')
+        amount, streak = claim_bonus(session['user_id'])
+        flash(f'🎁 Бонус получен: +{amount} монет (серия {streak})!')
     else:
         flash('Бонус пока недоступен')
     return redirect(url_for('index'))
@@ -1317,8 +1346,7 @@ def profile_page(username):
     import traceback
     try:
         user_row = get_user(username)
-        if not user_row:
-            flash('Игрока нет'); return redirect(url_for('index'))
+        if not user_row: flash('Игрока нет'); return redirect(url_for('index'))
         profile = get_user_profile(user_row[0])
         favorite_car = get_car_info(profile['favorite_car_id']) if profile['favorite_car_id'] else None
         return render_template('profile.html', profile=profile, favorite_car=favorite_car,
@@ -1434,7 +1462,6 @@ def shop_wishlist_toggle(car_id):
 def wishlist_page():
     items = get_wishlist_cars(session['user_id'])
     balance = get_balance(session['user_id'])
-    # Считаем финальные цены со скидкой
     ensure_discount()
     discount = get_active_discount()
     for item in items:
@@ -1628,8 +1655,11 @@ def achievements_page():
     flash_new_achievements(session['user_id'])
     achievements = get_achievements_for_user(session['user_id'])
     unlocked = sum(1 for a in achievements if a['unlocked'])
+    total_reward = sum(a['reward'] for a in achievements)
+    earned_reward = sum(a['reward'] for a in achievements if a['unlocked'])
     return render_template('achievements.html', achievements=achievements,
                            unlocked_count=unlocked, total=len(achievements),
+                           total_reward=total_reward, earned_reward=earned_reward,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
@@ -1738,13 +1768,14 @@ def race_create():
     car_id = request.form.get('car_id', '')
     bet = request.form.get('bet', '0')
     offer_car = bool(request.form.get('offer_car'))
+    hide_car = bool(request.form.get('hide_car'))
     if not car_id.isdigit(): flash('Выбери машину'); return redirect(url_for('races_page'))
     try:
         bet = int(bet)
         if bet < 0: raise ValueError
     except ValueError:
         flash('Ставка — число'); return redirect(url_for('races_page'))
-    ok, result = create_race_challenge(session['user_id'], int(car_id), bet, offer_car)
+    ok, result = create_race_challenge(session['user_id'], int(car_id), bet, offer_car, hide_car)
     if ok: flash('Вызов создан! Ждём соперника.')
     else: flash(result)
     return redirect(url_for('races_page'))
