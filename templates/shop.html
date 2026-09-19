@@ -47,11 +47,13 @@
                             </form>
                         </div>
                     {% endif %}
-                    <div class="car-image">
-                        <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
-                    </div>
+                    <a href="/car/{{ car.id }}" class="car-image-link">
+                        <div class="car-image">
+                            <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                        </div>
+                    </a>
                     <div class="car-info">
-                        <div class="car-model">{{ car.model }}</div>
+                        <div class="car-model"><a href="/car/{{ car.id }}">{{ car.model }}</a></div>
                         <div class="car-stars">
                             {% for i in range(1, 9) %}
                                 <span class="star {% if i <= car.rating %}filled{% endif %}">★</span>
