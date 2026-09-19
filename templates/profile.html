@@ -53,7 +53,7 @@
         {% if public_cars %}
             <div class="cars-grid">
                 {% for car in public_cars %}
-                    {% set car_id, model, rating = car %}
+                    {% set car_id, model, rating, price = car %}
                     <div class="car-card">
                         <div class="car-image">
                             <img src="/car_image/{{ car_id }}" alt="{{ model }}">
