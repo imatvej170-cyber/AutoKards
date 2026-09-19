@@ -875,30 +875,40 @@ def logout():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
-    user_id = session['user_id']
-    if request.method == 'POST':
-        bio = request.form.get('bio', '').strip()[:200]
-        fav = request.form.get('favorite_car_id', '').strip()
-        fav_id = None
-        if fav and fav.isdigit() and has_car(user_id, int(fav)):
-            fav_id = int(fav)
-        file = request.files.get('avatar')
-        if file and file.filename != '':
-            if file.mimetype in ALLOWED_MIME:
-                update_avatar(user_id, file.read(), file.mimetype)
-            else:
-                flash('Аватарка: только PNG, JPG, WEBP, GIF'); return redirect(url_for('settings'))
-        public_ids = [int(x) for x in request.form.getlist('public_cars') if x.isdigit()]
-        my_ids = {c[0] for c in get_user_cars(user_id)}
-        public_ids = [x for x in public_ids if x in my_ids]
-        set_public_cars(user_id, public_ids)
-        update_profile(user_id, bio, fav_id)
-        flash('Профиль обновлён!')
-        return redirect(url_for('index'))
-    profile = get_user_profile(user_id)
-    return render_template('settings.html', user=session.get('username'), profile=profile,
-                           my_cars=get_user_cars(user_id), public_ids=get_public_ids(user_id),
-                           is_admin=is_admin(session.get('username')))
+    import traceback
+    try:
+        user_id = session['user_id']
+        if request.method == 'POST':
+            bio = request.form.get('bio', '').strip()[:200]
+            fav = request.form.get('favorite_car_id', '').strip()
+            fav_id = None
+            if fav and fav.isdigit() and has_car(user_id, int(fav)):
+                fav_id = int(fav)
+            file = request.files.get('avatar')
+            if file and file.filename != '':
+                if file.mimetype in ALLOWED_MIME:
+                    update_avatar(user_id, file.read(), file.mimetype)
+                else:
+                    flash('Аватарка: только PNG, JPG, WEBP, GIF')
+                    return redirect(url_for('settings'))
+            public_ids = [int(x) for x in request.form.getlist('public_cars') if x.isdigit()]
+            my_ids = {c[0] for c in get_user_cars(user_id)}
+            public_ids = [x for x in public_ids if x in my_ids]
+            set_public_cars(user_id, public_ids)
+            update_profile(user_id, bio, fav_id)
+            flash('Профиль обновлён!')
+            return redirect(url_for('index'))
+        profile = get_user_profile(user_id)
+        my_cars = get_user_cars(user_id)
+        public_ids = get_public_ids(user_id)
+        return render_template('settings.html',
+                               user=session.get('username'),
+                               profile=profile,
+                               my_cars=my_cars,
+                               public_ids=public_ids,
+                               is_admin=is_admin(session.get('username')))
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /settings:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
 @app.route('/avatar/<int:user_id>')
