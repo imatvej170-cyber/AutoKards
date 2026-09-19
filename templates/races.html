@@ -13,7 +13,6 @@
         {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
-    {# ===== СОЗДАТЬ ВЫЗОВ ===== #}
     <div class="create-block">
         <h3 class="section-title">🏎️ Создать вызов</h3>
         {% if my_cars %}
@@ -23,17 +22,22 @@
                     <option value="">— Выбери машину —</option>
                     {% for car in my_cars %}
                         {% set car_id, model, rating, price = car %}
-                        <option value="{{ car_id }}">{{ model }} ({{ rating }}★) — мин. ставка {{ rating * rating * 25 }}</option>
+                        <option value="{{ car_id }}">{{ model }} ({{ rating }}★) — мин. {{ rating * rating * 25 }}</option>
                     {% endfor %}
                 </select>
 
                 <label class="form-label">Ставка (монет)</label>
                 <input type="number" name="bet" min="25" step="25" value="100" required class="form-input">
-                <p class="hint">Чем выше звёзды машины — тем выше минимальная ставка. Победитель забирает весь банк (×2).</p>
+                <p class="hint">Победитель забирает весь банк (×2).</p>
 
                 <label class="check-row">
                     <input type="checkbox" name="offer_car" value="1">
-                    Готов поставить машину на кон (если соперник тоже — проигравший отдаёт авто)
+                    🚗 Поставить машину на кон (если соперник тоже — проигравший отдаёт авто)
+                </label>
+
+                <label class="check-row">
+                    <input type="checkbox" name="hide_car" value="1">
+                    🙈 Скрыть мою машину от соперника (честная гонка — без подсматривания)
                 </label>
 
                 <button type="submit" class="btn btn-primary">🔍 Искать соперника</button>
@@ -43,7 +47,6 @@
         {% endif %}
     </div>
 
-    {# ===== МОИ АКТИВНЫЕ ВЫЗОВЫ ===== #}
     {% if my_challenges %}
         <h3 class="section-title">⏳ Мои активные вызовы ({{ my_challenges|length }})</h3>
         <div class="races-list">
@@ -62,6 +65,7 @@
                             {% endfor %}
                         </div>
                         {% if ch.offer_car %}<div class="offer-tag">🚗 Машина на кону</div>{% endif %}
+                        {% if ch.hide_car %}<div class="hide-tag">🙈 Скрытая</div>{% endif %}
                     </div>
                     <form method="POST" action="/races/cancel/{{ ch.id }}">
                         <button type="submit" class="btn btn-secondary btn-tiny">Отменить</button>
@@ -71,7 +75,6 @@
         </div>
     {% endif %}
 
-    {# ===== ЧУЖИЕ ВЫЗОВЫ ===== #}
     <h3 class="section-title">🔥 Открытые вызовы ({{ other_challenges|length }})</h3>
     {% if other_challenges %}
         <div class="races-list">
@@ -82,14 +85,27 @@
                         <span class="race-bet">💰 {{ ch.bet }}</span>
                     </div>
                     <div class="race-car">
-                        <img src="/car_image/{{ ch.car.id }}" alt="{{ ch.car.model }}">
-                        <div class="race-model">{{ ch.car.model }}</div>
-                        <div class="race-mini-stars">
-                            {% for i in range(1, 9) %}
-                                <span class="star {% if i <= ch.car.rating %}filled{% endif %}">★</span>
-                            {% endfor %}
-                        </div>
+                        {% if ch.hide_car %}
+                            <div class="hidden-car">
+                                <div class="hidden-car-icon">❓</div>
+                                <div class="hidden-car-text">Машина скрыта</div>
+                                <div class="race-mini-stars">
+                                    {% for i in range(1, 9) %}
+                                        <span class="star filled">★</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <img src="/car_image/{{ ch.car.id }}" alt="{{ ch.car.model }}">
+                            <div class="race-model">{{ ch.car.model }}</div>
+                            <div class="race-mini-stars">
+                                {% for i in range(1, 9) %}
+                                    <span class="star {% if i <= ch.car.rating %}filled{% endif %}">★</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         {% if ch.offer_car %}<div class="offer-tag">🚗 Машина на кону</div>{% endif %}
+                        {% if ch.hide_car %}<div class="hide-tag">🙈 Скрытая</div>{% endif %}
                     </div>
                     {% if balance < ch.bet %}
                         <p class="hint">Нужно {{ ch.bet }} монет</p>
@@ -196,6 +212,18 @@
             font-size: 12px; background: #fff3cd; color: #856404;
             padding: 4px 12px; border-radius: 20px; font-weight: 700;
         }
+        .hide-tag {
+            font-size: 12px; background: #e3f2fd; color: #1565c0;
+            padding: 4px 12px; border-radius: 20px; font-weight: 700;
+        }
+        .hidden-car {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            border-radius: 14px; padding: 20px;
+            width: 150px; height: 90px; justify-content: center;
+        }
+        .hidden-car-icon { font-size: 36px; }
+        .hidden-car-text { font-size: 12px; color: #6b3d00; font-weight: 700; }
         .btn-tiny { padding: 10px 20px; font-size: 14px; }
         .join-form { display: flex; flex-direction: column; gap: 6px; }
     </style>
