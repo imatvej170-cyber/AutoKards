@@ -910,17 +910,29 @@ def avatar(user_id):
 
 @app.route('/profile/<username>')
 def profile_page(username):
-    user_row = get_user(username)
-    if not user_row: flash('Игрока нет'); return redirect(url_for('index'))
-    profile = get_user_profile(user_row[0])
-    favorite_car = get_car_info(profile['favorite_car_id']) if profile['favorite_car_id'] else None
-    return render_template('profile.html', profile=profile, favorite_car=favorite_car,
-                           public_cars=get_public_cars(user_row[0]),
-                           cars_count=count_user_cars(user_row[0]),
-                           achievements=get_achievements_for_user(user_row[0]),
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
-
+    import traceback
+    try:
+        user_row = get_user(username)
+        if not user_row:
+            flash('Такого игрока нет')
+            return redirect(url_for('index'))
+        profile = get_user_profile(user_row[0])
+        favorite_car = None
+        if profile['favorite_car_id']:
+            favorite_car = get_car_info(profile['favorite_car_id'])
+        public_cars = get_public_cars(user_row[0])
+        cars_count = count_user_cars(user_row[0])
+        achievements = get_achievements_for_user(user_row[0])
+        return render_template('profile.html',
+                               profile=profile,
+                               favorite_car=favorite_car,
+                               public_cars=public_cars,
+                               cars_count=cars_count,
+                               achievements=achievements,
+                               user=session.get('username'),
+                               is_admin=is_admin(session.get('username')))
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /profile:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 # ---------- ГАРАЖ ----------
 @app.route('/garage')
