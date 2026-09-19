@@ -80,13 +80,17 @@
             <h3 class="action-title">Что ты отдашь взамен?</h3>
             {% if my_cars %}
                 <form method="POST" action="/trades/{{ trade.id }}/accept">
-                    <label class="form-label">Выбери свою машину</label>
-                    <select name="to_car_id" class="form-select" required>
-                        <option value="">— Выбери машину —</option>
-                        {% for car in my_cars %}
-                            {% set car_id, model, rating, price = car %}
-                            <option value="{{ car_id }}">{{ model }} ({{ rating }}★)</option>
-                        {% endfor %}
+<label class="form-label">Выбери свою машину (необязательно)</label>
+<select name="to_car_id" class="form-select">
+    <option value="">— Не давать машину —</option>
+    {% for car in my_cars %}
+        {% set car_id, model, rating, price = car %}
+        <option value="{{ car_id }}">{{ model }} ({{ rating }}★)</option>
+    {% endfor %}
+</select>
+<p class="hint">Если не выберешь машину — просто получишь предложенное, доплатив монетами (или совсем ничего).</p>
+                    </select>
+<p class="hint">Если не выберешь машину — просто получишь предложенное, доплатив монетами (или совсем ничего).</p>
                     </select>
 
                     <label class="form-label">Сколько своих монет отдаёшь</label>
