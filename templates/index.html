@@ -19,6 +19,7 @@
                 <span class="stat-pill">💰 {{ profile.balance }} монет</span>
                 <span class="stat-pill">🚗 {{ cars_count }} машин</span>
                 <span class="stat-pill">🏆 {{ achievements_count }} достиж.</span>
+                <span class="stat-pill">👥 {{ friends_count }} друзей</span>
             </div>
 
             <div class="bonus-row">
@@ -66,6 +67,7 @@
                 <a href="/compare" class="btn btn-secondary">⚖️ Сравнить</a>
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
+                <a href="/friends" class="btn btn-primary">👥 Друзья{% if incoming_friend_requests %} ({{ incoming_friend_requests }}){% endif %}</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
                 {% endif %}
