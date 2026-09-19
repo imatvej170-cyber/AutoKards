@@ -30,27 +30,29 @@ RACE_TIMEOUT_MIN = 15
 RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8: 1600}
 
 # ============ АДМИНЫ ============
-ADMIN_USERNAMES = {'AppleAT'}  # ← замени на свой ник
+ADMIN_USERNAMES = {'imatvej170'}  # ← замени на свой ник
 
-# ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ ============
+# ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ (обновлённый баланс колеса) ============
 DEFAULT_SETTINGS = {
     'discount_enabled': '1',
     'discount_min_rating': '1',
     'discount_max_rating': '3',
     'discount_percent': '50',
+    # Бесплатное колесо — теперь скромнее
     'wheel_enabled': '1',
-    'wheel_coin_min': '50',
-    'wheel_coin_max': '500',
-    'wheel_car_chance': '10',
+    'wheel_coin_min': '30',
+    'wheel_coin_max': '150',
+    'wheel_car_chance': '5',
     'wheel_car_min_rating': '1',
-    'wheel_car_max_rating': '5',
+    'wheel_car_max_rating': '4',
     'wheel_cooldown_hours': '24',
+    # Премиум-колесо — дороже и щедрее по шансу машины, но монет меньше
     'paid_wheel_enabled': '1',
-    'paid_wheel_price': '300',
-    'paid_wheel_coin_min': '200',
-    'paid_wheel_coin_max': '2000',
-    'paid_wheel_car_chance': '30',
-    'paid_wheel_car_min_rating': '4',
+    'paid_wheel_price': '1000',
+    'paid_wheel_coin_min': '100',
+    'paid_wheel_coin_max': '600',
+    'paid_wheel_car_chance': '15',
+    'paid_wheel_car_min_rating': '5',
     'paid_wheel_car_max_rating': '8',
 }
 
@@ -156,11 +158,37 @@ def init_db():
         created_at TEXT NOT NULL,
         completed_at TEXT
     )''')
+    # НОВОЕ: избранное и вишлист
+    c.execute('''CREATE TABLE IF NOT EXISTS favorite_cars (
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL, UNIQUE(user_id, car_id)
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS wishlist (
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL, UNIQUE(user_id, car_id)
+    )''')
 
     c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
     c.execute('UPDATE cars SET price = 500 WHERE price IS NULL')
     for k, v in DEFAULT_SETTINGS.items():
         c.execute('INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING', (k, v))
+
+    # Одноразовое обновление баланса колеса до новой версии
+    c.execute("SELECT value FROM settings WHERE key = 'settings_version'")
+    row = c.fetchone()
+    if not row:
+        c.execute("UPDATE settings SET value = '30' WHERE key = 'wheel_coin_min'")
+        c.execute("UPDATE settings SET value = '150' WHERE key = 'wheel_coin_max'")
+        c.execute("UPDATE settings SET value = '5' WHERE key = 'wheel_car_chance'")
+        c.execute("UPDATE settings SET value = '4' WHERE key = 'wheel_car_max_rating'")
+        c.execute("UPDATE settings SET value = '1000' WHERE key = 'paid_wheel_price'")
+        c.execute("UPDATE settings SET value = '100' WHERE key = 'paid_wheel_coin_min'")
+        c.execute("UPDATE settings SET value = '600' WHERE key = 'paid_wheel_coin_max'")
+        c.execute("UPDATE settings SET value = '15' WHERE key = 'paid_wheel_car_chance'")
+        c.execute("UPDATE settings SET value = '5' WHERE key = 'paid_wheel_car_min_rating'")
+        c.execute("INSERT INTO settings (key, value) VALUES ('settings_version', '2') "
+                  "ON CONFLICT (key) DO UPDATE SET value = '2'")
+
     conn.commit()
     c.close()
     conn.close()
@@ -463,6 +491,8 @@ def delete_car_from_catalog(car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
     c.execute('DELETE FROM public_cars WHERE car_id = %s', (car_id,))
+    c.execute('DELETE FROM favorite_cars WHERE car_id = %s', (car_id,))
+    c.execute('DELETE FROM wishlist WHERE car_id = %s', (car_id,))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE favorite_car_id = %s', (car_id,))
     c.execute('DELETE FROM daily_discount WHERE car_id = %s', (car_id,))
     c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
@@ -510,6 +540,8 @@ def buy_car(user_id, car_id):
     c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s', (final_price, user_id))
     c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
               (user_id, car_id, datetime.now().isoformat()))
+    # Убираем из вишлиста после покупки
+    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     conn.commit(); c.close(); conn.close()
     desc = f'Покупка: {car[1]}' + (' (со скидкой дня)' if was_disc else '')
     log_transaction(user_id, 'buy', -final_price, car_id, desc)
@@ -524,12 +556,70 @@ def sell_car(user_id, car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
               (user_id, car_id))
     c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (refund, user_id))
     conn.commit(); c.close(); conn.close()
     log_transaction(user_id, 'sell', refund, car_id, f'Продажа: {car[1]}')
     return True, f'«{car[1]}» продана за {refund} монет', refund
+
+
+# ---------- ИЗБРАННОЕ ----------
+def toggle_favorite(user_id, car_id):
+    """Возвращает True, если добавили; False, если убрали."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    exists = c.fetchone()
+    if exists:
+        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+        result = False
+    else:
+        c.execute('INSERT INTO favorite_cars (user_id, car_id, created_at) VALUES (%s, %s, %s)',
+                  (user_id, car_id, datetime.now().isoformat()))
+        result = True
+    conn.commit(); c.close(); conn.close()
+    return result
+
+
+def get_favorite_ids(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT car_id FROM favorite_cars WHERE user_id = %s', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return {r[0] for r in rows}
+
+
+# ---------- ВИШЛИСТ ----------
+def toggle_wishlist(user_id, car_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    exists = c.fetchone()
+    if exists:
+        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+        result = False
+    else:
+        c.execute('INSERT INTO wishlist (user_id, car_id, created_at) VALUES (%s, %s, %s)',
+                  (user_id, car_id, datetime.now().isoformat()))
+        result = True
+    conn.commit(); c.close(); conn.close()
+    return result
+
+
+def get_wishlist_ids(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT car_id FROM wishlist WHERE user_id = %s', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return {r[0] for r in rows}
+
+
+def get_wishlist_cars(user_id):
+    """Возвращает список dict-ов машин из вишлиста."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT c.id, c.model, c.rating, c.price, w.created_at
+                 FROM cars c JOIN wishlist w ON w.car_id = c.id
+                 WHERE w.user_id = %s ORDER BY w.id DESC''', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'model': r[1], 'rating': r[2], 'price': r[3] or 0} for r in rows]
 
 
 # ---------- СКИДКА ДНЯ ----------
@@ -585,15 +675,15 @@ def can_spin(user_id):
 
 def do_spin(user_id, paid=False):
     if paid:
-        price = get_int_setting('paid_wheel_price', 300)
+        price = get_int_setting('paid_wheel_price', 1000)
         if get_balance(user_id) < price:
             return {'error': f'Нужно {price} монет'}
         add_coins(user_id, -price)
         log_transaction(user_id, 'paid_wheel_spend', -price, None, 'Премиум-колесо')
-        car_chance = get_int_setting('paid_wheel_car_chance', 30)
-        coin_min = get_int_setting('paid_wheel_coin_min', 200)
-        coin_max = get_int_setting('paid_wheel_coin_max', 2000)
-        min_r = get_int_setting('paid_wheel_car_min_rating', 4)
+        car_chance = get_int_setting('paid_wheel_car_chance', 15)
+        coin_min = get_int_setting('paid_wheel_coin_min', 100)
+        coin_max = get_int_setting('paid_wheel_coin_max', 600)
+        min_r = get_int_setting('paid_wheel_car_min_rating', 5)
         max_r = get_int_setting('paid_wheel_car_max_rating', 8)
         coins_tx, car_tx = 'paid_wheel_coins', 'paid_wheel_car'
         prefix = 'Премиум-колесо'
@@ -605,11 +695,11 @@ def do_spin(user_id, paid=False):
         c.execute('UPDATE users SET last_spin_at = %s WHERE id = %s',
                   (datetime.now().isoformat(), user_id))
         conn.commit(); c.close(); conn.close()
-        car_chance = get_int_setting('wheel_car_chance', 10)
-        coin_min = get_int_setting('wheel_coin_min', 50)
-        coin_max = get_int_setting('wheel_coin_max', 500)
+        car_chance = get_int_setting('wheel_car_chance', 5)
+        coin_min = get_int_setting('wheel_coin_min', 30)
+        coin_max = get_int_setting('wheel_coin_max', 150)
         min_r = get_int_setting('wheel_car_min_rating', 1)
-        max_r = get_int_setting('wheel_car_max_rating', 5)
+        max_r = get_int_setting('wheel_car_max_rating', 4)
         coins_tx, car_tx = 'wheel_coins', 'wheel_car'
         prefix = 'Колесо'
 
@@ -635,15 +725,11 @@ def do_spin(user_id, paid=False):
 # ---------- ОБМЕНЫ ----------
 def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
     to_user = get_user(to_username)
-    if not to_user:
-        return False, 'Игрок с таким ником не найден'
+    if not to_user: return False, 'Игрок с таким ником не найден'
     to_user_id = to_user[0]
-    if to_user_id == from_user_id:
-        return False, 'Нельзя предложить обмен самому себе'
-    if not has_car(from_user_id, from_car_id):
-        return False, 'У тебя нет этой машины'
-    if from_coins < 0:
-        return False, 'Монеты не могут быть отрицательными'
+    if to_user_id == from_user_id: return False, 'Нельзя предложить обмен самому себе'
+    if not has_car(from_user_id, from_car_id): return False, 'У тебя нет этой машины'
+    if from_coins < 0: return False, 'Монеты не могут быть отрицательными'
     if get_balance(from_user_id) < from_coins:
         return False, f'Не хватает монет. У тебя {get_balance(from_user_id)}'
     message = (message or '')[:200]
@@ -736,8 +822,7 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
     if has_car(user_id, t['from_car_id']):
         return False, 'У тебя уже есть эта машина — обмен не имеет смысла'
     if to_car_id:
-        if not has_car(user_id, to_car_id):
-            return False, 'У тебя нет этой машины'
+        if not has_car(user_id, to_car_id): return False, 'У тебя нет этой машины'
         if has_car(t['from_user_id'], to_car_id):
             return False, 'У отправителя уже есть эта машина'
 
@@ -749,8 +834,12 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
               (user_id, t['from_car_id'], datetime.now().isoformat()))
     c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s',
               (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
               (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s',
+              (user_id, t['from_car_id']))
 
     if to_car_id:
         c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
@@ -758,8 +847,11 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
                      VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
                   (t['from_user_id'], to_car_id, datetime.now().isoformat()))
         c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
+        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
         c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
                   (user_id, to_car_id))
+        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s',
+                  (t['from_user_id'], to_car_id))
 
     diff = t['from_coins'] - to_coins
     if diff > 0:
@@ -952,6 +1044,8 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
                   (winner_id, loser_car_id, datetime.now().isoformat()))
         c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s',
                   (loser_id, loser_car_id))
+        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s',
+                  (loser_id, loser_car_id))
         c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
                   (loser_id, loser_car_id))
         car_transferred = True
@@ -1030,11 +1124,8 @@ def get_leaderboard(sort_by='cars', limit=50):
     result = []
     for i, row in enumerate(rows, start=1):
         result.append({
-            'rank': i,
-            'id': row[0],
-            'username': row[1],
-            'value': row[2] or 0,
-            'has_avatar': row[3],
+            'rank': i, 'id': row[0], 'username': row[1],
+            'value': row[2] or 0, 'has_avatar': row[3],
         })
     return result
 
@@ -1102,6 +1193,7 @@ def index():
     achievements_count = 0
     incoming_trades_count = 0
     active_races_count = 0
+    wishlist_count = 0
     if 'user_id' in session:
         flash_new_achievements(session['user_id'])
         profile = get_user_profile(session['user_id'])
@@ -1115,6 +1207,7 @@ def index():
         achievements_count = len(get_unlocked_keys(session['user_id']))
         incoming_trades_count = count_incoming_trades(session['user_id'])
         active_races_count = count_active_challenges()
+        wishlist_count = len(get_wishlist_ids(session['user_id']))
     return render_template('index.html',
                            user=session.get('username'), profile=profile,
                            favorite_car=favorite_car, cars_count=cars_count,
@@ -1124,6 +1217,7 @@ def index():
                            total_achievements=len(ACHIEVEMENTS),
                            incoming_trades_count=incoming_trades_count,
                            active_races_count=active_races_count,
+                           wishlist_count=wishlist_count,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -1242,8 +1336,14 @@ def profile_page(username):
 @login_required
 def garage():
     flash_new_achievements(session['user_id'])
-    return render_template('garage.html', cars=get_user_cars(session['user_id']),
-                           balance=get_balance(session['user_id']),
+    filter_type = request.args.get('filter', 'all')
+    cars = get_user_cars(session['user_id'])
+    fav_ids = get_favorite_ids(session['user_id'])
+    if filter_type == 'fav':
+        cars = [c for c in cars if c[0] in fav_ids]
+    return render_template('garage.html', cars=cars, balance=get_balance(session['user_id']),
+                           fav_ids=fav_ids, filter=filter_type,
+                           total_count=count_user_cars(session['user_id']),
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
@@ -1254,6 +1354,16 @@ def remove_from_garage(car_id):
     _, msg, _ = sell_car(session['user_id'], car_id)
     flash(msg)
     return redirect(url_for('garage'))
+
+
+@app.route('/garage/favorite/<int:car_id>', methods=['POST'])
+@login_required
+def garage_favorite(car_id):
+    if not has_car(session['user_id'], car_id):
+        flash('У тебя нет этой машины'); return redirect(url_for('garage'))
+    added = toggle_favorite(session['user_id'], car_id)
+    flash('⭐ Добавлено в избранное' if added else 'Убрано из избранного')
+    return redirect(request.referrer or url_for('garage'))
 
 
 # ---------- МАГАЗИН ----------
@@ -1267,11 +1377,11 @@ def shop():
         balance = get_balance(session['user_id'])
         settings = {k: get_setting(k) for k in DEFAULT_SETTINGS}
         sort = request.args.get('sort', 'new')
+        wish_ids = get_wishlist_ids(session['user_id'])
 
         conn = get_db(); c = conn.cursor()
         c.execute('SELECT id, model, rating, price, horsepower FROM cars ORDER BY id DESC')
-        rows = c.fetchall()
-        c.close(); conn.close()
+        rows = c.fetchall(); c.close(); conn.close()
 
         cars = []
         for row in rows:
@@ -1285,21 +1395,18 @@ def shop():
             cars.append({'id': cid, 'model': model, 'rating': rating, 'price': price,
                          'final_price': final_price, 'has_discount': has_disc,
                          'horsepower': hp or 0,
-                         'owned': has_car(session['user_id'], cid)})
+                         'owned': has_car(session['user_id'], cid),
+                         'wished': cid in wish_ids})
 
-        if sort == 'price_asc':
-            cars.sort(key=lambda x: x['final_price'])
-        elif sort == 'price_desc':
-            cars.sort(key=lambda x: x['final_price'], reverse=True)
-        elif sort == 'rating_desc':
-            cars.sort(key=lambda x: x['rating'], reverse=True)
-        elif sort == 'rating_asc':
-            cars.sort(key=lambda x: x['rating'])
-        elif sort == 'hp_desc':
-            cars.sort(key=lambda x: x['horsepower'], reverse=True)
+        if sort == 'price_asc': cars.sort(key=lambda x: x['final_price'])
+        elif sort == 'price_desc': cars.sort(key=lambda x: x['final_price'], reverse=True)
+        elif sort == 'rating_desc': cars.sort(key=lambda x: x['rating'], reverse=True)
+        elif sort == 'rating_asc': cars.sort(key=lambda x: x['rating'])
+        elif sort == 'hp_desc': cars.sort(key=lambda x: x['horsepower'], reverse=True)
 
         return render_template('shop.html', cars=cars, balance=balance, discount=discount,
                                settings=settings, sort=sort,
+                               wishlist_count=len(wish_ids),
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
@@ -1314,6 +1421,35 @@ def shop_buy(car_id):
     return redirect(url_for('shop'))
 
 
+@app.route('/shop/wishlist/<int:car_id>', methods=['POST'])
+@login_required
+def shop_wishlist_toggle(car_id):
+    added = toggle_wishlist(session['user_id'], car_id)
+    flash('❤ Добавлено в желаемое' if added else 'Убрано из желаемого')
+    return redirect(request.referrer or url_for('shop'))
+
+
+@app.route('/shop/wishlist')
+@login_required
+def wishlist_page():
+    items = get_wishlist_cars(session['user_id'])
+    balance = get_balance(session['user_id'])
+    # Считаем финальные цены со скидкой
+    ensure_discount()
+    discount = get_active_discount()
+    for item in items:
+        final_price = item['price']
+        item['has_discount'] = False
+        if discount and discount['car_id'] == item['id']:
+            final_price = int(item['price'] * (100 - discount['discount_percent']) / 100)
+            item['has_discount'] = True
+        item['final_price'] = final_price
+        item['owned'] = has_car(session['user_id'], item['id'])
+    return render_template('wishlist.html', items=items, balance=balance,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
 @app.route('/shop/add', methods=['GET', 'POST'])
 @admin_required
 def add_car_page():
@@ -1326,8 +1462,7 @@ def add_car_page():
         top = request.form.get('top_speed', '').strip()
         file = request.files.get('image')
 
-        if not model:
-            flash('Впиши название'); return redirect(url_for('add_car_page'))
+        if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
         try:
             rating = int(rating)
             if rating < 1 or rating > 8: raise ValueError
@@ -1341,15 +1476,11 @@ def add_car_page():
 
         hp = int(hp) if hp.isdigit() else None
         top = int(top) if top.isdigit() else None
-        try:
-            accel = float(accel) if accel else None
-        except ValueError:
-            accel = None
+        try: accel = float(accel) if accel else None
+        except ValueError: accel = None
 
-        if not file or file.filename == '':
-            flash('Выбери картинку'); return redirect(url_for('add_car_page'))
-        if file.mimetype not in ALLOWED_MIME:
-            flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
+        if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
+        if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
 
         add_car(model, rating, price, hp, accel, top, file.read(), file.mimetype)
         flash(f'«{model}» добавлена!')
@@ -1382,10 +1513,8 @@ def edit_car_page(car_id):
             flash('Цена — число >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
         hp = int(hp) if hp.isdigit() else None
         top = int(top) if top.isdigit() else None
-        try:
-            accel = float(accel) if accel else None
-        except ValueError:
-            accel = None
+        try: accel = float(accel) if accel else None
+        except ValueError: accel = None
         update_car(car_id, model, rating, price, hp, accel, top)
         flash('Машина обновлена')
         return redirect(url_for('shop'))
@@ -1405,12 +1534,26 @@ def delete_from_catalog(car_id):
 def car_detail(car_id):
     car = get_car_full(car_id)
     if not car:
-        flash('Машина не найдена')
-        return redirect(url_for('index'))
+        flash('Машина не найдена'); return redirect(url_for('index'))
     owned = False
     if 'user_id' in session:
         owned = has_car(session['user_id'], car_id)
     return render_template('car_detail.html', car=car, owned=owned,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+# ---------- СРАВНЕНИЕ ----------
+@app.route('/compare')
+@login_required
+def compare_page():
+    all_cars = get_catalog()
+    c1 = request.args.get('c1', '')
+    c2 = request.args.get('c2', '')
+    car1 = get_car_full(int(c1)) if c1.isdigit() else None
+    car2 = get_car_full(int(c2)) if c2.isdigit() else None
+    return render_template('compare.html', all_cars=all_cars,
+                           car1=car1, car2=car2,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
@@ -1423,20 +1566,20 @@ def wheel():
     ready, secs = can_spin(session['user_id'])
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
-    paid_price = get_int_setting('paid_wheel_price', 300)
+    paid_price = get_int_setting('paid_wheel_price', 1000)
     paid_info = {
-        'car_chance': get_int_setting('paid_wheel_car_chance', 30),
-        'coin_min': get_int_setting('paid_wheel_coin_min', 200),
-        'coin_max': get_int_setting('paid_wheel_coin_max', 2000),
-        'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 4),
+        'car_chance': get_int_setting('paid_wheel_car_chance', 15),
+        'coin_min': get_int_setting('paid_wheel_coin_min', 100),
+        'coin_max': get_int_setting('paid_wheel_coin_max', 600),
+        'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
         'car_max_rating': get_int_setting('paid_wheel_car_max_rating', 8),
     }
     free_info = {
-        'car_chance': get_int_setting('wheel_car_chance', 10),
-        'coin_min': get_int_setting('wheel_coin_min', 50),
-        'coin_max': get_int_setting('wheel_coin_max', 500),
+        'car_chance': get_int_setting('wheel_car_chance', 5),
+        'coin_min': get_int_setting('wheel_coin_min', 30),
+        'coin_max': get_int_setting('wheel_coin_max', 150),
         'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
-        'car_max_rating': get_int_setting('wheel_car_max_rating', 5),
+        'car_max_rating': get_int_setting('wheel_car_max_rating', 4),
     }
     return render_template('wheel.html',
                            ready=ready, time_left=format_time_left(secs) if not ready else '',
@@ -1514,14 +1657,10 @@ def trade_new():
         from_car_id = request.form.get('from_car_id', '')
         from_coins = request.form.get('from_coins', '0')
         message = request.form.get('message', '').strip()
-        if not to_username:
-            flash('Впиши ник игрока'); return redirect(url_for('trade_new'))
-        if not from_car_id.isdigit():
-            flash('Выбери свою машину'); return redirect(url_for('trade_new'))
-        try:
-            from_coins = int(from_coins or 0)
-        except ValueError:
-            flash('Монеты должны быть числом'); return redirect(url_for('trade_new'))
+        if not to_username: flash('Впиши ник игрока'); return redirect(url_for('trade_new'))
+        if not from_car_id.isdigit(): flash('Выбери свою машину'); return redirect(url_for('trade_new'))
+        try: from_coins = int(from_coins or 0)
+        except ValueError: flash('Монеты должны быть числом'); return redirect(url_for('trade_new'))
         ok, result = create_trade(session['user_id'], to_username, int(from_car_id),
                                   from_coins, message)
         if ok:
@@ -1538,8 +1677,7 @@ def trade_new():
 @login_required
 def trade_view(trade_id):
     t = get_trade_full(trade_id)
-    if not t:
-        flash('Обмен не найден'); return redirect(url_for('trades_page'))
+    if not t: flash('Обмен не найден'); return redirect(url_for('trades_page'))
     if t['from_user_id'] != session['user_id'] and t['to_user_id'] != session['user_id']:
         flash('Это не твой обмен'); return redirect(url_for('trades_page'))
     my_cars = get_user_cars(session['user_id']) if t['to_user_id'] == session['user_id'] else []
@@ -1556,8 +1694,7 @@ def trade_accept(trade_id):
     to_car_raw = request.form.get('to_car_id', '').strip()
     to_coins = request.form.get('to_coins', '0')
     to_car_id = int(to_car_raw) if to_car_raw.isdigit() else None
-    try:
-        to_coins = int(to_coins or 0)
+    try: to_coins = int(to_coins or 0)
     except ValueError:
         flash('Монеты должны быть числом'); return redirect(url_for('trade_view', trade_id=trade_id))
     ok, msg = accept_trade(trade_id, session['user_id'], to_car_id, to_coins)
@@ -1588,8 +1725,7 @@ def races_page():
     my_challenges = get_user_challenges(session['user_id'])
     other_challenges = get_open_challenges(exclude_user_id=session['user_id'])
     return render_template('races.html',
-                           my_challenges=my_challenges,
-                           other_challenges=other_challenges,
+                           my_challenges=my_challenges, other_challenges=other_challenges,
                            my_cars=get_user_cars(session['user_id']),
                            balance=get_balance(session['user_id']),
                            user=session.get('username'),
@@ -1602,8 +1738,7 @@ def race_create():
     car_id = request.form.get('car_id', '')
     bet = request.form.get('bet', '0')
     offer_car = bool(request.form.get('offer_car'))
-    if not car_id.isdigit():
-        flash('Выбери машину'); return redirect(url_for('races_page'))
+    if not car_id.isdigit(): flash('Выбери машину'); return redirect(url_for('races_page'))
     try:
         bet = int(bet)
         if bet < 0: raise ValueError
@@ -1620,8 +1755,7 @@ def race_create():
 def race_join(challenge_id):
     car_id = request.form.get('car_id', '')
     offer_car = bool(request.form.get('offer_car'))
-    if not car_id.isdigit():
-        flash('Выбери свою машину'); return redirect(url_for('races_page'))
+    if not car_id.isdigit(): flash('Выбери свою машину'); return redirect(url_for('races_page'))
     ok, msg, info = join_race_challenge(challenge_id, session['user_id'], int(car_id), offer_car)
     flash(msg)
     if ok and info:
@@ -1641,8 +1775,7 @@ def race_cancel(challenge_id):
 @login_required
 def race_result(challenge_id):
     r = get_race(challenge_id)
-    if not r:
-        flash('Гонка не найдена'); return redirect(url_for('races_page'))
+    if not r: flash('Гонка не найдена'); return redirect(url_for('races_page'))
     if r['user_id'] != session['user_id'] and r['opponent_id'] != session['user_id']:
         flash('Это не твоя гонка'); return redirect(url_for('races_page'))
     winner_id = r['winner_id']
@@ -1660,15 +1793,12 @@ def rating_page():
         sort = 'cars'
     leaders = get_leaderboard(sort_by=sort, limit=50)
     total_users = count_users()
-    my_rank = None
-    my_value = 0
+    my_rank = None; my_value = 0
     if 'user_id' in session:
         full_list = get_leaderboard(sort_by=sort, limit=1000)
         for entry in full_list:
             if entry['id'] == session['user_id']:
-                my_rank = entry['rank']
-                my_value = entry['value']
-                break
+                my_rank = entry['rank']; my_value = entry['value']; break
     return render_template('rating.html', leaders=leaders, sort=sort,
                            total_users=total_users,
                            my_rank=my_rank, my_value=my_value,
