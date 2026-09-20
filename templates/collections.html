@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Коллекции — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>📦 Коллекции</h2>
+        <div class="stats-pill">Собрано: {{ claimed }} / {{ total }}</div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {% if collections %}
+        <div class="collections-grid">
+            {% for col in collections %}
+                {% set p = col.progress %}
+                {% set ri = col.rarity_info %}
+                <a href="/collections/{{ col.id }}" class="collection-card rarity-{{ col.rarity }}
+                    {% if p.main_claimed %}claimed{% endif %}
+                    {% if p.completed and not p.main_claimed %}ready{% endif %}">
+                    <div class="rarity-badge">{{ ri.icon }} {{ ri.label }}</div>
+
+                    {% if p.main_claimed %}
+                        <div class="status-badge claimed-badge">✓ Собрано</div>
+                    {% elif p.completed %}
+                        <div class="status-badge ready-badge">🎁 Забрать награду</div>
+                    {% endif %}
+
+                    {% if p.main_claimed and p.bonus_available %}
+                        <div class="bonus-badge">🆕 +{{ p.bonus_available|length }} новых</div>
+                    {% endif %}
+
+                    <div class="collection-icon">📦</div>
+                    <div class="collection-name">{{ col.name }}</div>
+                    {% if col.description %}
+                        <div class="collection-desc">{{ col.description }}</div>
+                    {% endif %}
+
+                    <div class="collection-progress-bar">
+                        <div class="collection-progress-fill" style="width: {{ p.progress_pct }}%;"></div>
+                    </div>
+                    <div class="collection-progress-text">{{ p.owned }} / {{ p.total }} машин</div>
+
+                    <div class="collection-rewards">
+                        <span class="reward-tag">💰 {{ col.coins_reward }}</span>
+                        {% if col.exclusive_car_id %}
+                            <span class="reward-tag exclusive">🚗 Эксклюзив</span>
+                        {% endif %}
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Коллекций пока нет. Загляни позже!</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 34px; color: #ff8c1a; }
+        .stats-pill {
+            font-size: 16px; font-weight: 700; color: #6b3d00;
+            background: #fff; padding: 10px 22px; border-radius: 30px;
+            border: 2px solid #ffd9a6;
+        }
+
+        .collections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 22px; width: 100%; max-width: 1100px;
+        }
+        .collection-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.92);
+            border: 3px solid #ffd9a6; border-radius: 20px;
+            padding: 22px 20px; text-decoration: none;
+            color: inherit; display: flex; flex-direction: column; align-items: center;
+            gap: 10px; transition: all 0.25s ease;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+        }
+        .collection-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 14px 35px rgba(255, 140, 26, 0.3);
+        }
+        .collection-card.rarity-common    { border-color: #bdbdbd; }
+        .collection-card.rarity-rare      { border-color: #42a5f5; box-shadow: 0 6px 20px rgba(66, 165, 245, 0.25); }
+        .collection-card.rarity-legendary { border-color: #ffc107; box-shadow: 0 6px 20px rgba(255, 193, 7, 0.35); }
+        .collection-card.ready {
+            animation: pulseCard 2s infinite;
+            border-color: #2e7d32;
+            box-shadow: 0 8px 25px rgba(46, 125, 50, 0.4);
+        }
+        @keyframes pulseCard {
+            0%, 100% { box-shadow: 0 8px 25px rgba(46, 125, 50, 0.4); }
+            50%      { box-shadow: 0 12px 35px rgba(46, 125, 50, 0.65); }
+        }
+        .collection-card.claimed { opacity: 0.85; }
+        .collection-card.claimed:hover { opacity: 1; }
+
+        .rarity-badge {
+            position: absolute; top: 10px; left: 10px;
+            font-size: 12px; font-weight: 700;
+            background: #fff; padding: 4px 12px; border-radius: 20px;
+            border: 1px solid #ddd;
+        }
+        .rarity-common .rarity-badge    { background: #f5f5f5; color: #616161; }
+        .rarity-rare .rarity-badge      { background: #e3f2fd; color: #1565c0; }
+        .rarity-legendary .rarity-badge { background: #fff8e1; color: #b8860b; }
+
+        .status-badge {
+            position: absolute; top: 10px; right: 10px;
+            font-size: 12px; font-weight: 900;
+            padding: 4px 12px; border-radius: 20px;
+        }
+        .ready-badge { background: #2e7d32; color: #fff; }
+        .claimed-badge { background: #e8f5e9; color: #2e7d32; }
+
+        .bonus-badge {
+            position: absolute; top: 42px; right: 10px;
+            font-size: 11px; font-weight: 900;
+            background: #ff9800; color: #fff;
+            padding: 4px 10px; border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+        }
+
+        .collection-icon { font-size: 48px; margin-top: 12px; }
+        .collection-name {
+            font-size: 20px; font-weight: 900; color: #4a2c00;
+            text-align: center; line-height: 1.2;
+        }
+        .collection-desc {
+            font-size: 13px; color: #8a6538; text-align: center;
+            line-height: 1.4; min-height: 18px;
+        }
+
+        .collection-progress-bar {
+            width: 100%; height: 12px; background: #fff5e6;
+            border-radius: 20px; overflow: hidden;
+            border: 1px solid #ffd9a6; margin-top: 6px;
+        }
+        .collection-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c1a, #ffb347);
+            transition: width 0.5s;
+        }
+        .collection-progress-text {
+            font-size: 13px; font-weight: 700; color: #6b3d00;
+        }
+
+        .collection-rewards {
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            margin-top: 4px;
+        }
+        .reward-tag {
+            font-size: 13px; font-weight: 700;
+            background: #fff3cd; color: #856404;
+            padding: 4px 12px; border-radius: 20px;
+        }
+        .reward-tag.exclusive {
+            background: #fce4ec; color: #c2185b;
+        }
+    </style>
+
+{% endblock %}
