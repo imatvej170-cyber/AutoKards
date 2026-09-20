@@ -17,6 +17,8 @@
 
         <form method="POST" action="/shop/edit/{{ car.id }}">
             <label class="form-label">Название модели</label>
+            <label class="form-label">Бренд</label>
+            <input type="text" name="brand" value="{{ car.brand or '' }}" maxlength="40" class="form-input">
             <input type="text" name="model" value="{{ car.model }}" maxlength="60" required class="form-input">
 
             <label class="form-label">Оценка в звёздах (1–8)</label>
