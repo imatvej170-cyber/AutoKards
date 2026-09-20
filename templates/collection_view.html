@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}{{ col.name }} — коллекция{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="collection-header rarity-{{ col.rarity }}">
+        <div class="rarity-label">{{ rarity_info.icon }} {{ rarity_info.label }} коллекция</div>
+        <h2 class="col-name">📦 {{ col.name }}</h2>
+        {% if col.description %}
+            <p class="col-desc">{{ col.description }}</p>
+        {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="progress-block">
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ prog.progress_pct }}%;"></div>
+        </div>
+        <div class="progress-text">{{ prog.owned }} / {{ prog.total }} машин собрано</div>
+    </div>
+
+    {# ===== КНОПКА ОСНОВНОЙ НАГРАДЫ ===== #}
+    {% if prog.completed and not prog.main_claimed %}
+        <form method="POST" action="/collections/{{ col.id }}/claim" class="claim-form">
+            <button type="submit" class="btn btn-primary btn-claim">
+                🎁 Забрать награду за коллекцию
+            </button>
+        </form>
+    {% elif prog.main_claimed %}
+        <div class="claimed-notice">
+            ✓ Основная награда получена
+        </div>
+    {% else %}
+        <div class="not-ready-notice">
+            Собери все машины, чтобы получить награду
+        </div>
+    {% endif %}
+
+    {# ===== НАГРАДЫ ===== #}
+    <div class="rewards-block">
+        <h3 class="section-h">Награды за коллекцию</h3>
+        <div class="rewards-row">
+            <div class="reward-card">
+                <div class="reward-icon">💰</div>
+                <div class="reward-label">Монеты</div>
+                <div class="reward-value">+{{ col.coins_reward }}</div>
+            </div>
+            <div class="reward-card">
+                <div class="reward-icon">{{ rarity_info.icon }}</div>
+                <div class="reward-label">Достижение</div>
+                <div class="reward-value">Коллекционер {{ col.name }}</div>
+            </div>
+            {% if excl_car %}
+                <div class="reward-card exclusive">
+                    <div class="reward-image">
+                        <img src="/car_image/{{ excl_car.id }}" alt="{{ excl_car.model }}">
+                    </div>
+                    <div class="reward-label">Эксклюзивная машина</div>
+                    <div class="reward-value">{{ excl_car.model }}</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ===== СПИСОК МАШИН ===== #}
+    <h3 class="section-h">Машины в коллекции</h3>
+    <div class="cars-grid">
+        {% for car in cars %}
+            {% set owned = car.id in prog.owned_ids %}
+            <a href="/car/{{ car.id }}" class="car-card-link">
+                <div class="car-card {% if owned %}owned{% endif %}">
+                    <div class="owned-badge-card">
+                        {% if owned %}✓{% else %}✗{% endif %}
+                    </div>
+                    <div class="car-image">
+                        <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                    </div>
+                    <div class="car-info">
+                        <div class="car-model">{{ car.model }}</div>
+                        {% if car.brand %}<div class="car-brand">{{ car.brand }}</div>{% endif %}
+                        <div class="car-stars">
+                            {% for i in range(1, 9) %}
+                                <span class="star {% if i <= car.rating %}filled{% endif %}">★</span>
+                            {% endfor %}
+                        </div>
+                        <div class="car-price">💰 {{ car.price }}</div>
+                    </div>
+                </div>
+            </a>
+        {% endfor %}
+    </div>
+
+    {# ===== БОНУСЫ ЗА НОВЫЕ МАШИНЫ ===== #}
+    {% if prog.bonus_available %}
+        <h3 class="section-h">🆕 Бонус за новые машины</h3>
+        <div class="bonus-list">
+            {% for car in prog.bonus_available %}
+                <div class="bonus-row">
+                    <div class="bonus-car-img">
+                        <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                    </div>
+                    <div class="bonus-info">
+                        <div class="bonus-model">{{ car.model }}</div>
+                        <div class="bonus-coins">+{{ col.bonus_coins }} 💰</div>
+                    </div>
+                    <form method="POST" action="/collections/{{ col.id }}/bonus/{{ car.id }}">
+                        <button type="submit" class="btn btn-primary btn-tiny">Забрать</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;">
+        <a href="/collections">← К коллекциям</a> · <a href="/">На главную</a>
+    </p>
+
+    <style>
+        .collection-header {
+            text-align: center; max-width: 700px;
+            margin: 0 auto 20px; padding: 20px 30px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 3px solid #ffd9a6;
+        }
+        .rarity-common    { border-color: #bdbdbd; }
+        .rarity-rare      { border-color: #42a5f5; box-shadow: 0 6px 20px rgba(66, 165, 245, 0.2); }
+        .rarity-legendary { border-color: #ffc107; box-shadow: 0 8px 25px rgba(255, 193, 7, 0.3); }
+        .rarity-label {
+            display: inline-block; font-size: 13px; font-weight: 900;
+            padding: 6px 16px; border-radius: 20px; margin-bottom: 10px;
+        }
+        .rarity-common .rarity-label    { background: #f5f5f5; color: #616161; }
+        .rarity-rare .rarity-label      { background: #e3f2fd; color: #1565c0; }
+        .rarity-legendary .rarity-label { background: #fff8e1; color: #b8860b; }
+        .col-name { font-size: 30px; color: #4a2c00; margin-bottom: 8px; }
+        .col-desc { font-size: 15px; color: #6b3d00; line-height: 1.5; }
+
+        .progress-block {
+            width: 100%; max-width: 600px; margin: 0 auto 20px;
+        }
+        .progress-bar {
+            height: 18px; background: #fff5e6; border-radius: 30px;
+            overflow: hidden; border: 2px solid #ffd9a6;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c1a, #ffb347);
+            transition: width 0.5s;
+        }
+        .progress-text {
+            text-align: center; margin-top: 8px;
+            font-size: 14px; font-weight: 700; color: #6b3d00;
+        }
+
+        .claim-form { margin-bottom: 20px; text-align: center; }
+        .btn-claim {
+            padding: 16px 40px; font-size: 18px;
+            animation: pulseBtn 1.8s infinite;
+        }
+        @keyframes pulseBtn {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.04); }
+        }
+        .claimed-notice {
+            background: #e8f5e9; color: #2e7d32; font-weight: 700;
+            padding: 12px 24px; border-radius: 30px;
+            text-align: center; max-width: 400px; margin: 0 auto 20px;
+        }
+        .not-ready-notice {
+            background: #fff5e6; color: #8a6538;
+            padding: 12px 24px; border-radius: 30px;
+            text-align: center; max-width: 500px; margin: 0 auto 20px;
+            font-style: italic;
+        }
+
+        .section-h {
+            font-size: 22px; color: #ff8c1a; font-weight: 900;
+            margin: 30px 0 15px; text-align: center;
+        }
+
+        .rewards-block { width: 100%; max-width: 850px; }
+        .rewards-row {
+            display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;
+        }
+        .reward-card {
+            background: #fff; border: 2px solid #ffd9a6;
+            border-radius: 16px; padding: 16px 22px;
+            text-align: center; min-width: 160px;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.12);
+        }
+        .reward-card.exclusive {
+            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+            border-color: #ec407a;
+        }
+        .reward-icon { font-size: 32px; margin-bottom: 6px; }
+        .reward-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            border-radius: 12px; padding: 8px; margin-bottom: 8px;
+        }
+        .reward-image img { width: 120px; height: 70px; object-fit: contain; }
+        .reward-label { font-size: 12px; color: #8a6538; margin-bottom: 4px; text-transform: uppercase; font-weight: 700; }
+        .reward-value { font-size: 15px; font-weight: 900; color: #ff8c1a; }
+        .reward-card.exclusive .reward-value { color: #c2185b; }
+
+        .cars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 18px; width: 100%; max-width: 1100px;
+        }
+        .car-card-link { text-decoration: none; }
+        .car-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid #ffd9a6; border-radius: 18px;
+            overflow: hidden; opacity: 0.6;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.1);
+        }
+        .car-card.owned {
+            opacity: 1; border-color: #4caf50;
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.25);
+        }
+        .car-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(255, 140, 26, 0.3); }
+        .owned-badge-card {
+            position: absolute; top: 8px; right: 8px;
+            width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 16px; z-index: 2;
+            background: #f44336; color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        .car-card.owned .owned-badge-card { background: #4caf50; }
+        .car-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            height: 130px; display: flex; align-items: center;
+            justify-content: center; padding: 10px;
+        }
+        .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .car-info { padding: 12px 14px 16px; text-align: center; }
+        .car-model { font-size: 16px; font-weight: 700; color: #4a2c00; margin-bottom: 4px; }
+        .car-brand {
+            font-size: 11px; font-weight: 700; color: #b08855;
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+        }
+        .car-stars { font-size: 15px; color: #ffd9a6; margin-bottom: 6px; }
+        .car-stars .star.filled { color: #ff8c1a; }
+        .car-price { font-size: 15px; font-weight: 900; color: #ff8c1a; }
+
+        .bonus-list {
+            display: flex; flex-direction: column; gap: 10px;
+            width: 100%; max-width: 600px;
+        }
+        .bonus-row {
+            display: flex; align-items: center; gap: 14px;
+            background: #fff; border: 2px solid #ff9800;
+            border-radius: 16px; padding: 12px 16px;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.25);
+        }
+        .bonus-car-img {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            border-radius: 10px; padding: 6px;
+        }
+        .bonus-car-img img { width: 80px; height: 50px; object-fit: contain; }
+        .bonus-info { flex: 1; }
+        .bonus-model { font-size: 15px; font-weight: 700; color: #4a2c00; }
+        .bonus-coins { font-size: 14px; font-weight: 900; color: #ff9800; }
+        .btn-tiny { padding: 8px 18px; font-size: 14px; }
+    </style>
+
+{% endblock %}
