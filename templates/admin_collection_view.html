@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Просмотр коллекции — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="admin-header">
+        <h2>{{ rarity_info.icon }} {{ col.name }}</h2>
+        <div class="header-actions">
+            <a href="/admin/collections/{{ col.id }}/edit" class="btn btn-primary btn-small">✎ Изменить</a>
+            <a href="/admin/collections" class="btn btn-secondary btn-small">← К списку</a>
+        </div>
+    </div>
+
+    <div class="info-row">
+        <span class="info-pill">Редкость: <strong>{{ rarity_info.label }}</strong></span>
+        <span class="info-pill">Машин: <strong>{{ cars|length }}</strong></span>
+        <span class="info-pill">💰 <strong>{{ col.coins_reward }}</strong></span>
+        <span class="info-pill">Бонус: 💰 <strong>{{ col.bonus_coins }}</strong> за новую</span>
+    </div>
+
+    {% if col.description %}
+        <p class="description">{{ col.description }}</p>
+    {% endif %}
+
+    {% if excl_car %}
+        <div class="excl-block">
+            <div class="excl-title">🚗 Эксклюзивная машина:</div>
+            <div class="excl-car">
+                <img src="/car_image/{{ excl_car.id }}" alt="{{ excl_car.model }}">
+                <div>{{ excl_car.model }} ({{ excl_car.rating }}★)</div>
+            </div>
+        </div>
+    {% endif %}
+
+    <h3 class="section-h">Машины в коллекции ({{ cars|length }})</h3>
+    {% if cars %}
+        <div class="cars-grid">
+            {% for car in cars %}
+                <a href="/car/{{ car.id }}" class="car-card-link">
+                    <div class="car-card">
+                        <div class="car-image">
+                            <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                        </div>
+                        <div class="car-info">
+                            <div class="car-model">{{ car.model }}</div>
+                            {% if car.brand %}<div class="car-brand">{{ car.brand }}</div>{% endif %}
+                            <div class="car-stars">
+                                {% for i in range(1, 9) %}
+                                    <span class="star {% if i <= car.rating %}filled{% endif %}">★</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Машин пока нет — добавь через редактирование.</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .admin-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 15px; flex-wrap: wrap; justify-content: center;
+        }
+        .admin-header h2 { font-size: 28px; color: #ff8c1a; }
+        .header-actions { display: flex; gap: 10px; }
+        .btn-small { padding: 10px 20px; font-size: 14px; }
+
+        .info-row {
+            display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+            margin-bottom: 20px;
+        }
+        .info-pill {
+            font-size: 14px; color: #6b3d00; background: #fff;
+            padding: 8px 18px; border-radius: 20px;
+            border: 2px solid #ffd9a6;
+        }
+        .info-pill strong { color: #ff8c1a; }
+
+        .excl-block {
+            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+            border: 2px solid #ec407a; border-radius: 16px;
+            padding: 16px 22px; max-width: 400px;
+            margin: 0 auto 25px; text-align: center;
+        }
+        .excl-title { font-size: 14px; color: #c2185b; font-weight: 700; margin-bottom: 10px; }
+        .excl-car img { width: 150px; height: 90px; object-fit: contain; }
+        .excl-car div { font-size: 15px; font-weight: 900; color: #4a2c00; }
+
+        .section-h {
+            font-size: 22px; color: #ff8c1a; font-weight: 900;
+            margin: 25px 0 15px; text-align: center;
+        }
+        .cars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 18px; width: 100%; max-width: 1100px;
+        }
+        .car-card-link { text-decoration: none; }
+        .car-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 16px;
+            overflow: hidden; transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.1);
+        }
+        .car-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(255, 140, 26, 0.25); }
+        .car-image {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            height: 120px; display: flex; align-items: center;
+            justify-content: center; padding: 10px;
+        }
+        .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .car-info { padding: 12px 14px 16px; text-align: center; }
+        .car-model { font-size: 15px; font-weight: 700; color: #4a2c00; margin-bottom: 4px; }
+        .car-brand { font-size: 11px; color: #b08855; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .car-stars { font-size: 14px; color: #ffd9a6; margin-top: 4px; }
+        .car-stars .star.filled { color: #ff8c1a; }
+    </style>
+
+{% endblock %}
