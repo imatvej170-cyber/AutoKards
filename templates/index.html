@@ -76,6 +76,7 @@
                 <a href="/shop/wishlist" class="btn btn-secondary">❤ Желаемое{% if wishlist_count %} ({{ wishlist_count }}){% endif %}</a>
                 <a href="/compare" class="btn btn-secondary">⚖️ Сравнить</a>
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
+                <a href="/quests" class="btn btn-primary">📋 Задания{% if quests_unclaimed %} ({{ quests_unclaimed }}){% endif %}</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
                 <a href="/friends" class="btn btn-primary">👥 Друзья{% if incoming_friend_requests %} ({{ incoming_friend_requests }}){% endif %}</a>
                 {% if is_admin %}
