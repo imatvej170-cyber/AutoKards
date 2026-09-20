@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'new' %}Новая коллекция{% else %}Редактирование{% endif %} — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">
+        {% if mode == 'new' %}📦 Новая коллекция{% else %}✎ Редактировать: {{ col.name }}{% endif %}
+    </h2>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <form method="POST" class="form-box" style="max-width: 700px;"
+          action="{% if mode == 'new' %}/admin/collections/new{% else %}/admin/collections/{{ col.id }}/edit{% endif %}">
+
+        <label class="form-label">Название коллекции</label>
+        <input type="text" name="name" maxlength="80" required class="form-input"
+               value="{{ col.name if col else '' }}"
+               placeholder="Например: Все BMW">
+
+        <label class="form-label">Описание (необязательно)</label>
+        <textarea name="description" maxlength="500" rows="2" class="form-textarea"
+                  placeholder="Например: Легенды баварского автопрома">{{ col.description if col else '' }}</textarea>
+
+        <label class="form-label">Редкость</label>
+        <select name="rarity" class="form-select" required>
+            {% for key, info in rarities.items() %}
+                <option value="{{ key }}" {% if col and col.rarity == key %}selected{% endif %}>
+                    {{ info.icon }} {{ info.label }} (базовая: {{ info.coins }} 💰, бонус: {{ info.bonus }} 💰)
+                </option>
+            {% endfor %}
+        </select>
+
+        <label class="form-label">Монет за сбор коллекции</label>
+        <input type="number" name="coins_reward" min="0" class="form-input"
+               value="{{ col.coins_reward if col else 500 }}">
+
+        <label class="form-label">Монет за каждую новую машину в коллекции (бонус)</label>
+        <input type="number" name="bonus_coins" min="0" class="form-input"
+               value="{{ col.bonus_coins if col else 50 }}">
+
+        <label class="form-label">Эксклюзивная машина в награду (необязательно)</label>
+        <select name="exclusive_car_id" class="form-select">
+            <option value="">— Не давать машину —</option>
+            {% for c in all_cars %}
+                <option value="{{ c[0] }}" {% if col and col.exclusive_car_id == c[0] %}selected{% endif %}>
+                    {{ c[1] }} ({{ c[2] }}★) — {{ c[3] }} 💰
+                </option>
+            {% endfor %}
+        </select>
+
+        <label class="form-label">Машины в коллекции (можно выбрать несколько через Ctrl/Cmd)</label>
+        <div class="cars-check-list">
+            {% for c in all_cars %}
+                <label class="car-check-item">
+                    <input type="checkbox" name="car_ids" value="{{ c[0] }}"
+                           {% if c[0] in col_car_ids %}checked{% endif %}>
+                    <span>{{ c[1] }} <small>({{ c[2] }}★ · {{ c[3] }} 💰)</small></span>
+                </label>
+            {% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                {% if mode == 'new' %}Создать коллекцию{% else %}Сохранить{% endif %}
+            </button>
+            <a href="/admin/collections" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+
+    <style>
+        .page-title { font-size: 28px; color: #ff8c1a; text-align: center; margin-bottom: 25px; }
+        .form-label {
+            display: block; text-align: left; font-size: 14px;
+            color: #6b3d00; margin-bottom: 6px; margin-top: 14px; font-weight: 700;
+        }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+            box-sizing: border-box;
+        }
+        .form-textarea { resize: vertical; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none; border-color: #ff8c1a;
+        }
+
+        .cars-check-list {
+            max-height: 400px; overflow-y: auto;
+            background: #fff; border: 2px solid #ffd9a6;
+            border-radius: 12px; padding: 10px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 6px;
+        }
+        .car-check-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-radius: 8px;
+            font-size: 14px; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .car-check-item:hover { background: #fff5e6; }
+        .car-check-item input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: #ff8c1a; cursor: pointer;
+        }
+        .car-check-item small { color: #8a6538; }
+
+        .form-actions {
+            display: flex; gap: 12px; margin-top: 25px; justify-content: center;
+            flex-wrap: wrap;
+        }
+    </style>
+
+{% endblock %}
