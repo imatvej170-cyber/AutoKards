@@ -35,10 +35,8 @@ RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8:
 
 # ============ УРОВНИ ============
 MAX_LEVEL = 100
-# Доступ к машинам по звёздам (звёзды: минимальный уровень)
 STAR_LEVEL_REQ = {1: 1, 2: 1, 3: 1, 4: 3, 5: 6, 6: 12, 7: 20, 8: 30}
 
-# Опыт за действия
 XP_REWARDS = {
     'bonus': 25,
     'buy': 30,
@@ -49,8 +47,8 @@ XP_REWARDS = {
     'achievement': 100,
     'wheel_free': 15,
     'wheel_paid': 25,
-    'quest': 0,          # задание само даёт XP
-    'quest_bonus': 400,  # бонус за все 3
+    'quest': 0,
+    'quest_bonus': 400,
 }
 
 # ============ ЕЖЕДНЕВНЫЕ ЗАДАНИЯ ============
@@ -68,7 +66,7 @@ QUEST_BONUS_XP = 400
 QUEST_BONUS_COINS = 500
 
 # ============ АДМИНЫ ============
-ADMIN_USERNAMES = {'imatvej170'}
+ADMIN_USERNAMES = {'AppleAT', 'Arbu3k52'}
 
 # ============ НАСТРОЙКИ ПО УМОЛЧАНИЮ ============
 DEFAULT_SETTINGS = {
@@ -209,31 +207,21 @@ def init_db():
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL, resolved_at TEXT
     )''')
-    # Ежедневные задания
     c.execute('''CREATE TABLE IF NOT EXISTS user_quests (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        quest_key VARCHAR(40) NOT NULL,
-        progress INTEGER NOT NULL DEFAULT 0,
-        target INTEGER NOT NULL,
-        xp_reward INTEGER NOT NULL,
-        coins_reward INTEGER NOT NULL,
-        completed BOOLEAN NOT NULL DEFAULT FALSE,
-        claimed BOOLEAN NOT NULL DEFAULT FALSE,
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+        quest_key VARCHAR(40) NOT NULL, progress INTEGER NOT NULL DEFAULT 0,
+        target INTEGER NOT NULL, xp_reward INTEGER NOT NULL, coins_reward INTEGER NOT NULL,
+        completed BOOLEAN NOT NULL DEFAULT FALSE, claimed BOOLEAN NOT NULL DEFAULT FALSE,
         assigned_date TEXT NOT NULL,
         UNIQUE(user_id, quest_key, assigned_date)
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS quest_bonus (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        claimed_date TEXT NOT NULL,
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, claimed_date TEXT NOT NULL,
         UNIQUE(user_id, claimed_date)
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS completed_quests (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        quest_key VARCHAR(40) NOT NULL,
-        completed_at TEXT NOT NULL
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+        quest_key VARCHAR(40) NOT NULL, completed_at TEXT NOT NULL
     )''')
 
     c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
@@ -272,12 +260,10 @@ def set_setting(key, value):
 
 # ---------- УРОВНИ И ОПЫТ ----------
 def xp_for_level(level):
-    """Сколько XP нужно для перехода с `level` на `level+1`."""
     return 100 + (level - 1) * 70
 
 
 def level_reward_coins(level):
-    """Награда монетами за достижение `level`."""
     return 100 + level * 30
 
 
@@ -294,8 +280,6 @@ def get_user_level_info(user_id):
 
 
 def add_xp(user_id, amount):
-    """Начисляет XP. Если хватает на новый уровень — повышает и даёт монеты.
-    Возвращает (leveled_up, new_level, coins_reward)."""
     if amount <= 0:
         return False, 0, 0
     conn = get_db(); c = conn.cursor()
@@ -334,7 +318,6 @@ def today_str():
 
 
 def get_user_quests(user_id):
-    """Возвращает список заданий на сегодня. Создаёт, если их ещё нет."""
     today = today_str()
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT quest_key, progress, target, xp_reward, coins_reward, completed, claimed
@@ -342,7 +325,6 @@ def get_user_quests(user_id):
                  ORDER BY id''', (user_id, today))
     rows = c.fetchall()
     if not rows:
-        # Генерируем новые задания
         pool = random.sample(QUEST_POOL, QUESTS_PER_DAY)
         for q in pool:
             c.execute('''INSERT INTO user_quests
@@ -358,8 +340,6 @@ def get_user_quests(user_id):
         rows = c.fetchall()
     c.close(); conn.close()
 
-    # Проверка бонуса
-    bonus_claimed = False
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT 1 FROM quest_bonus WHERE user_id = %s AND claimed_date = %s',
               (user_id, today))
@@ -384,7 +364,6 @@ def get_user_quests(user_id):
 
 
 def progress_quest(user_id, quest_key, amount=1):
-    """Обновляет прогресс задания, если оно активно на сегодня."""
     today = today_str()
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT id, progress, target, completed
@@ -431,7 +410,6 @@ def claim_quest(user_id, quest_key):
 
 
 def claim_quest_bonus(user_id):
-    """Бонус за все 3 задания дня."""
     today = today_str()
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT COUNT(*) FROM user_quests
@@ -522,6 +500,86 @@ def count_users():
     c.execute('SELECT COUNT(*) FROM users')
     r = c.fetchone(); c.close(); conn.close()
     return r[0] if r else 0
+
+
+# ---------- АДМИН: ВЫДАЧА ----------
+def admin_give_coins(user_id, amount):
+    if amount == 0:
+        return False, 'Сумма не может быть нулевой'
+    add_coins(user_id, amount)
+    sign = '+' if amount > 0 else ''
+    log_transaction(user_id, 'admin_give', amount, None, f'Админ: {sign}{amount} монет')
+    return True, f'Выдано {sign}{amount} монет'
+
+
+def admin_give_car(user_id, car_id):
+    if has_car(user_id, car_id):
+        return False, 'У игрока уже есть эта машина'
+    car = get_car_info(car_id)
+    if not car:
+        return False, 'Машина не найдена'
+    conn = get_db(); c = conn.cursor()
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
+              (user_id, car_id, datetime.now().isoformat()))
+    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    conn.commit(); c.close(); conn.close()
+    log_transaction(user_id, 'admin_give_car', 0, car_id, f'Админ: выдана «{car[1]}»')
+    return True, f'Выдана «{car[1]}»'
+
+
+def admin_take_car(user_id, car_id):
+    if not has_car(user_id, car_id):
+        return False, 'У игрока нет этой машины'
+    car = get_car_info(car_id)
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
+              (user_id, car_id))
+    conn.commit(); c.close(); conn.close()
+    log_transaction(user_id, 'admin_take_car', 0, car_id, f'Админ: забрана «{car[1]}»')
+    return True, f'Забрана «{car[1]}»'
+
+
+def admin_give_achievement(user_id, key):
+    ach = next((a for a in ACHIEVEMENTS if a['key'] == key), None)
+    if not ach:
+        return False, 'Такого достижения нет'
+    conn = get_db(); c = conn.cursor()
+    c.execute('INSERT INTO user_achievements (user_id, key, unlocked_at) VALUES (%s, %s, %s) '
+              'ON CONFLICT (user_id, key) DO NOTHING RETURNING id',
+              (user_id, key, datetime.now().isoformat()))
+    row = c.fetchone()
+    conn.commit(); c.close(); conn.close()
+    if not row:
+        return False, 'У игрока уже есть это достижение'
+    reward = ach['reward']
+    if reward > 0:
+        add_coins(user_id, reward)
+        log_transaction(user_id, 'ach_reward', reward, None, f'Награда за «{ach["title"]}»')
+    log_transaction(user_id, 'admin_give_ach', 0, None, f'Админ: достижение «{ach["title"]}»')
+    return True, f'Выдано достижение «{ach["title"]}» (+{reward} 💰)'
+
+
+def admin_take_achievement(user_id, key):
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM user_achievements WHERE user_id = %s AND key = %s RETURNING id',
+              (user_id, key))
+    row = c.fetchone()
+    conn.commit(); c.close(); conn.close()
+    if not row:
+        return False, 'У игрока нет этого достижения'
+    return True, 'Достижение убрано'
+
+
+def admin_set_level(user_id, level):
+    level = max(1, min(MAX_LEVEL, level))
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE users SET level = %s, xp = 0 WHERE id = %s', (level, user_id))
+    conn.commit(); c.close(); conn.close()
+    log_transaction(user_id, 'admin_set_level', 0, None, f'Админ: уровень = {level}')
+    return True, f'Уровень установлен: {level}'
 
 
 # ---------- БАЛАНС ----------
@@ -734,9 +792,7 @@ def unlock_achievement(user_id, key):
     if reward > 0:
         add_coins(user_id, reward)
         log_transaction(user_id, 'ach_reward', reward, None, f'Награда за «{ach["title"]}»')
-    # Задание "Открой достижение"
     progress_quest(user_id, 'achievement_1', 1)
-    # XP за достижение
     add_xp(user_id, XP_REWARDS.get('achievement', 100))
     return True, reward
 
@@ -979,7 +1035,6 @@ def buy_car(user_id, car_id):
     if has_car(user_id, car_id): return False, 'Эта машина уже в твоём гараже'
     car = get_car_full(car_id)
     if not car: return False, 'Машина не найдена'
-    # Проверка уровня
     req_level = get_level_required_for_stars(car['rating'])
     user_level = get_user_level_info(user_id)['level']
     if user_level < req_level:
@@ -1001,7 +1056,6 @@ def buy_car(user_id, car_id):
     conn.commit(); c.close(); conn.close()
     desc = f'Покупка: {car["model"]}' + (' (со скидкой дня)' if was_disc else '')
     log_transaction(user_id, 'buy', -final_price, car_id, desc)
-    # XP и задания
     add_xp(user_id, XP_REWARDS.get('buy', 30))
     progress_quest(user_id, 'buy_car_1', 1)
     return True, f'Куплена «{car["model"]}» за {final_price} монет!'
@@ -1163,7 +1217,6 @@ def do_spin(user_id, paid=False):
         prefix = 'Колесо'
         xp_key = 'wheel_free'
 
-    # XP и задание
     add_xp(user_id, XP_REWARDS.get(xp_key, 15))
     progress_quest(user_id, 'spin_wheel_1', 1)
 
@@ -1335,7 +1388,6 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
                     t['from_car_id'], f'Обмен с {other_name}')
     log_transaction(user_id, 'trade', t['from_coins'] - to_coins,
                     to_car_id, f'Обмен с {my_name}')
-    # XP и задание
     add_xp(t['from_user_id'], XP_REWARDS.get('trade', 40))
     add_xp(user_id, XP_REWARDS.get('trade', 40))
     progress_quest(t['from_user_id'], 'trade_1', 1)
@@ -1532,7 +1584,6 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
                     bet if winner_id == user_id else -bet, my_car_id,
                     'Гонка: победа' if winner_id == user_id else 'Гонка: поражение')
 
-    # XP и задания
     for uid in (author_id, user_id):
         if uid == winner_id:
             add_xp(uid, XP_REWARDS.get('race_win', 50))
@@ -1700,7 +1751,6 @@ def index():
         wishlist_count = len(get_wishlist_ids(session['user_id']))
         friends_count = count_friends(session['user_id'])
         incoming_friend_requests = count_incoming_requests(session['user_id'])
-        # Задания — сколько готовы к сдаче
         try:
             quests, all_done, bonus_claimed = get_user_quests(session['user_id'])
             quests_unclaimed = sum(1 for q in quests if q['completed'] and not q['claimed'])
@@ -2433,6 +2483,99 @@ def rating_page():
                            my_id=session.get('user_id'),
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
+
+
+# ---------- АДМИН: ВЫДАЧА ----------
+@app.route('/admin/give', methods=['GET', 'POST'])
+@admin_required
+def admin_give():
+    import traceback
+    try:
+        all_cars = get_catalog()
+        user = None
+        user_owned = []
+        user_achievements = []
+        if request.method == 'POST':
+            action = request.form.get('action', '')
+            username = request.form.get('username', '').strip()
+
+            if action == 'find':
+                u = get_user(username)
+                if not u:
+                    flash(f'Игрок «{username}» не найден')
+                else:
+                    user = get_user_profile(u[0])
+                    user_owned = get_user_cars(u[0])
+                    user_achievements = get_unlocked_keys(u[0])
+            else:
+                u = get_user(username)
+                if not u:
+                    flash('Игрок не найден')
+                    return redirect(url_for('admin_give'))
+                user_id = u[0]
+                user = get_user_profile(user_id)
+                user_owned = get_user_cars(user_id)
+                user_achievements = get_unlocked_keys(user_id)
+
+                if action == 'give_coins':
+                    amount = request.form.get('amount', '0')
+                    try:
+                        amount = int(amount)
+                    except ValueError:
+                        flash('Сумма должна быть числом'); return redirect(url_for('admin_give'))
+                    ok, msg = admin_give_coins(user_id, amount)
+                    flash(msg)
+                elif action == 'give_car':
+                    car_id = request.form.get('car_id', '')
+                    if not car_id.isdigit():
+                        flash('Выбери машину'); return redirect(url_for('admin_give'))
+                    ok, msg = admin_give_car(user_id, int(car_id))
+                    flash(msg)
+                elif action == 'take_car':
+                    car_id = request.form.get('car_id', '')
+                    if not car_id.isdigit():
+                        flash('Выбери машину'); return redirect(url_for('admin_give'))
+                    ok, msg = admin_take_car(user_id, int(car_id))
+                    flash(msg)
+                elif action == 'give_ach':
+                    key = request.form.get('ach_key', '')
+                    ok, msg = admin_give_achievement(user_id, key)
+                    flash(msg)
+                elif action == 'take_ach':
+                    key = request.form.get('ach_key', '')
+                    ok, msg = admin_take_achievement(user_id, key)
+                    flash(msg)
+                elif action == 'set_level':
+                    level = request.form.get('level', '1')
+                    try:
+                        level = int(level)
+                    except ValueError:
+                        flash('Уровень должен быть числом'); return redirect(url_for('admin_give'))
+                    ok, msg = admin_set_level(user_id, level)
+                    flash(msg)
+                elif action == 'clear_cars':
+                    conn = get_db(); c = conn.cursor()
+                    c.execute('DELETE FROM user_cars WHERE user_id = %s', (user_id,))
+                    c.execute('DELETE FROM public_cars WHERE user_id = %s', (user_id,))
+                    c.execute('DELETE FROM favorite_cars WHERE user_id = %s', (user_id,))
+                    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s', (user_id,))
+                    conn.commit(); c.close(); conn.close()
+                    flash('Все машины игрока удалены')
+
+                user = get_user_profile(user_id)
+                user_owned = get_user_cars(user_id)
+                user_achievements = get_unlocked_keys(user_id)
+
+        return render_template('admin_give.html',
+                               user=user,
+                               all_cars=all_cars,
+                               user_owned=user_owned,
+                               user_achievements=user_achievements,
+                               all_achievements=ACHIEVEMENTS,
+                               current_admin=session.get('username'),
+                               is_admin=True)
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /admin/give:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
 # ---------- АДМИН-НАСТРОЙКИ ----------
