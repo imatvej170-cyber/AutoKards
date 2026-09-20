@@ -15,6 +15,16 @@
             </div>
             <div class="profile-name">{{ user }}</div>
 
+            <div class="level-widget">
+                <div class="level-row">
+                    <span class="level-badge">Ур. {{ level_info.level }}</span>
+                    <div class="level-bar">
+                        <div class="level-fill" style="width: {{ level_info.progress }}%;"></div>
+                    </div>
+                    <span class="level-xp">{{ level_info.xp }}/{{ level_info.xp_needed }} XP</span>
+                </div>
+            </div>
+
             <div class="profile-stats">
                 <span class="stat-pill">💰 {{ profile.balance }} монет</span>
                 <span class="stat-pill">🚗 {{ cars_count }} машин</span>
