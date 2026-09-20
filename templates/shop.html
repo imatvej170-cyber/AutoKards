@@ -5,6 +5,7 @@
     <h1 class="logo"><a href="/">AutoKards</a></h1>
 
     <div class="garage-header">
+        <div class="user-level-line">Твой уровень: <strong>{{ user_level }}</strong></div>
         <h2>🛒 Магазин</h2>
         <div class="balance-pill">💰 {{ balance }} монет</div>
         <a href="/shop/wishlist" class="btn btn-primary btn-small">❤ Желаемое{% if wishlist_count %} ({{ wishlist_count }}){% endif %}</a>
@@ -80,6 +81,8 @@
                         <div class="car-action">
                             {% if car.owned %}
                                 <span class="owned-badge">✓ В гараже</span>
+                            {% elif car.locked %}
+                                <span class="locked-badge">🔒 Ур. {{ car.req_level }}</span>
                             {% else %}
                                 <form method="POST" action="/shop/buy/{{ car.id }}">
                                     <button type="submit" class="btn btn-primary btn-tiny"
@@ -89,10 +92,6 @@
                                 </form>
                             {% endif %}
                         </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
     {% else %}
         <p class="description">Магазин пуст.</p>
     {% endif %}
@@ -100,6 +99,17 @@
     <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
 
     <style>
+        .user-level-line {
+    text-align: center; font-size: 15px; color: #6b3d00;
+    background: #fff5e6; padding: 10px 22px; border-radius: 30px;
+    border: 1px solid #ffd9a6; margin-bottom: 18px;
+}
+.user-level-line strong { color: #ff8c1a; font-size: 18px; }
+        
+        .locked-badge {
+    display: inline-block; padding: 8px 16px; border-radius: 30px;
+    background: #fff3cd; color: #856404; font-weight: 700; font-size: 14px;
+}
         .garage-header {
             display: flex; align-items: center; gap: 14px;
             margin-bottom: 18px; flex-wrap: wrap; justify-content: center;
