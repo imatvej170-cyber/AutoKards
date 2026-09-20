@@ -38,17 +38,10 @@ MAX_LEVEL = 100
 STAR_LEVEL_REQ = {1: 1, 2: 1, 3: 1, 4: 3, 5: 6, 6: 12, 7: 20, 8: 30}
 
 XP_REWARDS = {
-    'bonus': 25,
-    'buy': 30,
-    'sell': 10,
-    'race_win': 50,
-    'race_lose': 15,
-    'trade': 40,
-    'achievement': 100,
-    'wheel_free': 15,
-    'wheel_paid': 25,
-    'quest': 0,
-    'quest_bonus': 400,
+    'bonus': 25, 'buy': 30, 'sell': 10,
+    'race_win': 50, 'race_lose': 15, 'trade': 40,
+    'achievement': 100, 'wheel_free': 15, 'wheel_paid': 25,
+    'quest': 0, 'quest_bonus': 400, 'collection': 500,
 }
 
 # ============ ЕЖЕДНЕВНЫЕ ЗАДАНИЯ ============
@@ -64,6 +57,14 @@ QUEST_POOL = [
 QUESTS_PER_DAY = 3
 QUEST_BONUS_XP = 400
 QUEST_BONUS_COINS = 500
+
+# ============ КОЛЛЕКЦИИ ============
+COLLECTION_RARITY = {
+    'common':    {'label': 'Обычная',      'icon': '⚪', 'coins': 500,   'bonus': 50},
+    'rare':      {'label': 'Редкая',       'icon': '🔵', 'coins': 2000,  'bonus': 200},
+    'legendary': {'label': 'Легендарная',  'icon': '🟡', 'coins': 10000, 'bonus': 1000},
+}
+COLLECTION_ACH_REWARD = 500  # монет за достижение коллекции
 
 # ============ АДМИНЫ ============
 ADMIN_USERNAMES = {'AppleAT', 'Arbu3k52'}
@@ -116,6 +117,10 @@ ACHIEVEMENTS = [
     {'key': 'quest_50',    'icon': '📖', 'title': 'Трудяга',          'desc': 'Выполнить 50 заданий',          'reward': 2000},
     {'key': 'race_win_10', 'icon': '🥇', 'title': 'Гонщик',           'desc': 'Победить в 10 гонках',          'reward': 500},
     {'key': 'race_win_50', 'icon': '🏆', 'title': 'Чемпион',          'desc': 'Победить в 50 гонках',          'reward': 2500},
+    {'key': 'collector_1', 'icon': '📦', 'title': 'Начинающий коллекционер', 'desc': 'Собрать первую коллекцию', 'reward': 500},
+    {'key': 'collector_3', 'icon': '📚', 'title': 'Знаток',           'desc': 'Собрать 3 коллекции',            'reward': 1500},
+    {'key': 'collector_5', 'icon': '🎓', 'title': 'Эксперт',          'desc': 'Собрать 5 коллекций',            'reward': 3000},
+    {'key': 'collector_10','icon': '💼', 'title': 'Антиквар',         'desc': 'Собрать 10 коллекций',           'reward': 10000},
 ]
 
 
@@ -151,6 +156,7 @@ def init_db():
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS acceleration REAL')
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS top_speed INTEGER')
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS brand VARCHAR(40)')
+    c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS is_exclusive BOOLEAN DEFAULT FALSE')
 
     c.execute('''CREATE TABLE IF NOT EXISTS user_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
@@ -224,6 +230,40 @@ def init_db():
         quest_key VARCHAR(40) NOT NULL, completed_at TEXT NOT NULL
     )''')
 
+    # ===== КОЛЛЕКЦИИ =====
+    c.execute('''CREATE TABLE IF NOT EXISTS collections (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(80) NOT NULL,
+        description TEXT,
+        rarity VARCHAR(20) NOT NULL DEFAULT 'common',
+        coins_reward INTEGER NOT NULL DEFAULT 500,
+        bonus_coins INTEGER NOT NULL DEFAULT 50,
+        exclusive_car_id INTEGER,
+        created_at TEXT NOT NULL
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS collection_cars (
+        id SERIAL PRIMARY KEY,
+        collection_id INTEGER NOT NULL,
+        car_id INTEGER NOT NULL,
+        UNIQUE(collection_id, car_id)
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS user_collections (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        collection_id INTEGER NOT NULL,
+        completed_at TEXT,
+        main_claimed BOOLEAN NOT NULL DEFAULT FALSE,
+        UNIQUE(user_id, collection_id)
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS user_collection_bonus (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        collection_id INTEGER NOT NULL,
+        car_id INTEGER NOT NULL,
+        claimed_at TEXT NOT NULL,
+        UNIQUE(user_id, collection_id, car_id)
+    )''')
+
     c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
     c.execute('UPDATE users SET xp = 0 WHERE xp IS NULL')
     c.execute('UPDATE users SET level = 1 WHERE level IS NULL')
@@ -258,7 +298,7 @@ def set_setting(key, value):
     conn.commit(); c.close(); conn.close()
 
 
-# ---------- УРОВНИ И ОПЫТ ----------
+# ---------- УРОВНИ ----------
 def xp_for_level(level):
     return 100 + (level - 1) * 70
 
@@ -321,8 +361,8 @@ def get_user_quests(user_id):
     today = today_str()
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT quest_key, progress, target, xp_reward, coins_reward, completed, claimed
-                 FROM user_quests WHERE user_id = %s AND assigned_date = %s
-                 ORDER BY id''', (user_id, today))
+                 FROM user_quests WHERE user_id = %s AND assigned_date = %s ORDER BY id''',
+              (user_id, today))
     rows = c.fetchall()
     if not rows:
         pool = random.sample(QUEST_POOL, QUESTS_PER_DAY)
@@ -335,14 +375,13 @@ def get_user_quests(user_id):
                       (user_id, q['key'], q['target'], q['xp'], q['coins'], today))
         conn.commit()
         c.execute('''SELECT quest_key, progress, target, xp_reward, coins_reward, completed, claimed
-                     FROM user_quests WHERE user_id = %s AND assigned_date = %s
-                     ORDER BY id''', (user_id, today))
+                     FROM user_quests WHERE user_id = %s AND assigned_date = %s ORDER BY id''',
+                  (user_id, today))
         rows = c.fetchall()
     c.close(); conn.close()
 
     conn = get_db(); c = conn.cursor()
-    c.execute('SELECT 1 FROM quest_bonus WHERE user_id = %s AND claimed_date = %s',
-              (user_id, today))
+    c.execute('SELECT 1 FROM quest_bonus WHERE user_id = %s AND claimed_date = %s', (user_id, today))
     bonus_claimed = c.fetchone() is not None
     c.close(); conn.close()
 
@@ -352,22 +391,18 @@ def get_user_quests(user_id):
         q = next((q for q in QUEST_POOL if q['key'] == r[0]), None)
         if not q: continue
         completed = bool(r[5])
-        if not completed:
-            all_completed = False
-        result.append({
-            'key': r[0], 'icon': q['icon'], 'title': q['title'],
-            'progress': r[1], 'target': r[2],
-            'xp': r[3], 'coins': r[4],
-            'completed': completed, 'claimed': bool(r[6]),
-        })
+        if not completed: all_completed = False
+        result.append({'key': r[0], 'icon': q['icon'], 'title': q['title'],
+                       'progress': r[1], 'target': r[2], 'xp': r[3], 'coins': r[4],
+                       'completed': completed, 'claimed': bool(r[6])})
     return result, all_completed, bonus_claimed
 
 
 def progress_quest(user_id, quest_key, amount=1):
     today = today_str()
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, progress, target, completed
-                 FROM user_quests WHERE user_id = %s AND quest_key = %s AND assigned_date = %s''',
+    c.execute('''SELECT id, progress, target, completed FROM user_quests
+                 WHERE user_id = %s AND quest_key = %s AND assigned_date = %s''',
               (user_id, quest_key, today))
     row = c.fetchone()
     if not row:
@@ -385,8 +420,8 @@ def progress_quest(user_id, quest_key, amount=1):
 def claim_quest(user_id, quest_key):
     today = today_str()
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, xp_reward, coins_reward, completed, claimed
-                 FROM user_quests WHERE user_id = %s AND quest_key = %s AND assigned_date = %s''',
+    c.execute('''SELECT id, xp_reward, coins_reward, completed, claimed FROM user_quests
+                 WHERE user_id = %s AND quest_key = %s AND assigned_date = %s''',
               (user_id, quest_key, today))
     row = c.fetchone()
     if not row:
@@ -413,13 +448,11 @@ def claim_quest_bonus(user_id):
     today = today_str()
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT COUNT(*) FROM user_quests
-                 WHERE user_id = %s AND assigned_date = %s AND completed = TRUE''',
-              (user_id, today))
+                 WHERE user_id = %s AND assigned_date = %s AND completed = TRUE''', (user_id, today))
     done = c.fetchone()[0]
     if done < QUESTS_PER_DAY:
         c.close(); conn.close(); return False, f'Сначала выполни все {QUESTS_PER_DAY} задания'
-    c.execute('SELECT 1 FROM quest_bonus WHERE user_id = %s AND claimed_date = %s',
-              (user_id, today))
+    c.execute('SELECT 1 FROM quest_bonus WHERE user_id = %s AND claimed_date = %s', (user_id, today))
     if c.fetchone():
         c.close(); conn.close(); return False, 'Бонус уже получен'
     c.execute('INSERT INTO quest_bonus (user_id, claimed_date) VALUES (%s, %s)', (user_id, today))
@@ -428,7 +461,7 @@ def claim_quest_bonus(user_id):
     conn.commit(); c.close(); conn.close()
     log_transaction(user_id, 'quest_bonus', QUEST_BONUS_COINS, None, 'Все задания выполнены')
     add_xp(user_id, QUEST_BONUS_XP)
-    return True, f'Бонус за все задания! +{QUEST_BONUS_COINS} 💰, +{QUEST_BONUS_XP} XP'
+    return True, f'Бонус! +{QUEST_BONUS_COINS} 💰, +{QUEST_BONUS_XP} XP'
 
 
 def count_completed_quests(user_id):
@@ -464,8 +497,7 @@ def get_username_by_id(user_id):
 def get_user_profile(user_id):
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT id, username, avatar_data, avatar_mime, bio, favorite_car_id,
-                        balance, login_streak, xp, level
-                 FROM users WHERE id = %s''', (user_id,))
+                        balance, login_streak, xp, level FROM users WHERE id = %s''', (user_id,))
     row = c.fetchone(); c.close(); conn.close()
     if not row: return None
     xp_needed = xp_for_level(row[9] or 1)
@@ -634,8 +666,7 @@ def get_friend_status(user_a, user_b):
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT from_user_id, status FROM friendships
                  WHERE (from_user_id = %s AND to_user_id = %s)
-                    OR (from_user_id = %s AND to_user_id = %s)''',
-              (user_a, user_b, user_b, user_a))
+                    OR (from_user_id = %s AND to_user_id = %s)''', (user_a, user_b, user_b, user_a))
     row = c.fetchone(); c.close(); conn.close()
     if not row: return None
     from_id, status = row
@@ -656,8 +687,7 @@ def send_friend_request(from_id, to_username):
     if status == 'pending_in': return False, 'Этот игрок уже отправил тебе заявку'
     conn = get_db(); c = conn.cursor()
     c.execute('''INSERT INTO friendships (from_user_id, to_user_id, status, created_at)
-                 VALUES (%s, %s, 'pending', %s)''',
-              (from_id, to_id, datetime.now().isoformat()))
+                 VALUES (%s, %s, 'pending', %s)''', (from_id, to_id, datetime.now().isoformat()))
     conn.commit(); c.close(); conn.close()
     return True, f'Заявка отправлена игроку {to_username}'
 
@@ -717,8 +747,7 @@ def get_friends(user_id):
                  JOIN users u ON (u.id = f.from_user_id AND f.to_user_id = %s)
                               OR (u.id = f.to_user_id AND f.from_user_id = %s)
                  WHERE f.status = 'accepted' AND u.id != %s
-                 ORDER BY u.level DESC, u.username''',
-              (user_id, user_id, user_id))
+                 ORDER BY u.level DESC, u.username''', (user_id, user_id, user_id))
     rows = c.fetchall(); c.close(); conn.close()
     return [{'id': r[0], 'username': r[1], 'has_avatar': r[2], 'balance': r[3],
              'bio': r[4], 'level': r[5], 'cars_count': count_user_cars(r[0])} for r in rows]
@@ -728,22 +757,18 @@ def get_incoming_requests(user_id):
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT f.id, u.id, u.username, (u.avatar_data IS NOT NULL), f.created_at
                  FROM friendships f JOIN users u ON u.id = f.from_user_id
-                 WHERE f.to_user_id = %s AND f.status = 'pending'
-                 ORDER BY f.id DESC''', (user_id,))
+                 WHERE f.to_user_id = %s AND f.status = 'pending' ORDER BY f.id DESC''', (user_id,))
     rows = c.fetchall(); c.close(); conn.close()
-    return [{'id': r[0], 'user_id': r[1], 'username': r[2], 'has_avatar': r[3],
-             'created_at': r[4]} for r in rows]
+    return [{'id': r[0], 'user_id': r[1], 'username': r[2], 'has_avatar': r[3], 'created_at': r[4]} for r in rows]
 
 
 def get_outgoing_requests(user_id):
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT f.id, u.id, u.username, (u.avatar_data IS NOT NULL), f.created_at
                  FROM friendships f JOIN users u ON u.id = f.to_user_id
-                 WHERE f.from_user_id = %s AND f.status = 'pending'
-                 ORDER BY f.id DESC''', (user_id,))
+                 WHERE f.from_user_id = %s AND f.status = 'pending' ORDER BY f.id DESC''', (user_id,))
     rows = c.fetchall(); c.close(); conn.close()
-    return [{'id': r[0], 'user_id': r[1], 'username': r[2], 'has_avatar': r[3],
-             'created_at': r[4]} for r in rows]
+    return [{'id': r[0], 'user_id': r[1], 'username': r[2], 'has_avatar': r[3], 'created_at': r[4]} for r in rows]
 
 
 def count_incoming_requests(user_id):
@@ -765,10 +790,299 @@ def search_users(query, exclude_id):
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT id, username, (avatar_data IS NOT NULL), COALESCE(level, 1)
                  FROM users WHERE username ILIKE %s AND id != %s
-                 ORDER BY level DESC, username LIMIT 20''',
-              (query + '%', exclude_id))
+                 ORDER BY level DESC, username LIMIT 20''', (query + '%', exclude_id))
     rows = c.fetchall(); c.close(); conn.close()
     return [{'id': r[0], 'username': r[1], 'has_avatar': r[2], 'level': r[3]} for r in rows]
+
+
+# ---------- КОЛЛЕКЦИИ ----------
+def get_collections():
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT id, name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, created_at '
+              'FROM collections ORDER BY id DESC')
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'name': r[1], 'description': r[2] or '', 'rarity': r[3],
+             'coins_reward': r[4], 'bonus_coins': r[5], 'exclusive_car_id': r[6],
+             'created_at': r[7]} for r in rows]
+
+
+def get_collection(cid):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT id, name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, created_at '
+              'FROM collections WHERE id = %s', (cid,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row: return None
+    return {'id': row[0], 'name': row[1], 'description': row[2] or '', 'rarity': row[3],
+            'coins_reward': row[4], 'bonus_coins': row[5], 'exclusive_car_id': row[6],
+            'created_at': row[7]}
+
+
+def get_collection_cars(cid):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT c.id, c.model, c.rating, c.price, c.brand FROM cars c
+                 JOIN collection_cars cc ON cc.car_id = c.id
+                 WHERE cc.collection_id = %s ORDER BY c.model''', (cid,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'model': r[1], 'rating': r[2], 'price': r[3] or 0, 'brand': r[4] or ''} for r in rows]
+
+
+def create_collection(name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, car_ids):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO collections (name, description, rarity, coins_reward, bonus_coins,
+                                          exclusive_car_id, created_at)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id''',
+              (name, description, rarity, coins_reward, bonus_coins, exclusive_car_id,
+               datetime.now().isoformat()))
+    cid = c.fetchone()[0]
+    for car_id in car_ids:
+        c.execute('INSERT INTO collection_cars (collection_id, car_id) VALUES (%s, %s) '
+                  'ON CONFLICT (collection_id, car_id) DO NOTHING', (cid, car_id))
+    conn.commit(); c.close(); conn.close()
+    return cid
+
+
+def update_collection(cid, name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, car_ids):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''UPDATE collections SET name = %s, description = %s, rarity = %s,
+                 coins_reward = %s, bonus_coins = %s, exclusive_car_id = %s WHERE id = %s''',
+              (name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, cid))
+    c.execute('DELETE FROM collection_cars WHERE collection_id = %s', (cid,))
+    for car_id in car_ids:
+        c.execute('INSERT INTO collection_cars (collection_id, car_id) VALUES (%s, %s) '
+                  'ON CONFLICT (collection_id, car_id) DO NOTHING', (cid, car_id))
+    conn.commit(); c.close(); conn.close()
+
+
+def delete_collection(cid):
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM collection_cars WHERE collection_id = %s', (cid,))
+    c.execute('DELETE FROM user_collections WHERE collection_id = %s', (cid,))
+    c.execute('DELETE FROM user_collection_bonus WHERE collection_id = %s', (cid,))
+    c.execute('DELETE FROM collections WHERE id = %s', (cid,))
+    conn.commit(); c.close(); conn.close()
+
+
+def get_collection_progress(user_id, cid):
+    """Возвращает инфу о прогрессе игрока в коллекции."""
+    cars = get_collection_cars(cid)
+    total = len(cars)
+    owned_ids = set()
+    if total > 0:
+        conn = get_db(); c = conn.cursor()
+        c.execute('SELECT car_id FROM user_cars WHERE user_id = %s', (user_id,))
+        owned_ids = {r[0] for r in c.fetchall()}
+        c.close(); conn.close()
+    owned_count = sum(1 for car in cars if car['id'] in owned_ids)
+    completed = total > 0 and owned_count == total
+
+    # Статус в user_collections
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT completed_at, main_claimed FROM user_collections '
+              'WHERE user_id = %s AND collection_id = %s', (user_id, cid))
+    row = c.fetchone(); c.close(); conn.close()
+    main_claimed = row[1] if row else False
+
+    # Бонусы: какие машины уже без бонуса / с бонусом
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT car_id FROM user_collection_bonus WHERE user_id = %s AND collection_id = %s',
+              (user_id, cid))
+    bonus_claimed_ids = {r[0] for r in c.fetchall()}
+    c.close(); conn.close()
+
+    # Автоматически записываем завершение, если ещё нет
+    if completed and not row:
+        conn = get_db(); c = conn.cursor()
+        c.execute('''INSERT INTO user_collections (user_id, collection_id, completed_at, main_claimed)
+                     VALUES (%s, %s, %s, FALSE) ON CONFLICT (user_id, collection_id)
+                     DO UPDATE SET completed_at = EXCLUDED.completed_at
+                     WHERE user_collections.completed_at IS NULL''',
+                  (user_id, cid, datetime.now().isoformat()))
+        conn.commit(); c.close(); conn.close()
+
+    # Машины, которые игрок собрал, но за них бонус не получен и основная награда уже забрана
+    bonus_available = []
+    if main_claimed:
+        for car in cars:
+            if car['id'] in owned_ids and car['id'] not in bonus_claimed_ids:
+                bonus_available.append(car)
+
+    return {
+        'total': total,
+        'owned': owned_count,
+        'progress_pct': int(owned_count * 100 / total) if total else 0,
+        'completed': completed,
+        'main_claimed': main_claimed,
+        'bonus_claimed_ids': bonus_claimed_ids,
+        'bonus_available': bonus_available,
+        'owned_ids': owned_ids,
+    }
+
+
+def get_all_collections_for_user(user_id):
+    """Список всех коллекций с прогрессом игрока."""
+    result = []
+    for col in get_collections():
+        prog = get_collection_progress(user_id, col['id'])
+        col2 = dict(col)
+        col2['progress'] = prog
+        col2['rarity_info'] = COLLECTION_RARITY.get(col['rarity'], COLLECTION_RARITY['common'])
+        result.append(col2)
+    return result
+
+
+def claim_collection_reward(user_id, cid):
+    """Забрать основную награду за коллекцию."""
+    col = get_collection(cid)
+    if not col: return False, 'Коллекция не найдена'
+    prog = get_collection_progress(user_id, cid)
+    if not prog['completed']:
+        return False, 'Коллекция ещё не собрана'
+    if prog['main_claimed']:
+        return False, 'Награда уже получена'
+
+    coins = col['coins_reward']
+    if coins > 0:
+        add_coins(user_id, coins)
+        log_transaction(user_id, 'collection_reward', coins, None, f'Коллекция «{col["name"]}»')
+
+    # Эксклюзивная машина
+    car_given = None
+    if col['exclusive_car_id']:
+        if not has_car(user_id, col['exclusive_car_id']):
+            conn = get_db(); c = conn.cursor()
+            c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
+                      (user_id, col['exclusive_car_id'], datetime.now().isoformat()))
+            conn.commit(); c.close(); conn.close()
+            car_given = get_car_info(col['exclusive_car_id'])
+            log_transaction(user_id, 'collection_car', 0, col['exclusive_car_id'],
+                            f'Эксклюзив коллекции «{col["name"]}»')
+
+    # Отмечаем основную награду
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE user_collections SET main_claimed = TRUE '
+              'WHERE user_id = %s AND collection_id = %s', (user_id, cid))
+    # Записываем все текущие машины коллекции в bonus-таблицу как "уже учтённые без бонуса"
+    cars = get_collection_cars(cid)
+    now = datetime.now().isoformat()
+    for car in cars:
+        if has_car(user_id, car['id']):
+            c.execute('INSERT INTO user_collection_bonus (user_id, collection_id, car_id, claimed_at) '
+                      'VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING',
+                      (user_id, cid, car['id'], now))
+    conn.commit(); c.close(); conn.close()
+
+    # XP
+    add_xp(user_id, XP_REWARDS.get('collection', 500))
+
+    # Достижение коллекции
+    _unlock_collection_achievement(user_id, cid)
+
+    # Достижения уровня коллекционера
+    _check_collector_achievements(user_id)
+
+    msg = f'🏆 Коллекция «{col["name"]}» собрана! +{coins} 💰'
+    if car_given:
+        msg += f' · Получена «{car_given[1]}»!'
+    return True, msg
+
+
+def claim_collection_bonus(user_id, cid, car_id):
+    """Забрать бонус за новую машину в коллекции (после основной награды)."""
+    col = get_collection(cid)
+    if not col: return False, 'Коллекция не найдена'
+    prog = get_collection_progress(user_id, cid)
+    if not prog['main_claimed']:
+        return False, 'Сначала забери основную награду'
+    if not has_car(user_id, car_id):
+        return False, 'У тебя нет этой машины'
+
+    # Проверим, что эта машина действительно в коллекции
+    cars = get_collection_cars(cid)
+    if not any(car['id'] == car_id for car in cars):
+        return False, 'Этой машины нет в коллекции'
+
+    # Проверим, что бонус за неё не получен
+    if car_id in prog['bonus_claimed_ids']:
+        return False, 'Бонус за эту машину уже получен'
+
+    bonus = col['bonus_coins']
+    if bonus > 0:
+        add_coins(user_id, bonus)
+        log_transaction(user_id, 'collection_bonus', bonus, car_id,
+                        f'Бонус коллекции «{col["name"]}»')
+    conn = get_db(); c = conn.cursor()
+    c.execute('INSERT INTO user_collection_bonus (user_id, collection_id, car_id, claimed_at) '
+              'VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING',
+              (user_id, cid, car_id, datetime.now().isoformat()))
+    conn.commit(); c.close(); conn.close()
+    return True, f'Бонус получен: +{bonus} 💰'
+
+
+def count_completed_collections(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM user_collections WHERE user_id = %s AND main_claimed = TRUE',
+              (user_id,))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def _unlock_collection_achievement(user_id, cid):
+    """Разблокировать достижение за коллекцию (храним как col_<id>)."""
+    key = f'col_{cid}'
+    conn = get_db(); c = conn.cursor()
+    c.execute('INSERT INTO user_achievements (user_id, key, unlocked_at) VALUES (%s, %s, %s) '
+              'ON CONFLICT (user_id, key) DO NOTHING',
+              (user_id, key, datetime.now().isoformat()))
+    conn.commit(); c.close(); conn.close()
+    # Награда монетами
+    add_coins(user_id, COLLECTION_ACH_REWARD)
+    log_transaction(user_id, 'ach_reward', COLLECTION_ACH_REWARD, None, f'Достижение коллекции')
+    add_xp(user_id, XP_REWARDS.get('achievement', 100))
+
+
+def _check_collector_achievements(user_id):
+    """Проверить достижения за количество собранных коллекций."""
+    count = count_completed_collections(user_id)
+    already = get_unlocked_keys(user_id)
+    checks = {
+        'collector_1':  count >= 1,
+        'collector_3':  count >= 3,
+        'collector_5':  count >= 5,
+        'collector_10': count >= 10,
+    }
+    for key, cond in checks.items():
+        if key not in already and cond:
+            conn = get_db(); c = conn.cursor()
+            c.execute('INSERT INTO user_achievements (user_id, key, unlocked_at) VALUES (%s, %s, %s) '
+                      'ON CONFLICT (user_id, key) DO NOTHING RETURNING id',
+                      (user_id, key, datetime.now().isoformat()))
+            row = c.fetchone()
+            conn.commit(); c.close(); conn.close()
+            if row:
+                ach = next((a for a in ACHIEVEMENTS if a['key'] == key), None)
+                if ach:
+                    add_coins(user_id, ach['reward'])
+                    log_transaction(user_id, 'ach_reward', ach['reward'], None, f'Награда за «{ach["title"]}»')
+
+
+def get_collection_achievements_for_user(user_id):
+    """Список коллекционных достижений для отображения (вместе с обычными)."""
+    unlocked = get_unlocked_keys(user_id)
+    result = []
+    for col in get_collections():
+        key = f'col_{col["id"]}'
+        rarity_info = COLLECTION_RARITY.get(col['rarity'], COLLECTION_RARITY['common'])
+        result.append({
+            'key': key,
+            'icon': rarity_info['icon'],
+            'title': f'Коллекционер: {col["name"]}',
+            'desc': f'Собрать коллекцию «{col["name"]}»',
+            'reward': COLLECTION_ACH_REWARD,
+            'unlocked': key in unlocked,
+            'is_collection': True,
+            'collection_id': col['id'],
+        })
+    return result
 
 
 # ---------- ДОСТИЖЕНИЯ ----------
@@ -813,6 +1127,7 @@ def check_achievements(user_id):
     level = get_user_level_info(user_id)['level']
     quests_done = count_completed_quests(user_id)
     race_wins = count_tx(user_id, 'race_win')
+    collections_done = count_completed_collections(user_id)
 
     checks = {
         'first_car':   cars_count >= 1,
@@ -849,6 +1164,10 @@ def check_achievements(user_id):
         'quest_50':    quests_done >= 50,
         'race_win_10': race_wins >= 10,
         'race_win_50': race_wins >= 50,
+        'collector_1': collections_done >= 1,
+        'collector_3': collections_done >= 3,
+        'collector_5': collections_done >= 5,
+        'collector_10': collections_done >= 10,
     }
     for key, cond in checks.items():
         if key not in already and cond:
@@ -868,7 +1187,10 @@ def get_max_car_rating(user_id):
 
 def get_achievements_for_user(user_id):
     unlocked = get_unlocked_keys(user_id)
-    return [{**a, 'unlocked': a['key'] in unlocked} for a in ACHIEVEMENTS]
+    result = [{**a, 'unlocked': a['key'] in unlocked} for a in ACHIEVEMENTS]
+    # Плюс коллекционные
+    result.extend(get_collection_achievements_for_user(user_id))
+    return result
 
 
 def flash_new_achievements(user_id):
@@ -952,21 +1274,21 @@ def get_catalog_by_rating(min_r, max_r):
     return rows
 
 
-def add_car(model, brand, rating, price, horsepower, acceleration, top_speed, data, mime):
+def add_car(model, brand, rating, price, horsepower, acceleration, top_speed, is_exclusive, data, mime):
     conn = get_db(); c = conn.cursor()
     c.execute('''INSERT INTO cars (model, brand, rating, price, horsepower, acceleration,
-                                   top_speed, image_data, image_mime, created_at)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-              (model, brand, rating, price, horsepower, acceleration, top_speed,
+                                   top_speed, is_exclusive, image_data, image_mime, created_at)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+              (model, brand, rating, price, horsepower, acceleration, top_speed, is_exclusive,
                psycopg2.Binary(data), mime, datetime.now().isoformat()))
     conn.commit(); c.close(); conn.close()
 
 
-def update_car(car_id, model, brand, rating, price, horsepower, acceleration, top_speed):
+def update_car(car_id, model, brand, rating, price, horsepower, acceleration, top_speed, is_exclusive):
     conn = get_db(); c = conn.cursor()
     c.execute('''UPDATE cars SET model = %s, brand = %s, rating = %s, price = %s,
-                 horsepower = %s, acceleration = %s, top_speed = %s WHERE id = %s''',
-              (model, brand, rating, price, horsepower, acceleration, top_speed, car_id))
+                 horsepower = %s, acceleration = %s, top_speed = %s, is_exclusive = %s WHERE id = %s''',
+              (model, brand, rating, price, horsepower, acceleration, top_speed, is_exclusive, car_id))
     conn.commit(); c.close(); conn.close()
 
 
@@ -986,13 +1308,13 @@ def get_car_info(car_id):
 
 def get_car_full(car_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, model, rating, price, horsepower, acceleration, top_speed, brand
-                 FROM cars WHERE id = %s''', (car_id,))
+    c.execute('''SELECT id, model, rating, price, horsepower, acceleration, top_speed, brand,
+                        COALESCE(is_exclusive, FALSE) FROM cars WHERE id = %s''', (car_id,))
     row = c.fetchone(); c.close(); conn.close()
     if not row: return None
     return {'id': row[0], 'model': row[1], 'rating': row[2], 'price': row[3] or 0,
             'horsepower': row[4], 'acceleration': row[5], 'top_speed': row[6],
-            'brand': row[7] or ''}
+            'brand': row[7] or '', 'is_exclusive': row[8]}
 
 
 def delete_car_from_catalog(car_id):
@@ -1003,6 +1325,8 @@ def delete_car_from_catalog(car_id):
     c.execute('DELETE FROM wishlist WHERE car_id = %s', (car_id,))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE favorite_car_id = %s', (car_id,))
     c.execute('DELETE FROM daily_discount WHERE car_id = %s', (car_id,))
+    c.execute('DELETE FROM collection_cars WHERE car_id = %s', (car_id,))
+    c.execute('UPDATE collections SET exclusive_car_id = NULL WHERE exclusive_car_id = %s', (car_id,))
     c.execute('DELETE FROM cars WHERE id = %s', (car_id,))
     conn.commit(); c.close(); conn.close()
 
@@ -1035,6 +1359,8 @@ def buy_car(user_id, car_id):
     if has_car(user_id, car_id): return False, 'Эта машина уже в твоём гараже'
     car = get_car_full(car_id)
     if not car: return False, 'Машина не найдена'
+    if car['is_exclusive']:
+        return False, 'Эксклюзивные машины нельзя купить — только получить за коллекцию'
     req_level = get_level_required_for_stars(car['rating'])
     user_level = get_user_level_info(user_id)['level']
     if user_level < req_level:
@@ -1250,7 +1576,6 @@ def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
     if get_balance(from_user_id) < from_coins:
         return False, f'Не хватает монет. У тебя {get_balance(from_user_id)}'
     message = (message or '')[:200]
-
     conn = get_db(); c = conn.cursor()
     if from_coins > 0:
         c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s',
@@ -1258,8 +1583,7 @@ def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
     c.execute('''INSERT INTO trades
                  (from_user_id, to_user_id, from_car_id, from_coins, message, status, created_at)
                  VALUES (%s, %s, %s, %s, %s, 'pending', %s) RETURNING id''',
-              (from_user_id, to_user_id, from_car_id, from_coins, message,
-               datetime.now().isoformat()))
+              (from_user_id, to_user_id, from_car_id, from_coins, message, datetime.now().isoformat()))
     trade_id = c.fetchone()[0]
     conn.commit(); c.close(); conn.close()
     if from_coins > 0:
@@ -1302,8 +1626,7 @@ def get_incoming_trades(user_id):
 
 def get_outgoing_trades(user_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id FROM trades WHERE from_user_id = %s
-                 ORDER BY id DESC LIMIT 50''', (user_id,))
+    c.execute('''SELECT id FROM trades WHERE from_user_id = %s ORDER BY id DESC LIMIT 50''', (user_id,))
     ids = [r[0] for r in c.fetchall()]; c.close(); conn.close()
     return [get_trade_full(i) for i in ids]
 
@@ -1319,8 +1642,7 @@ def get_trade_history(user_id):
 
 def count_incoming_trades(user_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT COUNT(*) FROM trades WHERE to_user_id = %s AND status = 'pending' ''',
-              (user_id,))
+    c.execute('''SELECT COUNT(*) FROM trades WHERE to_user_id = %s AND status = 'pending' ''', (user_id,))
     r = c.fetchone(); c.close(); conn.close()
     return r[0] if r else 0
 
@@ -1371,8 +1693,7 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
 
     diff = t['from_coins'] - to_coins
     if diff > 0:
-        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
-                  (diff, user_id))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (diff, user_id))
     elif diff < 0:
         c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
                   (-diff, t['from_user_id']))
@@ -1386,8 +1707,7 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
     my_name = get_username_by_id(t['from_user_id'])
     log_transaction(t['from_user_id'], 'trade', -t['from_coins'] + to_coins,
                     t['from_car_id'], f'Обмен с {other_name}')
-    log_transaction(user_id, 'trade', t['from_coins'] - to_coins,
-                    to_car_id, f'Обмен с {my_name}')
+    log_transaction(user_id, 'trade', t['from_coins'] - to_coins, to_car_id, f'Обмен с {my_name}')
     add_xp(t['from_user_id'], XP_REWARDS.get('trade', 40))
     add_xp(user_id, XP_REWARDS.get('trade', 40))
     progress_quest(t['from_user_id'], 'trade_1', 1)
@@ -1408,8 +1728,7 @@ def reject_trade(trade_id, user_id):
               (datetime.now().isoformat(), trade_id))
     conn.commit(); c.close(); conn.close()
     if t['from_coins'] > 0:
-        log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None,
-                        'Возврат из отклонённого обмена')
+        log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None, 'Возврат из отклонённого обмена')
     return True, 'Обмен отклонён'
 
 
@@ -1426,8 +1745,7 @@ def cancel_trade(trade_id, user_id):
               (datetime.now().isoformat(), trade_id))
     conn.commit(); c.close(); conn.close()
     if t['from_coins'] > 0:
-        log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None,
-                        'Возврат из отменённого обмена')
+        log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None, 'Возврат из отменённого обмена')
     return True, 'Обмен отменён'
 
 
@@ -1446,12 +1764,11 @@ def car_score(car_dict):
 def cleanup_expired_challenges():
     conn = get_db(); c = conn.cursor()
     cutoff = (datetime.now() - timedelta(minutes=RACE_TIMEOUT_MIN)).isoformat()
-    c.execute("SELECT id, user_id, bet FROM race_challenges "
-              "WHERE status = 'open' AND created_at < %s", (cutoff,))
+    c.execute("SELECT id, user_id, bet FROM race_challenges WHERE status = 'open' AND created_at < %s",
+              (cutoff,))
     expired = c.fetchall()
     for row in expired:
-        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
-                  (row[2], row[1]))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (row[2], row[1]))
         log_transaction(row[1], 'race_refund', row[2], None, 'Возврат: вызов истёк')
     if expired:
         c.execute("UPDATE race_challenges SET status = 'expired', completed_at = %s "
@@ -1490,8 +1807,7 @@ def get_open_challenges(exclude_user_id=None):
                   "WHERE status = 'open' ORDER BY id DESC")
     rows = c.fetchall(); c.close(); conn.close()
     return [{'id': r[0], 'user_id': r[1], 'username': get_username_by_id(r[1]),
-             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4],
-             'hide_car': bool(r[5])} for r in rows]
+             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4], 'hide_car': bool(r[5])} for r in rows]
 
 
 def get_user_challenges(user_id):
@@ -1501,8 +1817,7 @@ def get_user_challenges(user_id):
               "WHERE status = 'open' AND user_id = %s ORDER BY id DESC", (user_id,))
     rows = c.fetchall(); c.close(); conn.close()
     return [{'id': r[0], 'user_id': r[1], 'username': get_username_by_id(r[1]),
-             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4],
-             'hide_car': bool(r[5])} for r in rows]
+             'car': get_car_full(r[2]), 'bet': r[3], 'offer_car': r[4], 'hide_car': bool(r[5])} for r in rows]
 
 
 def cancel_race_challenge(challenge_id, user_id):
@@ -1529,10 +1844,8 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
     if not row:
         c.close(); conn.close(); return False, 'Вызов не найден', None
     author_id, author_car_id, bet, author_offer, status = row
-    if status != 'open':
-        c.close(); conn.close(); return False, 'Вызов уже занят', None
-    if author_id == user_id:
-        c.close(); conn.close(); return False, 'Нельзя принять свой вызов', None
+    if status != 'open': c.close(); conn.close(); return False, 'Вызов уже занят', None
+    if author_id == user_id: c.close(); conn.close(); return False, 'Нельзя принять свой вызов', None
     my_car = get_car_full(my_car_id)
     if not my_car or not has_car(user_id, my_car_id):
         c.close(); conn.close(); return False, 'Машина не найдена', None
@@ -1558,15 +1871,12 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
     car_transferred = False
     if car_stake:
         loser_car_id = author_car_id if loser_id == author_id else my_car_id
-        c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s',
-                  (loser_id, loser_car_id))
+        c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (loser_id, loser_car_id))
         c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
                      VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
                   (winner_id, loser_car_id, datetime.now().isoformat()))
-        c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s',
-                  (loser_id, loser_car_id))
-        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s',
-                  (loser_id, loser_car_id))
+        c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (loser_id, loser_car_id))
+        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (loser_id, loser_car_id))
         c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
                   (loser_id, loser_car_id))
         car_transferred = True
@@ -1594,9 +1904,7 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
             progress_quest(uid, 'win_races_3', 1)
 
     return True, 'Гонка завершена!', {
-        'winner_id': winner_id, 'challenge_id': challenge_id,
-        'car_transferred': car_transferred,
-    }
+        'winner_id': winner_id, 'challenge_id': challenge_id, 'car_transferred': car_transferred}
 
 
 def get_race(challenge_id):
@@ -1635,8 +1943,7 @@ def get_leaderboard(sort_by='cars', limit=50):
                      FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
     elif sort_by == 'races':
         c.execute('''SELECT u.id, u.username,
-                     (SELECT COUNT(*) FROM transactions t
-                      WHERE t.user_id = u.id AND t.type = 'race_win') as val,
+                     (SELECT COUNT(*) FROM transactions t WHERE t.user_id = u.id AND t.type = 'race_win') as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
                      FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
     elif sort_by == 'achievements':
@@ -1648,6 +1955,11 @@ def get_leaderboard(sort_by='cars', limit=50):
         c.execute('''SELECT u.id, u.username, COALESCE(u.level, 1) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
                      FROM users u ORDER BY val DESC, u.xp DESC, u.id ASC LIMIT %s''', (limit,))
+    elif sort_by == 'collections':
+        c.execute('''SELECT u.id, u.username,
+                     (SELECT COUNT(*) FROM user_collections uc WHERE uc.user_id = u.id AND uc.main_claimed = TRUE) as val,
+                     (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
+                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
     else:
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_cars uc WHERE uc.user_id = u.id) as val,
@@ -1730,6 +2042,8 @@ def index():
     streak = 0; next_bonus = 0
     level_info = {'level': 1, 'xp': 0, 'xp_needed': 100, 'progress': 0}
     quests_unclaimed = 0
+    collections_ready = 0
+    collections_total = 0
     if 'user_id' in session:
         flash_new_achievements(session['user_id'])
         profile = get_user_profile(session['user_id'])
@@ -1756,6 +2070,17 @@ def index():
             quests_unclaimed = sum(1 for q in quests if q['completed'] and not q['claimed'])
         except Exception:
             quests_unclaimed = 0
+        try:
+            all_cols = get_all_collections_for_user(session['user_id'])
+            collections_total = len(all_cols)
+            for col in all_cols:
+                p = col['progress']
+                if p['completed'] and not p['main_claimed']:
+                    collections_ready += 1
+                elif p['main_claimed'] and p['bonus_available']:
+                    collections_ready += len(p['bonus_available'])
+        except Exception:
+            pass
     return render_template('index.html',
                            user=session.get('username'), profile=profile,
                            favorite_car=favorite_car, cars_count=cars_count,
@@ -1771,6 +2096,8 @@ def index():
                            streak=streak, next_bonus=next_bonus,
                            level_info=level_info,
                            quests_unclaimed=quests_unclaimed,
+                           collections_ready=collections_ready,
+                           collections_total=collections_total,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -1822,6 +2149,153 @@ def login():
 def logout():
     session.pop('user_id', None); session.pop('username', None)
     return redirect(url_for('index'))
+
+
+# ---------- КОЛЛЕКЦИИ ----------
+@app.route('/collections')
+@login_required
+def collections_page():
+    flash_new_achievements(session['user_id'])
+    cols = get_all_collections_for_user(session['user_id'])
+    completed = sum(1 for c in cols if c['progress']['completed'])
+    claimed = sum(1 for c in cols if c['progress']['main_claimed'])
+    return render_template('collections.html', collections=cols,
+                           completed=completed, claimed=claimed, total=len(cols),
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/collections/<int:cid>')
+@login_required
+def collection_view(cid):
+    col = get_collection(cid)
+    if not col:
+        flash('Коллекция не найдена'); return redirect(url_for('collections_page'))
+    cars = get_collection_cars(cid)
+    prog = get_collection_progress(session['user_id'], cid)
+    excl_car = get_car_full(col['exclusive_car_id']) if col['exclusive_car_id'] else None
+    rarity_info = COLLECTION_RARITY.get(col['rarity'], COLLECTION_RARITY['common'])
+    return render_template('collection_view.html', col=col, cars=cars, prog=prog,
+                           excl_car=excl_car, rarity_info=rarity_info,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/collections/<int:cid>/claim', methods=['POST'])
+@login_required
+def collection_claim(cid):
+    ok, msg = claim_collection_reward(session['user_id'], cid)
+    flash(msg)
+    return redirect(url_for('collection_view', cid=cid))
+
+
+@app.route('/collections/<int:cid>/bonus/<int:car_id>', methods=['POST'])
+@login_required
+def collection_bonus_claim(cid, car_id):
+    ok, msg = claim_collection_bonus(session['user_id'], cid, car_id)
+    flash(msg)
+    return redirect(url_for('collection_view', cid=cid))
+
+
+# ---------- АДМИН: КОЛЛЕКЦИИ ----------
+@app.route('/admin/collections')
+@admin_required
+def admin_collections():
+    cols = get_collections()
+    for col in cols:
+        col['car_count'] = len(get_collection_cars(col['id']))
+        col['rarity_info'] = COLLECTION_RARITY.get(col['rarity'], COLLECTION_RARITY['common'])
+    return render_template('admin_collections.html', collections=cols,
+                           rarities=COLLECTION_RARITY,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/collections/new', methods=['GET', 'POST'])
+@admin_required
+def admin_collection_new():
+    all_cars = get_catalog()
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()[:80]
+        description = request.form.get('description', '').strip()[:500]
+        rarity = request.form.get('rarity', 'common')
+        if rarity not in COLLECTION_RARITY: rarity = 'common'
+        try: coins_reward = int(request.form.get('coins_reward', '500'))
+        except ValueError: coins_reward = 500
+        try: bonus_coins = int(request.form.get('bonus_coins', '50'))
+        except ValueError: bonus_coins = 50
+        excl_raw = request.form.get('exclusive_car_id', '').strip()
+        exclusive_car_id = int(excl_raw) if excl_raw.isdigit() else None
+        car_ids = [int(x) for x in request.form.getlist('car_ids') if x.isdigit()]
+
+        if not name:
+            flash('Впиши название'); return redirect(url_for('admin_collection_new'))
+        if not car_ids:
+            flash('Выбери хотя бы одну машину'); return redirect(url_for('admin_collection_new'))
+
+        cid = create_collection(name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, car_ids)
+        flash(f'Коллекция «{name}» создана!')
+        return redirect(url_for('admin_collection_view', cid=cid))
+    return render_template('admin_collection_form.html', mode='new',
+                           all_cars=all_cars, col=None, col_car_ids=set(),
+                           rarities=COLLECTION_RARITY,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/collections/<int:cid>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_collection_edit(cid):
+    col = get_collection(cid)
+    if not col:
+        flash('Не найдено'); return redirect(url_for('admin_collections'))
+    all_cars = get_catalog()
+    car_ids_in = {c['id'] for c in get_collection_cars(cid)}
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()[:80]
+        description = request.form.get('description', '').strip()[:500]
+        rarity = request.form.get('rarity', 'common')
+        if rarity not in COLLECTION_RARITY: rarity = 'common'
+        try: coins_reward = int(request.form.get('coins_reward', '500'))
+        except ValueError: coins_reward = 500
+        try: bonus_coins = int(request.form.get('bonus_coins', '50'))
+        except ValueError: bonus_coins = 50
+        excl_raw = request.form.get('exclusive_car_id', '').strip()
+        exclusive_car_id = int(excl_raw) if excl_raw.isdigit() else None
+        car_ids = [int(x) for x in request.form.getlist('car_ids') if x.isdigit()]
+
+        if not name:
+            flash('Впиши название'); return redirect(url_for('admin_collection_edit', cid=cid))
+        if not car_ids:
+            flash('Выбери хотя бы одну машину'); return redirect(url_for('admin_collection_edit', cid=cid))
+
+        update_collection(cid, name, description, rarity, coins_reward, bonus_coins, exclusive_car_id, car_ids)
+        flash('Коллекция обновлена!')
+        return redirect(url_for('admin_collection_view', cid=cid))
+    return render_template('admin_collection_form.html', mode='edit',
+                           all_cars=all_cars, col=col, col_car_ids=car_ids_in,
+                           rarities=COLLECTION_RARITY,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/collections/<int:cid>')
+@admin_required
+def admin_collection_view(cid):
+    col = get_collection(cid)
+    if not col:
+        flash('Не найдено'); return redirect(url_for('admin_collections'))
+    cars = get_collection_cars(cid)
+    excl_car = get_car_full(col['exclusive_car_id']) if col['exclusive_car_id'] else None
+    rarity_info = COLLECTION_RARITY.get(col['rarity'], COLLECTION_RARITY['common'])
+    return render_template('admin_collection_view.html', col=col, cars=cars,
+                           excl_car=excl_car, rarity_info=rarity_info,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/collections/<int:cid>/delete', methods=['POST'])
+@admin_required
+def admin_collection_delete(cid):
+    delete_collection(cid)
+    flash('Коллекция удалена')
+    return redirect(url_for('admin_collections'))
 
 
 # ---------- ЗАДАНИЯ ----------
@@ -1940,8 +2414,7 @@ def friends_page():
         search_results = search_users(search_query, user_id)
         for r in search_results:
             r['status'] = get_friend_status(user_id, r['id'])
-    return render_template('friends.html',
-                           friends=friends, incoming=incoming, outgoing=outgoing,
+    return render_template('friends.html', friends=friends, incoming=incoming, outgoing=outgoing,
                            search_query=search_query, search_results=search_results,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
@@ -2040,12 +2513,13 @@ def shop():
         user_level = get_user_level_info(session['user_id'])['level']
 
         conn = get_db(); c = conn.cursor()
-        c.execute('SELECT id, model, rating, price, horsepower, brand FROM cars ORDER BY id DESC')
+        c.execute('SELECT id, model, rating, price, horsepower, brand, COALESCE(is_exclusive, FALSE) '
+                  'FROM cars WHERE COALESCE(is_exclusive, FALSE) = FALSE ORDER BY id DESC')
         rows = c.fetchall(); c.close(); conn.close()
 
         cars = []
         for row in rows:
-            cid, model, rating, price, hp, brand = row
+            cid, model, rating, price, hp, brand, excl = row
             price = price or 0
             final_price = price
             has_disc = False
@@ -2126,6 +2600,7 @@ def add_car_page():
         hp = request.form.get('horsepower', '').strip()
         accel = request.form.get('acceleration', '').strip()
         top = request.form.get('top_speed', '').strip()
+        is_exclusive = bool(request.form.get('is_exclusive'))
         file = request.files.get('image')
 
         if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
@@ -2148,7 +2623,7 @@ def add_car_page():
         if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
         if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
 
-        add_car(model, brand, rating, price, hp, accel, top, file.read(), file.mimetype)
+        add_car(model, brand, rating, price, hp, accel, top, is_exclusive, file.read(), file.mimetype)
         flash(f'«{model}» добавлена!')
         return redirect(url_for('shop'))
     return render_template('add_car.html', user=session.get('username'), is_admin=True)
@@ -2167,6 +2642,7 @@ def edit_car_page(car_id):
         hp = request.form.get('horsepower', '').strip()
         accel = request.form.get('acceleration', '').strip()
         top = request.form.get('top_speed', '').strip()
+        is_exclusive = bool(request.form.get('is_exclusive'))
         if not model: flash('Впиши название'); return redirect(url_for('edit_car_page', car_id=car_id))
         try:
             rating = int(rating)
@@ -2182,7 +2658,7 @@ def edit_car_page(car_id):
         top = int(top) if top.isdigit() else None
         try: accel = float(accel) if accel else None
         except ValueError: accel = None
-        update_car(car_id, model, brand, rating, price, hp, accel, top)
+        update_car(car_id, model, brand, rating, price, hp, accel, top, is_exclusive)
         flash('Машина обновлена')
         return redirect(url_for('shop'))
     return render_template('edit_car.html', car=car, user=session.get('username'), is_admin=True)
@@ -2223,8 +2699,7 @@ def compare_page():
     c2 = request.args.get('c2', '')
     car1 = get_car_full(int(c1)) if c1.isdigit() else None
     car2 = get_car_full(int(c2)) if c2.isdigit() else None
-    return render_template('compare.html', all_cars=all_cars,
-                           car1=car1, car2=car2,
+    return render_template('compare.html', all_cars=all_cars, car1=car1, car2=car2,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
@@ -2315,8 +2790,7 @@ def trades_page():
     incoming = get_incoming_trades(session['user_id'])
     outgoing = [t for t in get_outgoing_trades(session['user_id']) if t['status'] == 'pending']
     history = get_trade_history(session['user_id'])
-    return render_template('trades.html',
-                           incoming=incoming, outgoing=outgoing, history=history,
+    return render_template('trades.html', incoming=incoming, outgoing=outgoing, history=history,
                            balance=get_balance(session['user_id']),
                            my_id=session['user_id'],
                            user=session.get('username'),
@@ -2335,8 +2809,7 @@ def trade_new():
         if not from_car_id.isdigit(): flash('Выбери свою машину'); return redirect(url_for('trade_new'))
         try: from_coins = int(from_coins or 0)
         except ValueError: flash('Монеты должны быть числом'); return redirect(url_for('trade_new'))
-        ok, result = create_trade(session['user_id'], to_username, int(from_car_id),
-                                  from_coins, message)
+        ok, result = create_trade(session['user_id'], to_username, int(from_car_id), from_coins, message)
         if ok:
             flash('Предложение отправлено!')
             return redirect(url_for('trades_page'))
@@ -2401,8 +2874,8 @@ def trade_cancel(trade_id):
 def races_page():
     my_challenges = get_user_challenges(session['user_id'])
     other_challenges = get_open_challenges(exclude_user_id=session['user_id'])
-    return render_template('races.html',
-                           my_challenges=my_challenges, other_challenges=other_challenges,
+    return render_template('races.html', my_challenges=my_challenges,
+                           other_challenges=other_challenges,
                            my_cars=get_user_cars(session['user_id']),
                            balance=get_balance(session['user_id']),
                            user=session.get('username'),
@@ -2467,7 +2940,7 @@ def race_result(challenge_id):
 @app.route('/rating')
 def rating_page():
     sort = request.args.get('sort', 'cars')
-    if sort not in ('cars', 'balance', 'races', 'achievements', 'level'):
+    if sort not in ('cars', 'balance', 'races', 'achievements', 'level', 'collections'):
         sort = 'cars'
     leaders = get_leaderboard(sort_by=sort, limit=50)
     total_users = count_users()
@@ -2478,8 +2951,7 @@ def rating_page():
             if entry['id'] == session['user_id']:
                 my_rank = entry['rank']; my_value = entry['value']; break
     return render_template('rating.html', leaders=leaders, sort=sort,
-                           total_users=total_users,
-                           my_rank=my_rank, my_value=my_value,
+                           total_users=total_users, my_rank=my_rank, my_value=my_value,
                            my_id=session.get('user_id'),
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
@@ -2498,7 +2970,6 @@ def admin_give():
         if request.method == 'POST':
             action = request.form.get('action', '')
             username = request.form.get('username', '').strip()
-
             if action == 'find':
                 u = get_user(username)
                 if not u:
@@ -2510,8 +2981,7 @@ def admin_give():
             else:
                 u = get_user(username)
                 if not u:
-                    flash('Игрок не найден')
-                    return redirect(url_for('admin_give'))
+                    flash('Игрок не найден'); return redirect(url_for('admin_give'))
                 user_id = u[0]
                 user = get_user_profile(user_id)
                 user_owned = get_user_cars(user_id)
@@ -2519,8 +2989,7 @@ def admin_give():
 
                 if action == 'give_coins':
                     amount = request.form.get('amount', '0')
-                    try:
-                        amount = int(amount)
+                    try: amount = int(amount)
                     except ValueError:
                         flash('Сумма должна быть числом'); return redirect(url_for('admin_give'))
                     ok, msg = admin_give_coins(user_id, amount)
@@ -2547,8 +3016,7 @@ def admin_give():
                     flash(msg)
                 elif action == 'set_level':
                     level = request.form.get('level', '1')
-                    try:
-                        level = int(level)
+                    try: level = int(level)
                     except ValueError:
                         flash('Уровень должен быть числом'); return redirect(url_for('admin_give'))
                     ok, msg = admin_set_level(user_id, level)
@@ -2566,14 +3034,10 @@ def admin_give():
                 user_owned = get_user_cars(user_id)
                 user_achievements = get_unlocked_keys(user_id)
 
-        return render_template('admin_give.html',
-                               user=user,
-                               all_cars=all_cars,
-                               user_owned=user_owned,
-                               user_achievements=user_achievements,
+        return render_template('admin_give.html', user=user, all_cars=all_cars,
+                               user_owned=user_owned, user_achievements=user_achievements,
                                all_achievements=ACHIEVEMENTS,
-                               current_admin=session.get('username'),
-                               is_admin=True)
+                               current_admin=session.get('username'), is_admin=True)
     except Exception:
         return '<h2 style="color:red;">Ошибка в /admin/give:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
@@ -2596,8 +3060,8 @@ def admin_settings():
     settings = {k: get_setting(k) for k in DEFAULT_SETTINGS}
     discount = get_active_discount()
     discount_car = get_car_info(discount['car_id']) if discount else None
-    return render_template('admin_settings.html', settings=settings,
-                           discount=discount, discount_car=discount_car,
+    return render_template('admin_settings.html', settings=settings, discount=discount,
+                           discount_car=discount_car,
                            user=session.get('username'), is_admin=True)
 
 
@@ -2613,7 +3077,7 @@ def admin_reroll_discount():
         else: flash('Не удалось. Проверь диапазон рейтинга.')
         return redirect(url_for('admin_settings'))
     except Exception:
-        return '<h2 style="color:red;">Ошибка в /admin/discount/reroll:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
+        return '<h2 style="color:red;">Ошибка:</h2><pre>' + traceback.format_exc() + '</pre>', 500
 
 
 # ---------- КАРТИНКИ ----------
