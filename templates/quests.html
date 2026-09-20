@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Задания — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">📋 Ежедневные задания</h2>
+
+    <div class="level-banner">
+        <div class="level-info">
+            <div class="level-label">Уровень {{ level_info.level }}</div>
+            <div class="level-bar">
+                <div class="level-fill" style="width: {{ level_info.progress }}%;"></div>
+            </div>
+            <div class="level-xp">{{ level_info.xp }} / {{ level_info.xp_needed }} XP</div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="quests-list">
+        {% for q in quests %}
+            <div class="quest-card {% if q.completed %}completed{% endif %} {% if q.claimed %}claimed{% endif %}">
+                <div class="quest-icon">{{ q.icon }}</div>
+                <div class="quest-info">
+                    <div class="quest-title">{{ q.title }}</div>
+                    <div class="quest-progress">
+                        Прогресс: {{ q.progress }} / {{ q.target }}
+                    </div>
+                    <div class="quest-rewards">
+                        <span class="reward-xp">+{{ q.xp }} XP</span>
+                        <span class="reward-coins">+{{ q.coins }} 💰</span>
+                    </div>
+                </div>
+                <div class="quest-action">
+                    {% if q.claimed %}
+                        <span class="claimed-badge">✓ Получено</span>
+                    {% elif q.completed %}
+                        <form method="POST" action="/quests/claim/{{ q.key }}">
+                            <button type="submit" class="btn btn-primary btn-tiny">Забрать</button>
+                        </form>
+                    {% else %}
+                        <span class="pending-badge">⏳ В процессе</span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    {# БОНУС ЗА ВСЕ ЗАДАНИЯ #}
+    <div class="bonus-quest {% if all_done and not bonus_claimed %}active{% endif %}">
+        <div class="bonus-icon">🎁</div>
+        <div class="bonus-info">
+            <div class="bonus-title">Бонус за все {{ quests|length }} задания</div>
+            <div class="bonus-rewards">
+                <span class="reward-xp">+{{ bonus_xp }} XP</span>
+                <span class="reward-coins">+{{ bonus_coins }} 💰</span>
+            </div>
+        </div>
+        <div class="bonus-action">
+            {% if bonus_claimed %}
+                <span class="claimed-badge">✓ Получено</span>
+            {% elif all_done %}
+                <form method="POST" action="/quests/claim_bonus">
+                    <button type="submit" class="btn btn-primary btn-tiny">Забрать бонус</button>
+                </form>
+            {% else %}
+                <span class="pending-badge">Выполни все задания</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="total-info">
+        📜 Всего выполнено заданий: <strong>{{ completed_total }}</strong>
+    </div>
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .page-title { font-size: 34px; color: #ff8c1a; margin-bottom: 20px; text-align: center; }
+
+        .level-banner {
+            background: linear-gradient(135deg, #fff8ec 0%, #ffe9c7 100%);
+            border: 2px solid #ff8c1a; border-radius: 20px;
+            padding: 18px 28px; max-width: 600px; margin-bottom: 25px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.25);
+        }
+        .level-info { display: flex; flex-direction: column; gap: 8px; }
+        .level-label { font-size: 20px; font-weight: 900; color: #ff8c1a; text-align: center; }
+        .level-bar {
+            height: 16px; background: #fff; border-radius: 20px;
+            overflow: hidden; border: 2px solid #ffd9a6;
+        }
+        .level-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c1a, #ffb347);
+            transition: width 0.5s;
+        }
+        .level-xp { font-size: 13px; text-align: center; color: #6b3d00; font-weight: 700; }
+
+        .quests-list {
+            display: flex; flex-direction: column; gap: 12px;
+            width: 100%; max-width: 700px; margin-bottom: 20px;
+        }
+        .quest-card {
+            display: flex; align-items: center; gap: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 16px;
+            padding: 16px 20px;
+            box-shadow: 0 4px 15px rgba(255, 140, 26, 0.12);
+            transition: all 0.2s;
+        }
+        .quest-card.completed { border-color: #ff8c1a; box-shadow: 0 6px 20px rgba(255, 140, 26, 0.3); }
+        .quest-card.claimed { opacity: 0.55; }
+        .quest-icon { font-size: 34px; flex-shrink: 0; }
+        .quest-info { flex: 1; }
+        .quest-title { font-size: 16px; font-weight: 700; color: #4a2c00; margin-bottom: 4px; }
+        .quest-progress { font-size: 13px; color: #8a6538; margin-bottom: 6px; }
+        .quest-rewards { display: flex; gap: 10px; flex-wrap: wrap; }
+        .reward-xp, .reward-coins {
+            font-size: 13px; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px;
+        }
+        .reward-xp { background: #e3f2fd; color: #1565c0; }
+        .reward-coins { background: #e8f5e9; color: #2e7d32; }
+        .quest-action { flex-shrink: 0; }
+        .btn-tiny { padding: 8px 18px; font-size: 14px; }
+        .claimed-badge {
+            background: #e8f5e9; color: #2e7d32;
+            padding: 8px 16px; border-radius: 20px;
+            font-size: 13px; font-weight: 700;
+        }
+        .pending-badge {
+            background: #fff3cd; color: #856404;
+            padding: 8px 16px; border-radius: 20px;
+            font-size: 13px; font-weight: 700;
+        }
+
+        .bonus-quest {
+            display: flex; align-items: center; gap: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px dashed #ffd9a6; border-radius: 16px;
+            padding: 20px 24px; max-width: 700px; width: 100%;
+            margin-bottom: 20px;
+        }
+        .bonus-quest.active {
+            border-style: solid; border-color: #ff8c1a;
+            background: linear-gradient(135deg, #fff8ec 0%, #ffe9c7 100%);
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.3);
+        }
+        .bonus-icon { font-size: 40px; }
+        .bonus-info { flex: 1; }
+        .bonus-title { font-size: 17px; font-weight: 900; color: #ff8c1a; margin-bottom: 6px; }
+        .bonus-rewards { display: flex; gap: 10px; flex-wrap: wrap; }
+        .bonus-action { flex-shrink: 0; }
+
+        .total-info {
+            font-size: 15px; color: #6b3d00; margin-top: 10px;
+            background: #fff5e6; padding: 12px 24px; border-radius: 30px;
+            border: 1px solid #ffd9a6;
+        }
+        .total-info strong { color: #ff8c1a; font-size: 17px; }
+    </style>
+
+{% endblock %}
