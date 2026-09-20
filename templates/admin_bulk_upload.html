@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}Массовая загрузка — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">📦 Массовая загрузка машин</h2>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {% if fatal_errors %}
+        <div class="error-block">
+            <h3>❌ Ошибка в CSV</h3>
+            <ul>{% for e in fatal_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+            {% if headers %}<p>Найденные колонки: <code>{{ headers|join(', ') }}</code></p>{% endif %}
+        </div>
+        <p class="form-link"><a href="/admin/bulk_upload">← Попробовать снова</a></p>
+    {% elif preview %}
+        <div class="preview-block">
+            <h3>👀 Превью загрузки</h3>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-num">{{ total_rows }}</div>
+                    <div class="stat-label">всего строк в CSV</div>
+                </div>
+                <div class="stat-box ok">
+                    <div class="stat-num">{{ will_add }}</div>
+                    <div class="stat-label">будет добавлено</div>
+                </div>
+                <div class="stat-box warn">
+                    <div class="stat-num">{{ will_skip_dup }}</div>
+                    <div class="stat-label">пропущено дубликатов</div>
+                </div>
+                <div class="stat-box bad">
+                    <div class="stat-num">{{ will_skip_img_count }}</div>
+                    <div class="stat-label">нет картинки в ZIP</div>
+                </div>
+            </div>
+            <p class="hint">Картинок в ZIP: {{ images_count }}</p>
+
+            {% if will_skip_img %}
+                <details>
+                    <summary>Строки без картинок (первые 30)</summary>
+                    <ul>
+                        {% for row in will_skip_img %}
+                            <li>строка {{ row.row }}: <strong>{{ row.model }}</strong>
+                                → ищем «{{ row.image_filename }}»</li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            {% endif %}
+
+            {% if parse_errors %}
+                <details>
+                    <summary>Ошибки в CSV ({{ parse_errors|length }})</summary>
+                    <ul>
+                        {% for e in parse_errors %}
+                            <li>строка {{ e.row }}: <strong>{{ e.model }}</strong> —
+                                {{ e.errors|join('; ') }}</li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            {% endif %}
+        </div>
+
+        <form method="POST" action="/admin/bulk_upload/process" enctype="multipart/form-data"
+              class="confirm-form">
+            <input type="hidden" name="csv_file" value="">
+            <input type="hidden" name="zip_file" value="">
+            <input type="hidden" name="skip_existing" value="1">
+            <p class="hint">Для реальной загрузки загрузи файлы заново и сними галочку «Только превью».</p>
+            <a href="/admin/bulk_upload" class="btn btn-primary">← Загрузить файлы</a>
+        </form>
+
+    {% elif result %}
+        <div class="result-block">
+            <h3>✅ Загрузка завершена</h3>
+            <div class="stats-grid">
+                <div class="stat-box ok">
+                    <div class="stat-num">{{ result.added }}</div>
+                    <div class="stat-label">добавлено машин</div>
+                </div>
+                <div class="stat-box warn">
+                    <div class="stat-num">{{ result.skipped_existing }}</div>
+                    <div class="stat-label">пропущено (уже есть)</div>
+                </div>
+                <div class="stat-box bad">
+                    <div class="stat-num">{{ result.skipped_no_image }}</div>
+                    <div class="stat-label">без картинки</div>
+                </div>
+            </div>
+            {% if result.errors %}
+                <details open>
+                    <summary>Ошибки ({{ result.errors_count }})</summary>
+                    <ul>
+                        {% for e in result.errors %}
+                            <li>строка {{ e.row }}: <strong>{{ e.model }}</strong> —
+                                {{ e.errors|join('; ') }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% if result.errors_count > 50 %}
+                        <p class="hint">Показаны первые 50 ошибок.</p>
+                    {% endif %}
+                </details>
+            {% endif %}
+        </div>
+        <p class="form-link"><a href="/shop" class="btn btn-primary">🛒 Посмотреть магазин</a></p>
+        <p class="form-link"><a href="/admin/bulk_upload">← Загрузить ещё партию</a></p>
+
+    {% else %}
+        {# ===== ФОРМА ЗАГРУЗКИ ===== #}
+        <div class="form-box" style="max-width: 700px;">
+            <h3 class="instructions-title">📖 Как это работает</h3>
+            <ol class="instructions">
+                <li>Подготовь <strong>CSV-файл</strong> со списком машин. Формат — ниже.</li>
+                <li>Собери все картинки в <strong>один ZIP-архив</strong>. Имя файла внутри ZIP должно совпадать с колонкой <code>image_filename</code>.</li>
+                <li>Загрузи CSV и ZIP сюда. Сначала система покажет превью — сколько машин добавится, где ошибки.</li>
+                <li>Если всё ок — подтверди загрузку.</li>
+            </ol>
+
+            <div class="csv-info">
+                <p><strong>Формат CSV</strong> (первая строка — заголовки):</p>
+                <pre>model,brand,rating,price,horsepower,acceleration,top_speed,image_filename,is_exclusive
+BMW M3 E46,BMW,5,5000,343,5.1,250,bmw_m3_e46.png,0</pre>
+                <p class="hint">Обязательные колонки: <code>model</code>, <code>brand</code>, <code>rating</code>, <code>price</code>, <code>image_filename</code>. Остальные — опциональны.</p>
+                <p class="hint"><code>is_exclusive</code>: 1 или 0. Если 1 — машина не появится в магазине, её можно только выдать за коллекцию.</p>
+                <p><a href="/admin/bulk_upload/template.csv" class="btn btn-secondary btn-tiny">⬇ Скачать шаблон CSV</a></p>
+            </div>
+
+            <form method="POST" action="/admin/bulk_upload/process" enctype="multipart/form-data">
+                <label class="form-label">CSV-файл</label>
+                <input type="file" name="csv_file" accept=".csv,text/csv" required class="form-file">
+
+                <label class="form-label">ZIP с картинками</label>
+                <input type="file" name="zip_file" accept=".zip,application/zip" required class="form-file">
+
+                <label class="check-row">
+                    <input type="checkbox" name="skip_existing" value="1" checked>
+                    Пропускать машины с уже существующим названием
+                </label>
+
+                <label class="check-row">
+                    <input type="checkbox" name="dry_run" value="1">
+                    Только превью (не добавлять в БД)
+                </label>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    📦 Загрузить
+                </button>
+            </form>
+        </div>
+        <p class="form-link"><a href="/admin/settings">← Назад в админку</a></p>
+    {% endif %}
+
+    <style>
+        .page-title { font-size: 30px; color: #ff8c1a; text-align: center; margin-bottom: 25px; }
+        .form-box {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 20px;
+            padding: 25px 30px; margin: 0 auto;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+        }
+        .instructions-title { font-size: 18px; color: #ff8c1a; margin-bottom: 12px; }
+        .instructions { margin-left: 20px; color: #4a2c00; line-height: 1.7; font-size: 14px; }
+        .instructions li { margin-bottom: 6px; }
+
+        .csv-info {
+            background: #fff5e6; border: 1px dashed #ffd9a6;
+            border-radius: 12px; padding: 14px 18px;
+            margin: 18px 0; font-size: 14px;
+        }
+        .csv-info pre {
+            background: #fff; padding: 10px 14px; border-radius: 8px;
+            overflow-x: auto; font-size: 12px;
+            margin: 8px 0; color: #4a2c00;
+            border: 1px solid #ffd9a6;
+        }
+        .csv-info code {
+            background: #fff; padding: 2px 6px; border-radius: 4px;
+            color: #b8590a;
+        }
+        .hint { font-size: 12px; color: #8a6538; margin: 6px 0; }
+
+        .form-label {
+            display: block; text-align: left; font-size: 14px;
+            color: #6b3d00; margin-bottom: 6px; margin-top: 14px; font-weight: 700;
+        }
+        .form-file {
+            width: 100%; padding: 12px 16px; font-size: 15px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+            box-sizing: border-box;
+        }
+        .form-file::file-selector-button {
+            background: #ffe0b3; border: none; padding: 8px 14px;
+            border-radius: 8px; color: #6b3d00; font-weight: 600;
+            cursor: pointer; margin-right: 12px; font-family: inherit;
+        }
+        .check-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            font-size: 14px; color: #4a2c00; font-weight: 600;
+            margin: 12px 0; text-align: left;
+        }
+        .check-row input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: #ff8c1a; margin-top: 2px;
+        }
+
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; margin: 18px 0;
+        }
+        .stat-box {
+            background: #fff; border: 2px solid #ffd9a6;
+            border-radius: 14px; padding: 16px; text-align: center;
+        }
+        .stat-box.ok { border-color: #4caf50; background: #e8f5e9; }
+        .stat-box.warn { border-color: #ffc107; background: #fff8e1; }
+        .stat-box.bad { border-color: #f44336; background: #ffebee; }
+        .stat-num { font-size: 28px; font-weight: 900; color: #ff8c1a; }
+        .stat-box.ok .stat-num { color: #2e7d32; }
+        .stat-box.warn .stat-num { color: #b8860b; }
+        .stat-box.bad .stat-num { color: #c62828; }
+        .stat-label { font-size: 12px; color: #6b3d00; font-weight: 700; text-transform: uppercase; }
+
+        .preview-block, .result-block, .error-block {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6; border-radius: 20px;
+            padding: 22px 28px; margin: 0 auto 20px;
+            max-width: 700px;
+        }
+        .error-block { border-color: #f44336; }
+        .error-block h3, .preview-block h3, .result-block h3 {
+            color: #ff8c1a; font-size: 20px; margin-bottom: 14px;
+        }
+        .error-block h3 { color: #c62828; }
+        .preview-block details, .result-block details {
+            margin-top: 14px; background: #fff5e6;
+            border-radius: 10px; padding: 10px 16px;
+        }
+        .preview-block summary, .result-block details summary {
+            cursor: pointer; font-weight: 700; color: #6b3d00;
+        }
+        .preview-block ul, .result-block details ul {
+            margin: 10px 0 0 20px; font-size: 13px; line-height: 1.6;
+        }
+        .btn-tiny { padding: 6px 14px; font-size: 13px; }
+    </style>
+
+{% endblock %}
