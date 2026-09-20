@@ -42,6 +42,12 @@
             <label class="form-label">🚀 Макс. скорость (км/ч)</label>
             <input type="number" name="top_speed" min="0" value="{{ car.top_speed or '' }}" class="form-input">
 
+            <label class="check-row">
+                <input type="checkbox" name="is_exclusive" value="1"
+                    {% if car.is_exclusive %}checked{% endif %}>
+                🚗 Эксклюзивная машина (не продаётся в магазине)
+            </label>
+
             <button type="submit" class="btn btn-primary">Сохранить</button>
         </form>
 
@@ -65,6 +71,14 @@
             font-family: inherit; background: #fff; color: #4a2c00;
         }
         .form-select:focus, .form-input:focus { outline: none; border-color: #ff8c1a; }
+        .check-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 14px; color: #4a2c00; font-weight: 600;
+    margin: 14px 0; text-align: left;
+}
+.check-row input[type="checkbox"] {
+    width: 18px; height: 18px; accent-color: #ff8c1a; margin-top: 2px;
+}
     </style>
 
 {% endblock %}
