@@ -13,6 +13,8 @@
 
         <form method="POST" action="/shop/add" enctype="multipart/form-data">
             <label class="form-label">Название модели</label>
+            <label class="form-label">Бренд (BMW, Toyota, Bugatti...)</label>
+            <input type="text" name="brand" placeholder="Например: BMW" maxlength="40" class="form-input">
             <input type="text" name="model" placeholder="Например: Toyota Supra" maxlength="60" required autofocus class="form-input">
 
             <label class="form-label">Оценка в звёздах (1–8)</label>
