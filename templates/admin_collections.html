@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Админ: коллекции — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>⚙ Управление коллекциями</h2>
+        <a href="/admin/collections/new" class="btn btn-primary btn-small">+ Создать коллекцию</a>
+        <a href="/admin/give" class="btn btn-secondary btn-small">⚙ Выдача игрокам</a>
+        <a href="/admin/settings" class="btn btn-secondary btn-small">⚙ Настройки</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {% if collections %}
+        <div class="admin-list">
+            {% for col in collections %}
+                {% set ri = col.rarity_info %}
+                <div class="admin-row rarity-{{ col.rarity }}">
+                    <div class="admin-rarity">{{ ri.icon }}</div>
+                    <div class="admin-info">
+                        <div class="admin-name">{{ col.name }}</div>
+                        {% if col.description %}
+                            <div class="admin-desc">{{ col.description }}</div>
+                        {% endif %}
+                        <div class="admin-meta">
+                            {{ ri.label }} · {{ col.car_count }} машин · 💰 {{ col.coins_reward }}
+                            {% if col.exclusive_car_id %} · 🚗 Есть эксклюзив{% endif %}
+                        </div>
+                    </div>
+                    <div class="admin-actions">
+                        <a href="/admin/collections/{{ col.id }}" class="btn btn-secondary btn-tiny">Открыть</a>
+                        <a href="/admin/collections/{{ col.id }}/edit" class="btn btn-primary btn-tiny">✎ Изменить</a>
+                        <form method="POST" action="/admin/collections/{{ col.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Удалить коллекцию «{{ col.name }}»? Прогресс всех игроков исчезнет!');">
+                            <button type="submit" class="btn btn-danger btn-tiny">✕</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Коллекций нет. Создай первую!</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 14px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 30px; color: #ff8c1a; }
+        .btn-small { padding: 10px 18px; font-size: 14px; }
+        .btn-tiny { padding: 6px 14px; font-size: 13px; }
+        .btn-danger {
+            background: #dc3545; color: #fff; border: none;
+            border-radius: 20px; cursor: pointer; font-family: inherit;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover { background: #c82333; }
+
+        .admin-list {
+            display: flex; flex-direction: column; gap: 12px;
+            width: 100%; max-width: 900px;
+        }
+        .admin-row {
+            display: flex; align-items: center; gap: 16px;
+            background: #fff; border: 2px solid #ffd9a6;
+            border-radius: 16px; padding: 16px 20px;
+            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.1);
+        }
+        .admin-row.rarity-common    { border-color: #bdbdbd; }
+        .admin-row.rarity-rare      { border-color: #42a5f5; }
+        .admin-row.rarity-legendary { border-color: #ffc107; }
+
+        .admin-rarity { font-size: 32px; }
+        .admin-info { flex: 1; }
+        .admin-name { font-size: 17px; font-weight: 900; color: #4a2c00; margin-bottom: 4px; }
+        .admin-desc { font-size: 13px; color: #8a6538; margin-bottom: 6px; }
+        .admin-meta { font-size: 13px; color: #6b3d00; font-weight: 700; }
+        .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    </style>
+
+{% endblock %}
