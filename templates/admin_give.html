@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Админ: выдача — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>⚙ Админ: выдача</h2>
+        <a href="/admin/settings" class="btn btn-secondary btn-small">⚙ Настройки игры</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {# ===== ПОИСК ИГРОКА ===== #}
+    <div class="search-block">
+        <form method="POST" action="/admin/give" class="search-form">
+            <input type="hidden" name="action" value="find">
+            <input type="text" name="username" value="{{ user.username if user else '' }}"
+                   placeholder="Введи ник игрока..." maxlength="20" class="form-input" required>
+            <button type="submit" class="btn btn-primary">Найти игрока</button>
+        </form>
+    </div>
+
+    {% if user %}
+        {# ===== ИНФОРМАЦИЯ ОБ ИГРОКЕ ===== #}
+        <div class="user-info-card">
+            <div class="user-header">
+                <div class="user-avatar">
+                    {% if user.avatar_data %}
+                        <img src="/avatar/{{ user.id }}" alt="{{ user.username }}">
+                    {% else %}
+                        <div class="user-avatar-letter">{{ user.username[0]|upper }}</div>
+                    {% endif %}
+                </div>
+                <div class="user-meta">
+                    <div class="user-name">{{ user.username }}</div>
+                    <div class="user-stats">
+                        💰 {{ user.balance }} · 🚗 {{ user_owned|length }} · 🏆 {{ user_achievements|length }} · 📈 Ур. {{ user.level }}
+                    </div>
+                </div>
+            </div>
+
+            {# ===== МОНЕТЫ ===== #}
+            <div class="action-section">
+                <h3 class="section-h">💰 Монеты</h3>
+                <form method="POST" action="/admin/give" class="inline-form">
+                    <input type="hidden" name="action" value="give_coins">
+                    <input type="hidden" name="username" value="{{ user.username }}">
+                    <input type="number" name="amount" value="1000" required class="form-input small">
+                    <button type="submit" class="btn btn-primary">Выдать</button>
+                    <button type="submit" class="btn btn-secondary" name="amount" value="-1000">Забрать 1000</button>
+                </form>
+                <p class="hint">Введи отрицательное число, чтобы забрать монеты. Например: -500</p>
+            </div>
+
+            {# ===== УРОВЕНЬ ===== #}
+            <div class="action-section">
+                <h3 class="section-h">📈 Уровень</h3>
+                <form method="POST" action="/admin/give" class="inline-form">
+                    <input type="hidden" name="action" value="set_level">
+                    <input type="hidden" name="username" value="{{ user.username }}">
+                    <input type="number" name="level" min="1" max="100" value="{{ user.level }}" required class="form-input small">
+                    <button type="submit" class="btn btn-primary">Установить</button>
+                </form>
+                <p class="hint">XP сбрасывается на 0. Текущий уровень: {{ user.level }}</p>
+            </div>
+
+            {# ===== МАШИНЫ ===== #}
+            <div class="action-section">
+                <h3 class="section-h">🚗 Машины</h3>
+
+                <form method="POST" action="/admin/give" class="inline-form">
+                    <input type="hidden" name="action" value="give_car">
+                    <input type="hidden" name="username" value="{{ user.username }}">
+                    <select name="car_id" class="form-select" required>
+                        <option value="">— Выбери машину для выдачи —</option>
+                        {% for c in all_cars %}
+                            <option value="{{ c[0] }}">{{ c[1] }} ({{ c[2] }}★) — {{ c[3] }} 💰</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">Выдать</button>
+                </form>
+
+                <form method="POST" action="/admin/give" class="inline-form" style="margin-top:10px;">
+                    <input type="hidden" name="action" value="take_car">
+                    <input type="hidden" name="username" value="{{ user.username }}">
+                    <select name="car_id" class="form-select" required>
+                        <option value="">— Забрать машину у игрока —</option>
+                        {% for c in user_owned %}
+                            <option value="{{ c[0] }}">{{ c[1] }} ({{ c[2] }}★)</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-secondary">Забрать</button>
+                </form>
+
+                {% if user_owned %}
+                    <form method="POST" action="/admin/give" style="margin-top:10px;"
+                          onsubmit="return confirm('Удалить ВСЕ машины у {{ user.username }}? Это необратимо.');">
+                        <input type="hidden" name="action" value="clear_cars">
+                        <input type="hidden" name="username" value="{{ user.username }}">
+                        <button type="submit" class="btn btn-danger">🗑 Удалить ВСЕ машины</button>
+                    </form>
+                {% endif %}
+
+                <p class="hint">У игрока {{ user_owned|length }} машин в гараже.</p>
+            </div>
+
+            {# ===== ДОСТИЖЕНИЯ ===== #}
+            <div class="action-section">
+                <h3 class="section-h">🏆 Достижения</h3>
+
+                <form method="POST" action="/admin/give" class="inline-form">
+                    <input type="hidden" name="action" value="give_ach">
+                    <input type="hidden" name="username" value="{{ user.username }}">
+                    <select name="ach_key" class="form-select" required>
+                        <option value="">— Выбери достижение для выдачи —</option>
+                        {% for a in all_achievements %}
+                            {% if a.key not in user_achievements %}
+                                <option value="{{ a.key }}">{{ a.icon }} {{ a.title }} (+{{ a.reward }} 💰)</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">Выдать</button>
+                </form>
+
+                {% if user_achievements %}
+                    <form method="POST" action="/admin/give" class="inline-form" style="margin-top:10px;">
+                        <input type="hidden" name="action" value="take_ach">
+                        <input type="hidden" name="username" value="{{ user.username }}">
+                        <select name="ach_key" class="form-select" required>
+                            <option value="">— Забрать достижение —</option>
+                            {% for a in all_achievements %}
+                                {% if a.key in user_achievements %}
+                                    <option value="{{ a.key }}">{{ a.icon }} {{ a.title }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-secondary">Забрать</button>
+                    </form>
+                {% endif %}
+
+                <p class="hint">У игрока {{ user_achievements|length }} из {{ all_achievements|length }} достижений.</p>
+            </div>
+        </div>
+    {% else %}
+        <p class="description">Введи ник игрока выше, чтобы управлять его аккаунтом.</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 18px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 34px; color: #ff8c1a; }
+        .btn-small { padding: 10px 22px; font-size: 15px; }
+
+        .search-block {
+            background: rgba(255, 255, 255, 0.9); border: 2px solid #ffd9a6;
+            border-radius: 20px; padding: 20px 25px; max-width: 600px;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.15);
+            margin-bottom: 25px;
+        }
+        .search-form { display: flex; gap: 10px; }
+        .form-input {
+            flex: 1; padding: 12px 16px; font-size: 16px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-input:focus { outline: none; border-color: #ff8c1a; }
+        .form-input.small { max-width: 180px; }
+
+        .user-info-card {
+            width: 100%; max-width: 800px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ff8c1a; border-radius: 20px;
+            padding: 25px 30px; margin-bottom: 25px;
+            box-shadow: 0 8px 25px rgba(255, 140, 26, 0.25);
+        }
+        .user-header {
+            display: flex; align-items: center; gap: 18px;
+            padding-bottom: 20px; margin-bottom: 20px;
+            border-bottom: 2px dashed #ffd9a6;
+        }
+        .user-avatar { width: 70px; height: 70px; }
+        .user-avatar img {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; border: 3px solid #ff8c1a;
+        }
+        .user-avatar-letter {
+            width: 100%; height: 100%; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            color: #fff; font-weight: 900; font-size: 28px;
+            border: 3px solid #ff8c1a;
+        }
+        .user-meta { flex: 1; }
+        .user-name { font-size: 24px; font-weight: 900; color: #ff8c1a; margin-bottom: 4px; }
+        .user-stats { font-size: 14px; color: #6b3d00; font-weight: 700; }
+
+        .action-section {
+            padding: 15px 0;
+            border-bottom: 1px dashed #ffe0b3;
+        }
+        .action-section:last-child { border-bottom: none; padding-bottom: 0; }
+        .section-h {
+            font-size: 18px; color: #ff8c1a; font-weight: 900;
+            margin-bottom: 10px;
+        }
+        .inline-form {
+            display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+        }
+        .form-select {
+            flex: 1; min-width: 220px;
+            padding: 12px 16px; font-size: 15px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+        }
+        .form-select:focus { outline: none; border-color: #ff8c1a; }
+        .hint { font-size: 12px; color: #8a6538; margin-top: 6px; }
+        .btn-danger {
+            background: #dc3545; color: #fff; border: none;
+            padding: 10px 22px; border-radius: 30px; font-size: 14px;
+            font-weight: 700; cursor: pointer; font-family: inherit;
+            transition: all 0.2s ease;
+        }
+        .btn-danger:hover { background: #c82333; transform: translateY(-2px); }
+    </style>
+
+{% endblock %}
