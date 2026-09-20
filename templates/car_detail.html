@@ -51,6 +51,9 @@
                 {% endif %}
                 <a href="/compare?c1={{ car.id }}" class="btn btn-primary">⚖️ Сравнить</a>
                 <a href="javascript:history.back()" class="btn btn-secondary">← Назад</a>
+                {% if locked and not owned %}
+                <span class="locked-badge">🔒 Нужен {{ req_level }} уровень (у тебя {{ user_level }})</span>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -128,6 +131,10 @@
             .car-detail { gap: 25px; }
             .car-detail-name { font-size: 26px; }
         }
+        .locked-badge {
+    display: inline-block; padding: 12px 24px; border-radius: 30px;
+    background: #fff3cd; color: #856404; font-weight: 700; font-size: 15px;
+}
     </style>
 
 {% endblock %}
