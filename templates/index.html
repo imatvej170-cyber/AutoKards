@@ -82,6 +82,8 @@
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
                 <a href="/appearance" class="btn btn-secondary">🎨 Вид и звук</a>
+                <a href="/news" class="btn btn-secondary">📰 Новости</a>
+                <a href="/notifications" class="btn btn-secondary">🔔 Уведомления{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
                 {% endif %}
