@@ -157,24 +157,6 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS music_enabled BOOLEAN DEFAULT FALSE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS vibration_enabled BOOLEAN DEFAULT TRUE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS dark_theme BOOLEAN DEFAULT FALSE')
-    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    type VARCHAR(30) NOT NULL,
-    title VARCHAR(200) NOT NULL,
-    text TEXT,
-    link VARCHAR(200),
-    is_read BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TEXT NOT NULL
-    )''')
-  c.execute('''CREATE TABLE IF NOT EXISTS news (
-      id SERIAL PRIMARY KEY,
-      title VARCHAR(200) NOT NULL,
-      content TEXT NOT NULL,
-      category VARCHAR(30) NOT NULL DEFAULT 'update',
-      is_published BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TEXT NOT NULL
-    )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
@@ -278,6 +260,17 @@ def init_db():
         car_id INTEGER NOT NULL, claimed_at TEXT NOT NULL,
         UNIQUE(user_id, collection_id, car_id)
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+        type VARCHAR(30) NOT NULL, title VARCHAR(200) NOT NULL,
+        text TEXT, link VARCHAR(200), is_read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TEXT NOT NULL
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS news (
+        id SERIAL PRIMARY KEY, title VARCHAR(200) NOT NULL, content TEXT NOT NULL,
+        category VARCHAR(30) NOT NULL DEFAULT 'update',
+        is_published BOOLEAN NOT NULL DEFAULT TRUE, created_at TEXT NOT NULL
+    )''')
 
     c.execute('UPDATE users SET balance = %s WHERE balance IS NULL', (START_BALANCE,))
     c.execute('UPDATE users SET xp = 0 WHERE xp IS NULL')
@@ -360,15 +353,113 @@ def add_xp(user_id, amount):
     conn.commit(); c.close(); conn.close()
     if leveled and coins_reward > 0:
         log_transaction(user_id, 'levelup', coins_reward, None, f'Уровень {level}')
-              create_notification(user_id, 'level_up',
-                            f'🎉 Новый уровень: {level}!',
-                            f'Ты получил {coins_reward} монет за повышение.',
-                            '/')
+        create_notification(user_id, 'level_up', f'🎉 Новый уровень: {level}!',
+                            f'Ты получил {coins_reward} монет за повышение.', '/')
     return leveled, level, coins_reward
 
 
 def get_level_required_for_stars(stars):
     return STAR_LEVEL_REQ.get(stars, 1)
+
+
+# ---------- УВЕДОМЛЕНИЯ ----------
+def create_notification(user_id, ntype, title, text='', link=''):
+    try:
+        conn = get_db(); c = conn.cursor()
+        c.execute('''INSERT INTO notifications (user_id, type, title, text, link, created_at)
+                     VALUES (%s, %s, %s, %s, %s, %s)''',
+                  (user_id, ntype, title, text, link, datetime.now().isoformat()))
+        conn.commit(); c.close(); conn.close()
+    except Exception:
+        pass
+
+
+def get_user_notifications(user_id, limit=50):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, type, title, text, link, is_read, created_at
+                 FROM notifications WHERE user_id = %s ORDER BY id DESC LIMIT %s''', (user_id, limit))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'type': r[1], 'title': r[2], 'text': r[3] or '',
+             'link': r[4] or '', 'is_read': bool(r[5]), 'created_at': r[6]} for r in rows]
+
+
+def count_unread_notifications(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM notifications WHERE user_id = %s AND is_read = FALSE', (user_id,))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def mark_notification_read(notif_id, user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE notifications SET is_read = TRUE WHERE id = %s AND user_id = %s',
+              (notif_id, user_id))
+    conn.commit(); c.close(); conn.close()
+
+
+def mark_all_notifications_read(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE notifications SET is_read = TRUE WHERE user_id = %s', (user_id,))
+    conn.commit(); c.close(); conn.close()
+
+
+def notify_all_users(title, text, link=''):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT id FROM users WHERE username != ALL(%s)', (list(ADMIN_USERNAMES) or [''],))
+    ids = [r[0] for r in c.fetchall()]
+    now = datetime.now().isoformat()
+    for uid in ids:
+        c.execute('''INSERT INTO notifications (user_id, type, title, text, link, created_at)
+                     VALUES (%s, 'news', %s, %s, %s, %s)''', (uid, title, text, link, now))
+    conn.commit(); c.close(); conn.close()
+    return len(ids)
+
+
+# ---------- НОВОСТИ ----------
+def get_news(only_published=True, limit=100):
+    conn = get_db(); c = conn.cursor()
+    if only_published:
+        c.execute('''SELECT id, title, content, category, is_published, created_at
+                     FROM news WHERE is_published = TRUE ORDER BY id DESC LIMIT %s''', (limit,))
+    else:
+        c.execute('''SELECT id, title, content, category, is_published, created_at
+                     FROM news ORDER BY id DESC LIMIT %s''', (limit,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'title': r[1], 'content': r[2], 'category': r[3],
+             'is_published': bool(r[4]), 'created_at': r[5]} for r in rows]
+
+
+def get_news_item(news_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT id, title, content, category, is_published, created_at FROM news WHERE id = %s',
+              (news_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row: return None
+    return {'id': row[0], 'title': row[1], 'content': row[2], 'category': row[3],
+            'is_published': bool(row[4]), 'created_at': row[5]}
+
+
+def create_news(title, content, category, is_published=True):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO news (title, content, category, is_published, created_at)
+                 VALUES (%s, %s, %s, %s, %s) RETURNING id''',
+              (title, content, category, is_published, datetime.now().isoformat()))
+    nid = c.fetchone()[0]
+    conn.commit(); c.close(); conn.close()
+    return nid
+
+
+def update_news(news_id, title, content, category, is_published):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''UPDATE news SET title = %s, content = %s, category = %s, is_published = %s
+                 WHERE id = %s''', (title, content, category, is_published, news_id))
+    conn.commit(); c.close(); conn.close()
+
+
+def delete_news(news_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM news WHERE id = %s', (news_id,))
+    conn.commit(); c.close(); conn.close()
 
 
 # ---------- ЗАДАНИЯ ----------
@@ -551,113 +642,13 @@ def count_users():
     c.execute('SELECT COUNT(*) FROM users')
     r = c.fetchone(); c.close(); conn.close()
     return r[0] if r else 0
-  
-# ---------- УВЕДОМЛЕНИЯ ----------
-def create_notification(user_id, ntype, title, text='', link=''):
-    """Создаёт уведомление для игрока."""
-    conn = get_db(); c = conn.cursor()
-    c.execute('''INSERT INTO notifications (user_id, type, title, text, link, created_at)
-                 VALUES (%s, %s, %s, %s, %s, %s)''',
-              (user_id, ntype, title, text, link, datetime.now().isoformat()))
-    conn.commit(); c.close(); conn.close()
 
-
-def get_user_notifications(user_id, limit=50):
-    conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, type, title, text, link, is_read, created_at
-                 FROM notifications WHERE user_id = %s
-                 ORDER BY id DESC LIMIT %s''', (user_id, limit))
-    rows = c.fetchall(); c.close(); conn.close()
-    return [{'id': r[0], 'type': r[1], 'title': r[2], 'text': r[3] or '',
-             'link': r[4] or '', 'is_read': bool(r[5]), 'created_at': r[6]} for r in rows]
-
-
-def count_unread_notifications(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM notifications WHERE user_id = %s AND is_read = FALSE', (user_id,))
-    r = c.fetchone(); c.close(); conn.close()
-    return r[0] if r else 0
-
-
-def mark_notification_read(notif_id, user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('UPDATE notifications SET is_read = TRUE WHERE id = %s AND user_id = %s',
-              (notif_id, user_id))
-    conn.commit(); c.close(); conn.close()
-
-
-def mark_all_notifications_read(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('UPDATE notifications SET is_read = TRUE WHERE user_id = %s', (user_id,))
-    conn.commit(); c.close(); conn.close()
-
-
-def notify_all_users(title, text, link=''):
-    """Рассылает уведомление всем игрокам, кроме админов."""
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT id FROM users WHERE username != ALL(%s)', (list(ADMIN_USERNAMES) or [''],))
-    ids = [r[0] for r in c.fetchall()]
-    now = datetime.now().isoformat()
-    for uid in ids:
-        c.execute('''INSERT INTO notifications (user_id, type, title, text, link, created_at)
-                     VALUES (%s, 'news', %s, %s, %s, %s)''', (uid, title, text, link, now))
-    conn.commit(); c.close(); conn.close()
-    return len(ids)
-
-
-# ---------- НОВОСТИ ----------
-def get_news(only_published=True, limit=100):
-    conn = get_db(); c = conn.cursor()
-    if only_published:
-        c.execute('''SELECT id, title, content, category, is_published, created_at
-                     FROM news WHERE is_published = TRUE ORDER BY id DESC LIMIT %s''', (limit,))
-    else:
-        c.execute('''SELECT id, title, content, category, is_published, created_at
-                     FROM news ORDER BY id DESC LIMIT %s''', (limit,))
-    rows = c.fetchall(); c.close(); conn.close()
-    return [{'id': r[0], 'title': r[1], 'content': r[2], 'category': r[3],
-             'is_published': bool(r[4]), 'created_at': r[5]} for r in rows]
-
-
-def get_news_item(news_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT id, title, content, category, is_published, created_at FROM news WHERE id = %s',
-              (news_id,))
-    row = c.fetchone(); c.close(); conn.close()
-    if not row: return None
-    return {'id': row[0], 'title': row[1], 'content': row[2], 'category': row[3],
-            'is_published': bool(row[4]), 'created_at': row[5]}
-
-
-def create_news(title, content, category, is_published=True):
-    conn = get_db(); c = conn.cursor()
-    c.execute('''INSERT INTO news (title, content, category, is_published, created_at)
-                 VALUES (%s, %s, %s, %s, %s) RETURNING id''',
-              (title, content, category, is_published, datetime.now().isoformat()))
-    nid = c.fetchone()[0]
-    conn.commit(); c.close(); conn.close()
-    return nid
-
-
-def update_news(news_id, title, content, category, is_published):
-    conn = get_db(); c = conn.cursor()
-    c.execute('''UPDATE news SET title = %s, content = %s, category = %s, is_published = %s
-                 WHERE id = %s''', (title, content, category, is_published, news_id))
-    conn.commit(); c.close(); conn.close()
-
-
-def delete_news(news_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('DELETE FROM news WHERE id = %s', (news_id,))
-    conn.commit(); c.close(); conn.close()
 
 # ---------- НАСТРОЙКИ ВНЕШНЕГО ВИДА ----------
 def get_user_appearance(user_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT COALESCE(sound_enabled, TRUE),
-                        COALESCE(music_enabled, FALSE),
-                        COALESCE(vibration_enabled, TRUE),
-                        COALESCE(dark_theme, FALSE)
+    c.execute('''SELECT COALESCE(sound_enabled, TRUE), COALESCE(music_enabled, FALSE),
+                        COALESCE(vibration_enabled, TRUE), COALESCE(dark_theme, FALSE)
                  FROM users WHERE id = %s''', (user_id,))
     row = c.fetchone(); c.close(); conn.close()
     if not row:
@@ -675,40 +666,30 @@ def update_user_appearance(user_id, sound, music, vibration, dark):
 
 
 # ---------- BULK UPLOAD ----------
-MIME_BY_EXT = {
-    'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
-    'webp': 'image/webp', 'gif': 'image/gif'
-}
+MIME_BY_EXT = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+               'webp': 'image/webp', 'gif': 'image/gif'}
 
 
 def parse_bulk_csv(csv_bytes):
-    errors = []
-    rows = []
+    errors = []; rows = []
     try:
         text = csv_bytes.decode('utf-8-sig')
     except UnicodeDecodeError:
-        try:
-            text = csv_bytes.decode('cp1251')
+        try: text = csv_bytes.decode('cp1251')
         except UnicodeDecodeError:
             return [], ['Не удалось прочитать CSV. Сохрани в UTF-8 или Windows-1251.'], []
-
     reader = csv.DictReader(io.StringIO(text))
     if not reader.fieldnames:
         return [], ['CSV пустой или не содержит заголовков.'], []
-
     headers = [h.strip().lower() for h in reader.fieldnames]
     required = {'model', 'brand', 'rating', 'price', 'image_filename'}
     missing = required - set(headers)
     if missing:
         return [], [f'В CSV не хватает колонок: {", ".join(sorted(missing))}'], headers
-
     for i, raw in enumerate(reader, start=2):
         row = {(k or '').strip().lower(): (v or '').strip() for k, v in raw.items()}
-        model = row.get('model', '')
-        brand = row.get('brand', '')
-        image = row.get('image_filename', '')
-        if not model and not brand and not image:
-            continue
+        model = row.get('model', ''); brand = row.get('brand', ''); image = row.get('image_filename', '')
+        if not model and not brand and not image: continue
         row_errors = []
         if not model: row_errors.append('пустое поле model')
         if len(model) > 60: row_errors.append('model длиннее 60 символов')
@@ -717,14 +698,12 @@ def parse_bulk_csv(csv_bytes):
             rating = int(row.get('rating', ''))
             if rating < 1 or rating > 8: raise ValueError()
         except (ValueError, TypeError):
-            row_errors.append(f'rating "{row.get("rating", "")}" не 1–8')
-            rating = 1
+            row_errors.append(f'rating "{row.get("rating", "")}" не 1–8'); rating = 1
         try:
             price = int(row.get('price', ''))
             if price < 0: raise ValueError()
         except (ValueError, TypeError):
-            row_errors.append(f'price "{row.get("price", "")}" не число')
-            price = 0
+            row_errors.append(f'price "{row.get("price", "")}" не число'); price = 0
         hp = None
         if row.get('horsepower'):
             try: hp = int(row['horsepower'])
@@ -757,10 +736,8 @@ def extract_zip_images(zip_bytes):
                 if not base: continue
                 ext = base.rsplit('.', 1)[-1] if '.' in base else ''
                 if ext not in MIME_BY_EXT: continue
-                try:
-                    data = zf.read(name)
-                except Exception:
-                    continue
+                try: data = zf.read(name)
+                except Exception: continue
                 images[base] = (data, MIME_BY_EXT[ext])
     except zipfile.BadZipFile:
         return None, 'Не удалось прочитать ZIP-архив.'
@@ -768,20 +745,15 @@ def extract_zip_images(zip_bytes):
 
 
 def bulk_insert_cars(rows, images, skip_existing=True):
-    added = 0
-    skipped_existing = 0
-    skipped_no_image = 0
-    errors = []
+    added = 0; skipped_existing = 0; skipped_no_image = 0; errors = []
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT LOWER(model) FROM cars')
     existing = {r[0] for r in c.fetchall()}
     c.close(); conn.close()
-
     for row in rows:
         model_lower = row['model'].lower()
         if skip_existing and model_lower in existing:
-            skipped_existing += 1
-            continue
+            skipped_existing += 1; continue
         img_name = row['image_filename'].lower()
         if img_name not in images:
             skipped_no_image += 1
@@ -797,11 +769,9 @@ def bulk_insert_cars(rows, images, skip_existing=True):
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                       (row['model'], row['brand'], row['rating'], row['price'],
                        row['horsepower'], row['acceleration'], row['top_speed'],
-                       row['is_exclusive'], psycopg2.Binary(data), mime,
-                       datetime.now().isoformat()))
+                       row['is_exclusive'], psycopg2.Binary(data), mime, datetime.now().isoformat()))
             conn.commit(); c.close(); conn.close()
-            existing.add(model_lower)
-            added += 1
+            existing.add(model_lower); added += 1
         except Exception as e:
             errors.append({'row': row['row'], 'model': row['model'],
                            'errors': [f'ошибка БД: {str(e)[:120]}']})
@@ -812,8 +782,7 @@ def bulk_insert_cars(rows, images, skip_existing=True):
 
 # ---------- АДМИН: ВЫДАЧА ----------
 def admin_give_coins(user_id, amount):
-    if amount == 0:
-        return False, 'Сумма не может быть нулевой'
+    if amount == 0: return False, 'Сумма не может быть нулевой'
     add_coins(user_id, amount)
     sign = '+' if amount > 0 else ''
     log_transaction(user_id, 'admin_give', amount, None, f'Админ: {sign}{amount} монет')
@@ -821,11 +790,9 @@ def admin_give_coins(user_id, amount):
 
 
 def admin_give_car(user_id, car_id):
-    if has_car(user_id, car_id):
-        return False, 'У игрока уже есть эта машина'
+    if has_car(user_id, car_id): return False, 'У игрока уже есть эта машина'
     car = get_car_info(car_id)
-    if not car:
-        return False, 'Машина не найдена'
+    if not car: return False, 'Машина не найдена'
     conn = get_db(); c = conn.cursor()
     c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
               (user_id, car_id, datetime.now().isoformat()))
@@ -836,8 +803,7 @@ def admin_give_car(user_id, car_id):
 
 
 def admin_take_car(user_id, car_id):
-    if not has_car(user_id, car_id):
-        return False, 'У игрока нет этой машины'
+    if not has_car(user_id, car_id): return False, 'У игрока нет этой машины'
     car = get_car_info(car_id)
     conn = get_db(); c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
@@ -852,16 +818,14 @@ def admin_take_car(user_id, car_id):
 
 def admin_give_achievement(user_id, key):
     ach = next((a for a in ACHIEVEMENTS if a['key'] == key), None)
-    if not ach:
-        return False, 'Такого достижения нет'
+    if not ach: return False, 'Такого достижения нет'
     conn = get_db(); c = conn.cursor()
     c.execute('INSERT INTO user_achievements (user_id, key, unlocked_at) VALUES (%s, %s, %s) '
               'ON CONFLICT (user_id, key) DO NOTHING RETURNING id',
               (user_id, key, datetime.now().isoformat()))
     row = c.fetchone()
     conn.commit(); c.close(); conn.close()
-    if not row:
-        return False, 'У игрока уже есть это достижение'
+    if not row: return False, 'У игрока уже есть это достижение'
     reward = ach['reward']
     if reward > 0:
         add_coins(user_id, reward)
@@ -876,8 +840,7 @@ def admin_take_achievement(user_id, key):
               (user_id, key))
     row = c.fetchone()
     conn.commit(); c.close(); conn.close()
-    if not row:
-        return False, 'У игрока нет этого достижения'
+    if not row: return False, 'У игрока нет этого достижения'
     return True, 'Достижение убрано'
 
 
@@ -937,8 +900,7 @@ def count_tx_like(user_id, pattern):
 
 # ---------- ДРУЗЬЯ ----------
 def get_friend_status(user_a, user_b):
-    if user_a == user_b:
-        return 'self'
+    if user_a == user_b: return 'self'
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT from_user_id, status FROM friendships
                  WHERE (from_user_id = %s AND to_user_id = %s)
@@ -965,22 +927,25 @@ def send_friend_request(from_id, to_username):
     c.execute('''INSERT INTO friendships (from_user_id, to_user_id, status, created_at)
                  VALUES (%s, %s, 'pending', %s)''', (from_id, to_id, datetime.now().isoformat()))
     conn.commit(); c.close(); conn.close()
-      create_notification(to_id, 'friend_request', f'Заявка в друзья от {get_username_by_id(from_id)}',
-                        'Открой раздел Друзья, чтобы принять или отклонить.',
-                        '/friends')
+    create_notification(to_id, 'friend_request', f'Заявка в друзья от {get_username_by_id(from_id)}',
+                        'Открой раздел Друзья, чтобы принять или отклонить.', '/friends')
     return True, f'Заявка отправлена игроку {to_username}'
 
 
 def accept_friend_request(request_id, user_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('SELECT to_user_id, status FROM friendships WHERE id = %s', (request_id,))
+    c.execute('SELECT to_user_id, status, from_user_id FROM friendships WHERE id = %s', (request_id,))
     row = c.fetchone()
     if not row: c.close(); conn.close(); return False, 'Заявка не найдена'
     if row[0] != user_id: c.close(); conn.close(); return False, 'Это не твоя заявка'
     if row[1] != 'pending': c.close(); conn.close(); return False, 'Уже обработана'
+    from_id = row[2]
     c.execute("UPDATE friendships SET status = 'accepted', resolved_at = %s WHERE id = %s",
               (datetime.now().isoformat(), request_id))
     conn.commit(); c.close(); conn.close()
+    create_notification(from_id, 'friend_accept',
+                        f'{get_username_by_id(user_id)} принял заявку в друзья',
+                        '', f'/profile/{get_username_by_id(user_id)}')
     return True, 'Теперь вы друзья!'
 
 
@@ -993,13 +958,6 @@ def reject_friend_request(request_id, user_id):
     if row[1] != 'pending': c.close(); conn.close(); return False, 'Уже обработана'
     c.execute('DELETE FROM friendships WHERE id = %s', (request_id,))
     conn.commit(); c.close(); conn.close()
-      conn2 = get_db(); c2 = conn2.cursor()
-    c2.execute('SELECT from_user_id FROM friendships WHERE id = %s', (request_id,))
-    fr = c2.fetchone(); c2.close(); conn2.close()
-    if fr:
-        create_notification(fr[0], 'friend_accept',
-                            f'{get_username_by_id(user_id)} принял заявку в друзья',
-                            '', f'/profile/{get_username_by_id(user_id)}')
     return True, 'Заявка отклонена'
 
 
@@ -1191,8 +1149,7 @@ def get_collection_progress(user_id, cid):
             'progress_pct': int(owned_count * 100 / total) if total else 0,
             'completed': completed, 'main_claimed': main_claimed,
             'bonus_claimed_ids': bonus_claimed_ids,
-            'bonus_available': bonus_available,
-            'owned_ids': owned_ids}
+            'bonus_available': bonus_available, 'owned_ids': owned_ids}
 
 
 def get_all_collections_for_user(user_id):
@@ -1210,10 +1167,8 @@ def claim_collection_reward(user_id, cid):
     col = get_collection(cid)
     if not col: return False, 'Коллекция не найдена'
     prog = get_collection_progress(user_id, cid)
-    if not prog['completed']:
-        return False, 'Коллекция ещё не собрана'
-    if prog['main_claimed']:
-        return False, 'Награда уже получена'
+    if not prog['completed']: return False, 'Коллекция ещё не собрана'
+    if prog['main_claimed']: return False, 'Награда уже получена'
 
     coins = col['coins_reward']
     if coins > 0:
@@ -1248,8 +1203,7 @@ def claim_collection_reward(user_id, cid):
     _check_collector_achievements(user_id)
 
     msg = f'🏆 Коллекция «{col["name"]}» собрана! +{coins} 💰'
-    if car_given:
-        msg += f' · Получена «{car_given[1]}»!'
+    if car_given: msg += f' · Получена «{car_given[1]}»!'
     return True, msg
 
 
@@ -1257,10 +1211,8 @@ def claim_collection_bonus(user_id, cid, car_id):
     col = get_collection(cid)
     if not col: return False, 'Коллекция не найдена'
     prog = get_collection_progress(user_id, cid)
-    if not prog['main_claimed']:
-        return False, 'Сначала забери основную награду'
-    if not has_car(user_id, car_id):
-        return False, 'У тебя нет этой машины'
+    if not prog['main_claimed']: return False, 'Сначала забери основную награду'
+    if not has_car(user_id, car_id): return False, 'У тебя нет этой машины'
     cars = get_collection_cars(cid)
     if not any(car['id'] == car_id for car in cars):
         return False, 'Этой машины нет в коллекции'
@@ -1752,8 +1704,7 @@ def can_spin(user_id):
 def do_spin(user_id, paid=False):
     if paid:
         price = get_int_setting('paid_wheel_price', 1000)
-        if get_balance(user_id) < price:
-            return {'error': f'Нужно {price} монет'}
+        if get_balance(user_id) < price: return {'error': f'Нужно {price} монет'}
         add_coins(user_id, -price)
         log_transaction(user_id, 'paid_wheel_spend', -price, None, 'Премиум-колесо')
         car_chance = get_int_setting('paid_wheel_car_chance', 15)
@@ -1762,12 +1713,10 @@ def do_spin(user_id, paid=False):
         min_r = get_int_setting('paid_wheel_car_min_rating', 5)
         max_r = get_int_setting('paid_wheel_car_max_rating', 8)
         coins_tx, car_tx = 'paid_wheel_coins', 'paid_wheel_car'
-        prefix = 'Премиум-колесо'
-        xp_key = 'wheel_paid'
+        prefix = 'Премиум-колесо'; xp_key = 'wheel_paid'
     else:
         ready, _ = can_spin(user_id)
-        if not ready:
-            return {'error': 'Колесо пока недоступно'}
+        if not ready: return {'error': 'Колесо пока недоступно'}
         conn = get_db(); c = conn.cursor()
         c.execute('UPDATE users SET last_spin_at = %s WHERE id = %s',
                   (datetime.now().isoformat(), user_id))
@@ -1778,12 +1727,10 @@ def do_spin(user_id, paid=False):
         min_r = get_int_setting('wheel_car_min_rating', 1)
         max_r = get_int_setting('wheel_car_max_rating', 4)
         coins_tx, car_tx = 'wheel_coins', 'wheel_car'
-        prefix = 'Колесо'
-        xp_key = 'wheel_free'
+        prefix = 'Колесо'; xp_key = 'wheel_free'
 
     add_xp(user_id, XP_REWARDS.get(xp_key, 15))
     progress_quest(user_id, 'spin_wheel_1', 1)
-
     roll = random.randint(1, 100)
     if roll <= car_chance:
         candidates = [c for c in get_catalog_by_rating(min_r, max_r) if not has_car(user_id, c[0])]
@@ -1796,7 +1743,6 @@ def do_spin(user_id, paid=False):
             log_transaction(user_id, car_tx, 0, chosen[0], f'{prefix}: {chosen[1]}')
             return {'type': 'car', 'paid': paid, 'car_id': chosen[0],
                     'model': chosen[1], 'rating': chosen[2]}
-
     amount = random.randint(coin_min, coin_max)
     add_coins(user_id, amount)
     log_transaction(user_id, coins_tx, amount, None, f'{prefix}: монеты')
@@ -1827,7 +1773,7 @@ def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
     if from_coins > 0:
         log_transaction(from_user_id, 'trade_reserve', -from_coins, from_car_id,
                         f'Заморожено для обмена с {to_username}')
-          create_notification(to_user_id, 'trade_new',
+    create_notification(to_user_id, 'trade_new',
                         f'Новое предложение обмена от {get_username_by_id(from_user_id)}',
                         message or 'Без сообщения', f'/trades/{trade_id}')
     return True, trade_id
@@ -1843,8 +1789,7 @@ def get_trade(trade_id):
     return {'id': row[0], 'from_user_id': row[1], 'to_user_id': row[2],
             'from_car_id': row[3], 'from_coins': row[4] or 0,
             'to_car_id': row[5], 'to_coins': row[6] or 0,
-            'message': row[7], 'status': row[8],
-            'created_at': row[9], 'resolved_at': row[10]}
+            'message': row[7], 'status': row[8], 'created_at': row[9], 'resolved_at': row[10]}
 
 
 def get_trade_full(trade_id):
@@ -1859,8 +1804,7 @@ def get_trade_full(trade_id):
 
 def get_incoming_trades(user_id):
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id FROM trades WHERE to_user_id = %s AND status = 'pending'
-                 ORDER BY id DESC''', (user_id,))
+    c.execute('''SELECT id FROM trades WHERE to_user_id = %s AND status = 'pending' ORDER BY id DESC''', (user_id,))
     ids = [r[0] for r in c.fetchall()]; c.close(); conn.close()
     return [get_trade_full(i) for i in ids]
 
@@ -1875,8 +1819,8 @@ def get_outgoing_trades(user_id):
 def get_trade_history(user_id):
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT id FROM trades WHERE (from_user_id = %s OR to_user_id = %s)
-                 AND status IN ('completed', 'rejected', 'cancelled')
-                 ORDER BY id DESC LIMIT 50''', (user_id, user_id))
+                 AND status IN ('completed', 'rejected', 'cancelled') ORDER BY id DESC LIMIT 50''',
+              (user_id, user_id))
     ids = [r[0] for r in c.fetchall()]; c.close(); conn.close()
     return [get_trade_full(i) for i in ids]
 
@@ -1894,68 +1838,51 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
     if t['to_user_id'] != user_id: return False, 'Это не твой обмен'
     if t['status'] != 'pending': return False, 'Обмен уже обработан'
     if to_coins < 0: return False, 'Монеты не могут быть отрицательными'
-    if get_balance(user_id) < to_coins:
-        return False, f'У тебя только {get_balance(user_id)} монет'
-    if not has_car(t['from_user_id'], t['from_car_id']):
-        return False, 'У отправителя уже нет этой машины'
-    if has_car(user_id, t['from_car_id']):
-        return False, 'У тебя уже есть эта машина'
+    if get_balance(user_id) < to_coins: return False, f'У тебя только {get_balance(user_id)} монет'
+    if not has_car(t['from_user_id'], t['from_car_id']): return False, 'У отправителя уже нет этой машины'
+    if has_car(user_id, t['from_car_id']): return False, 'У тебя уже есть эта машина'
     if to_car_id:
         if not has_car(user_id, to_car_id): return False, 'У тебя нет этой машины'
-        if has_car(t['from_user_id'], to_car_id):
-            return False, 'У отправителя уже есть эта машина'
+        if has_car(t['from_user_id'], to_car_id): return False, 'У отправителя уже есть эта машина'
 
     conn = get_db(); c = conn.cursor()
-    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s',
-              (t['from_user_id'], t['from_car_id']))
-    c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
-                 VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (t['from_user_id'], t['from_car_id']))
+    c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)
+                 ON CONFLICT (user_id, car_id) DO NOTHING''',
               (user_id, t['from_car_id'], datetime.now().isoformat()))
-    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s',
-              (t['from_user_id'], t['from_car_id']))
-    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s',
-              (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (t['from_user_id'], t['from_car_id']))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
               (t['from_user_id'], t['from_car_id']))
-    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s',
-              (user_id, t['from_car_id']))
-
+    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, t['from_car_id']))
     if to_car_id:
         c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
-        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
-                     VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)
+                     ON CONFLICT (user_id, car_id) DO NOTHING''',
                   (t['from_user_id'], to_car_id, datetime.now().isoformat()))
         c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
         c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
         c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
                   (user_id, to_car_id))
-        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s',
-                  (t['from_user_id'], to_car_id))
-
+        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (t['from_user_id'], to_car_id))
     diff = t['from_coins'] - to_coins
     if diff > 0:
         c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (diff, user_id))
     elif diff < 0:
-        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
-                  (-diff, t['from_user_id']))
-
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (-diff, t['from_user_id']))
     c.execute('''UPDATE trades SET to_car_id = %s, to_coins = %s,
                  status = 'completed', resolved_at = %s WHERE id = %s''',
               (to_car_id, to_coins, datetime.now().isoformat(), trade_id))
     conn.commit(); c.close(); conn.close()
-
-    other_name = get_username_by_id(user_id)
-    my_name = get_username_by_id(t['from_user_id'])
-    log_transaction(t['from_user_id'], 'trade', -t['from_coins'] + to_coins,
-                    t['from_car_id'], f'Обмен с {other_name}')
+    other_name = get_username_by_id(user_id); my_name = get_username_by_id(t['from_user_id'])
+    log_transaction(t['from_user_id'], 'trade', -t['from_coins'] + to_coins, t['from_car_id'], f'Обмен с {other_name}')
     log_transaction(user_id, 'trade', t['from_coins'] - to_coins, to_car_id, f'Обмен с {my_name}')
     add_xp(t['from_user_id'], XP_REWARDS.get('trade', 40))
     add_xp(user_id, XP_REWARDS.get('trade', 40))
     progress_quest(t['from_user_id'], 'trade_1', 1)
     progress_quest(user_id, 'trade_1', 1)
     create_notification(t['from_user_id'], 'trade_accept',
-                        f'{get_username_by_id(user_id)} принял твой обмен',
-                        '', '/trades')
+                        f'{get_username_by_id(user_id)} принял твой обмен', '', '/trades')
     return True, 'Обмен выполнен!'
 
 
@@ -1973,6 +1900,8 @@ def reject_trade(trade_id, user_id):
     conn.commit(); c.close(); conn.close()
     if t['from_coins'] > 0:
         log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None, 'Возврат из отклонённого обмена')
+    create_notification(t['from_user_id'], 'trade_reject',
+                        f'{get_username_by_id(user_id)} отклонил твой обмен', '', '/trades')
     return True, 'Обмен отклонён'
 
 
@@ -1990,9 +1919,6 @@ def cancel_trade(trade_id, user_id):
     conn.commit(); c.close(); conn.close()
     if t['from_coins'] > 0:
         log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None, 'Возврат из отменённого обмена')
-    create_notification(t['from_user_id'], 'trade_reject',
-                        f'{get_username_by_id(user_id)} отклонил твой обмен',
-                        '', '/trades')
     return True, 'Обмен отменён'
 
 
@@ -2011,8 +1937,7 @@ def car_score(car_dict):
 def cleanup_expired_challenges():
     conn = get_db(); c = conn.cursor()
     cutoff = (datetime.now() - timedelta(minutes=RACE_TIMEOUT_MIN)).isoformat()
-    c.execute("SELECT id, user_id, bet FROM race_challenges WHERE status = 'open' AND created_at < %s",
-              (cutoff,))
+    c.execute("SELECT id, user_id, bet FROM race_challenges WHERE status = 'open' AND created_at < %s", (cutoff,))
     expired = c.fetchall()
     for row in expired:
         c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (row[2], row[1]))
@@ -2085,11 +2010,9 @@ def cancel_race_challenge(challenge_id, user_id):
 def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
     cleanup_expired_challenges()
     conn = get_db(); c = conn.cursor()
-    c.execute("SELECT user_id, car_id, bet, offer_car, status FROM race_challenges WHERE id = %s",
-              (challenge_id,))
+    c.execute("SELECT user_id, car_id, bet, offer_car, status FROM race_challenges WHERE id = %s", (challenge_id,))
     row = c.fetchone()
-    if not row:
-        c.close(); conn.close(); return False, 'Вызов не найден', None
+    if not row: c.close(); conn.close(); return False, 'Вызов не найден', None
     author_id, author_car_id, bet, author_offer, status = row
     if status != 'open': c.close(); conn.close(); return False, 'Вызов уже занят', None
     if author_id == user_id: c.close(); conn.close(); return False, 'Нельзя принять свой вызов', None
@@ -2101,62 +2024,48 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
 
     car_stake = bool(author_offer) and bool(offer_car)
     c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s', (bet, user_id))
-
     author_car = get_car_full(author_car_id)
-    p1_score = car_score(author_car)
-    p2_score = car_score(my_car)
-
+    p1_score = car_score(author_car); p2_score = car_score(my_car)
     if random.randint(1, 100) <= RACE_LUCK_CHANCE:
         winner_id = random.choice([author_id, user_id])
     else:
         winner_id = author_id if p1_score >= p2_score else user_id
-
     loser_id = user_id if winner_id == author_id else author_id
     bank = bet * 2
     c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (bank, winner_id))
-
     car_transferred = False
     if car_stake:
         loser_car_id = author_car_id if loser_id == author_id else my_car_id
         c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (loser_id, loser_car_id))
-        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
-                     VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)
+                     ON CONFLICT (user_id, car_id) DO NOTHING''',
                   (winner_id, loser_car_id, datetime.now().isoformat()))
         c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (loser_id, loser_car_id))
         c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (loser_id, loser_car_id))
         c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
                   (loser_id, loser_car_id))
         car_transferred = True
-
     c.execute('''UPDATE race_challenges SET status = 'completed',
                  opponent_id = %s, opponent_car_id = %s, winner_id = %s, completed_at = %s
                  WHERE id = %s''',
               (user_id, my_car_id, winner_id, datetime.now().isoformat(), challenge_id))
     conn.commit(); c.close(); conn.close()
-
     log_transaction(author_id, 'race_win' if winner_id == author_id else 'race_lose',
                     bet if winner_id == author_id else -bet, author_car_id,
                     'Гонка: победа' if winner_id == author_id else 'Гонка: поражение')
     log_transaction(user_id, 'race_win' if winner_id == user_id else 'race_lose',
                     bet if winner_id == user_id else -bet, my_car_id,
                     'Гонка: победа' if winner_id == user_id else 'Гонка: поражение')
-
     for uid in (author_id, user_id):
-        if uid == winner_id:
-            add_xp(uid, XP_REWARDS.get('race_win', 50))
-        else:
-            add_xp(uid, XP_REWARDS.get('race_lose', 15))
+        if uid == winner_id: add_xp(uid, XP_REWARDS.get('race_win', 50))
+        else: add_xp(uid, XP_REWARDS.get('race_lose', 15))
         progress_quest(uid, 'races_play_5', 1)
-        if uid == winner_id:
-            progress_quest(uid, 'win_races_3', 1)
-
+        if uid == winner_id: progress_quest(uid, 'win_races_3', 1)
     create_notification(author_id, 'race_joined',
                         f'{get_username_by_id(user_id)} принял твой вызов на гонку',
-                        'Открой раздел Гонки, чтобы посмотреть результат.',
-                        '/races')
-
-    return True, 'Гонка завершена!', {
-        'winner_id': winner_id, 'challenge_id': challenge_id, 'car_transferred': car_transferred}
+                        'Открой раздел Гонки, чтобы посмотреть результат.', '/races')
+    return True, 'Гонка завершена!', {'winner_id': winner_id, 'challenge_id': challenge_id,
+                                       'car_transferred': car_transferred}
 
 
 def get_race(challenge_id):
@@ -2166,16 +2075,14 @@ def get_race(challenge_id):
                  FROM race_challenges WHERE id = %s''', (challenge_id,))
     row = c.fetchone(); c.close(); conn.close()
     if not row: return None
-    return {
-        'id': row[0], 'user_id': row[1], 'car_id': row[2], 'bet': row[3],
-        'offer_car': row[4], 'hide_car': bool(row[5]), 'status': row[6],
-        'opponent_id': row[7], 'opponent_car_id': row[8], 'winner_id': row[9],
-        'created_at': row[10], 'completed_at': row[11],
-        'author': get_username_by_id(row[1]),
-        'author_car': get_car_full(row[2]),
-        'opponent': get_username_by_id(row[7]) if row[7] else None,
-        'opponent_car': get_car_full(row[8]) if row[8] else None,
-    }
+    return {'id': row[0], 'user_id': row[1], 'car_id': row[2], 'bet': row[3],
+            'offer_car': row[4], 'hide_car': bool(row[5]), 'status': row[6],
+            'opponent_id': row[7], 'opponent_car_id': row[8], 'winner_id': row[9],
+            'created_at': row[10], 'completed_at': row[11],
+            'author': get_username_by_id(row[1]),
+            'author_car': get_car_full(row[2]),
+            'opponent': get_username_by_id(row[7]) if row[7] else None,
+            'opponent_car': get_car_full(row[8]) if row[8] else None}
 
 
 def count_active_challenges():
@@ -2193,42 +2100,36 @@ def get_leaderboard(sort_by='cars', limit=50):
     if sort_by == 'balance':
         c.execute('''SELECT u.id, u.username, COALESCE(u.balance, 0) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u
-                     WHERE u.username != ALL(%s)
+                     FROM users u WHERE u.username != ALL(%s)
                      ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'races':
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM transactions t WHERE t.user_id = u.id AND t.type = 'race_win') as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u
-                     WHERE u.username != ALL(%s)
+                     FROM users u WHERE u.username != ALL(%s)
                      ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'achievements':
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u
-                     WHERE u.username != ALL(%s)
+                     FROM users u WHERE u.username != ALL(%s)
                      ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'level':
         c.execute('''SELECT u.id, u.username, COALESCE(u.level, 1) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u
-                     WHERE u.username != ALL(%s)
+                     FROM users u WHERE u.username != ALL(%s)
                      ORDER BY val DESC, u.xp DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'collections':
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_collections uc WHERE uc.user_id = u.id AND uc.main_claimed = TRUE) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u
-                     WHERE u.username != ALL(%s)
+                     FROM users u WHERE u.username != ALL(%s)
                      ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     else:
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_cars uc WHERE uc.user_id = u.id) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u
-                     WHERE u.username != ALL(%s)
+                     FROM users u WHERE u.username != ALL(%s)
                      ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     rows = c.fetchall(); c.close(); conn.close()
     result = []
@@ -2236,6 +2137,7 @@ def get_leaderboard(sort_by='cars', limit=50):
         result.append({'rank': i, 'id': row[0], 'username': row[1],
                        'value': row[2] or 0, 'has_avatar': row[3], 'level': row[4]})
     return result
+
 
 # ---------- ПУБЛИЧНЫЙ ГАРАЖ ----------
 def get_public_ids(user_id):
@@ -2305,8 +2207,6 @@ def inject_globals():
         except Exception:
             pass
     return result
-            pass
-    return {'appearance': {'sound': True, 'music': False, 'vibration': True, 'dark': False}}
 
 
 # ================= МАРШРУТЫ =================
@@ -2328,7 +2228,6 @@ def index():
     collections_total = 0
     unread_notifications = 0
     if 'user_id' in session:
-      unread_notifications = count_unread_notifications(session['user_id'])
         flash_new_achievements(session['user_id'])
         profile = get_user_profile(session['user_id'])
         if profile:
@@ -2349,6 +2248,7 @@ def index():
         wishlist_count = len(get_wishlist_ids(session['user_id']))
         friends_count = count_friends(session['user_id'])
         incoming_friend_requests = count_incoming_requests(session['user_id'])
+        unread_notifications = count_unread_notifications(session['user_id'])
         try:
             quests, all_done, bonus_claimed = get_user_quests(session['user_id'])
             quests_unclaimed = sum(1 for q in quests if q['completed'] and not q['claimed'])
@@ -2366,7 +2266,6 @@ def index():
         except Exception:
             pass
     return render_template('index.html',
-                           unread_notifications=unread_notifications,
                            user=session.get('username'), profile=profile,
                            favorite_car=favorite_car, cars_count=cars_count,
                            bonus_ready=bonus_ready, bonus_left=bonus_left,
@@ -2383,6 +2282,7 @@ def index():
                            quests_unclaimed=quests_unclaimed,
                            collections_ready=collections_ready,
                            collections_total=collections_total,
+                           unread_notifications=unread_notifications,
                            is_admin=is_admin(session.get('username')))
 
 
@@ -2435,6 +2335,26 @@ def logout():
     session.pop('user_id', None); session.pop('username', None)
     return redirect(url_for('index'))
 
+
+# ---------- ВНЕШНИЙ ВИД ----------
+@app.route('/appearance', methods=['GET', 'POST'])
+@login_required
+def appearance_page():
+    user_id = session['user_id']
+    if request.method == 'POST':
+        sound = bool(request.form.get('sound'))
+        music = bool(request.form.get('music'))
+        vibration = bool(request.form.get('vibration'))
+        dark = bool(request.form.get('dark'))
+        update_user_appearance(user_id, sound, music, vibration, dark)
+        flash('Настройки сохранены!')
+        return redirect(url_for('appearance_page'))
+    app_settings = get_user_appearance(user_id)
+    return render_template('appearance.html', settings=app_settings,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
 # ---------- УВЕДОМЛЕНИЯ ----------
 @app.route('/notifications')
 @login_required
@@ -2486,7 +2406,6 @@ def news_view(news_id):
                            is_admin=is_admin(session.get('username')))
 
 
-# ---------- АДМИН: НОВОСТИ ----------
 @app.route('/admin/news')
 @admin_required
 def admin_news():
@@ -2504,20 +2423,15 @@ def admin_news_new():
         category = request.form.get('category', 'update')
         is_published = bool(request.form.get('is_published'))
         notify = bool(request.form.get('notify'))
-
         if not title or not content:
             flash('Заполни заголовок и текст'); return redirect(url_for('admin_news_new'))
-
         nid = create_news(title, content, category, is_published)
-
         if notify and is_published:
             count = notify_all_users(title, '📰 Новая новость на сайте', f'/news/{nid}')
             flash(f'Новость создана и разослана {count} игрокам')
         else:
             flash('Новость создана')
-
         return redirect(url_for('admin_news'))
-
     return render_template('admin_news_form.html', mode='new', item=None,
                            user=session.get('username'), is_admin=True)
 
@@ -2528,20 +2442,16 @@ def admin_news_edit(news_id):
     item = get_news_item(news_id)
     if not item:
         flash('Не найдено'); return redirect(url_for('admin_news'))
-
     if request.method == 'POST':
         title = request.form.get('title', '').strip()[:200]
         content = request.form.get('content', '').strip()
         category = request.form.get('category', 'update')
         is_published = bool(request.form.get('is_published'))
-
         if not title or not content:
             flash('Заполни заголовок и текст'); return redirect(url_for('admin_news_edit', news_id=news_id))
-
         update_news(news_id, title, content, category, is_published)
         flash('Новость обновлена')
         return redirect(url_for('admin_news'))
-
     return render_template('admin_news_form.html', mode='edit', item=item,
                            user=session.get('username'), is_admin=True)
 
@@ -2552,24 +2462,6 @@ def admin_news_delete(news_id):
     delete_news(news_id)
     flash('Новость удалена')
     return redirect(url_for('admin_news'))
-
-# ---------- ВНЕШНИЙ ВИД ----------
-@app.route('/appearance', methods=['GET', 'POST'])
-@login_required
-def appearance_page():
-    user_id = session['user_id']
-    if request.method == 'POST':
-        sound = bool(request.form.get('sound'))
-        music = bool(request.form.get('music'))
-        vibration = bool(request.form.get('vibration'))
-        dark = bool(request.form.get('dark'))
-        update_user_appearance(user_id, sound, music, vibration, dark)
-        flash('Настройки сохранены!')
-        return redirect(url_for('appearance_page'))
-    app_settings = get_user_appearance(user_id)
-    return render_template('appearance.html', settings=app_settings,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
 
 
 # ---------- КОЛЛЕКЦИИ ----------
@@ -2634,14 +2526,11 @@ def admin_bulk_upload_process():
         zip_file = request.files.get('zip_file')
         skip_existing = bool(request.form.get('skip_existing'))
         dry_run = bool(request.form.get('dry_run'))
-
         if not csv_file or csv_file.filename == '':
             flash('Не выбран CSV-файл'); return redirect(url_for('admin_bulk_upload'))
         if not zip_file or zip_file.filename == '':
             flash('Не выбран ZIP-файл'); return redirect(url_for('admin_bulk_upload'))
-
-        csv_bytes = csv_file.read()
-        zip_bytes = zip_file.read()
+        csv_bytes = csv_file.read(); zip_bytes = zip_file.read()
         rows, errors, headers = parse_bulk_csv(csv_bytes)
         if not rows and errors:
             return render_template('admin_bulk_upload.html',
@@ -2651,7 +2540,6 @@ def admin_bulk_upload_process():
         images, zip_err = extract_zip_images(zip_bytes)
         if zip_err:
             flash(zip_err); return redirect(url_for('admin_bulk_upload'))
-
         if dry_run:
             conn = get_db(); c = conn.cursor()
             c.execute('SELECT LOWER(model) FROM cars')
@@ -2673,7 +2561,6 @@ def admin_bulk_upload_process():
                                    parse_errors=errors,
                                    csv_name=csv_file.filename, zip_name=zip_file.filename,
                                    images_count=len(images))
-
         result = bulk_insert_cars(rows, images, skip_existing=skip_existing)
         return render_template('admin_bulk_upload.html',
                                user=session.get('username'), is_admin=True,
@@ -2686,10 +2573,8 @@ def admin_bulk_upload_process():
 @app.route('/admin/bulk_upload/template.csv')
 @admin_required
 def admin_bulk_template():
-    csv_content = (
-        "model,brand,rating,price,horsepower,acceleration,top_speed,image_filename,is_exclusive\n"
-        "BMW M3 E46,BMW,5,5000,343,5.1,250,bmw_m3_e46.png,0\n"
-    )
+    csv_content = ("model,brand,rating,price,horsepower,acceleration,top_speed,image_filename,is_exclusive\n"
+                   "BMW M3 E46,BMW,5,5000,343,5.1,250,bmw_m3_e46.png,0\n")
     resp = make_response(csv_content)
     resp.headers['Content-Type'] = 'text/csv; charset=utf-8'
     resp.headers['Content-Disposition'] = 'attachment; filename=autokards_template.csv'
@@ -3012,18 +2897,15 @@ def shop():
         wish_ids = get_wishlist_ids(session['user_id'])
         user_level = get_user_level_info(session['user_id'])['level']
 
-        try:
-            page = max(1, int(page))
-        except ValueError:
-            page = 1
+        try: page = max(1, int(page))
+        except ValueError: page = 1
 
-        PER_PAGE = 24  # машин на страницу
+        PER_PAGE = 24
 
         conn = get_db(); c = conn.cursor()
         c.execute('SELECT id, model, rating, price, horsepower, brand, COALESCE(is_exclusive, FALSE) '
                   'FROM cars WHERE COALESCE(is_exclusive, FALSE) = FALSE ORDER BY id DESC')
         rows = c.fetchall(); c.close(); conn.close()
-
         all_brands = get_all_brands()
 
         try: pmin = int(price_min) if price_min else None
@@ -3031,7 +2913,6 @@ def shop():
         try: pmax = int(price_max) if price_max else None
         except ValueError: pmax = None
 
-        # Фильтруем
         filtered = []
         for row in rows:
             cid, model, rating, price, hp, brand, excl = row
@@ -3042,7 +2923,6 @@ def shop():
             if pmax is not None and price > pmax: continue
             filtered.append(row)
 
-        # Сортируем
         def price_final(r):
             cid, model, rating, price, hp, brand, excl = r
             p = price or 0
@@ -3055,16 +2935,13 @@ def shop():
         elif sort == 'rating_desc': filtered.sort(key=lambda r: r[2], reverse=True)
         elif sort == 'rating_asc': filtered.sort(key=lambda r: r[2])
         elif sort == 'hp_desc': filtered.sort(key=lambda r: r[4] or 0, reverse=True)
-        # 'new' оставляем как есть (по id DESC)
 
         total_filtered = len(filtered)
         total_pages = max(1, (total_filtered + PER_PAGE - 1) // PER_PAGE)
         if page > total_pages: page = total_pages
         start_idx = (page - 1) * PER_PAGE
-        end_idx = start_idx + PER_PAGE
-        page_rows = filtered[start_idx:end_idx]
+        page_rows = filtered[start_idx:start_idx + PER_PAGE]
 
-        # Собираем данные для шаблона
         cars = []
         for row in page_rows:
             cid, model, rating, price, hp, brand, excl = row
@@ -3083,7 +2960,6 @@ def shop():
                          'wished': cid in wish_ids,
                          'locked': locked, 'req_level': req_level})
 
-        # Строка фильтров для сохранения при сортировке/пагинации
         query_parts = []
         if search_query: query_parts.append(f'q={search_query}')
         if brand_filter: query_parts.append(f'brand={brand_filter}')
@@ -3092,37 +2968,145 @@ def shop():
         if sort and sort != 'new': query_parts.append(f'sort={sort}')
         query_keep = ('&'.join(query_parts) + '&') if query_parts else ''
 
-        # Список номеров страниц для навигации (максимум 7 видимых)
         page_numbers = []
-        if total_pages <= 7:
-            page_numbers = list(range(1, total_pages + 1))
+        if total_pages <= 7: page_numbers = list(range(1, total_pages + 1))
         else:
-            if page <= 4:
-                page_numbers = list(range(1, 8))
-            elif page >= total_pages - 3:
-                page_numbers = list(range(total_pages - 6, total_pages + 1))
-            else:
-                page_numbers = list(range(page - 3, page + 4))
+            if page <= 4: page_numbers = list(range(1, 8))
+            elif page >= total_pages - 3: page_numbers = list(range(total_pages - 6, total_pages + 1))
+            else: page_numbers = list(range(page - 3, page + 4))
 
         return render_template('shop.html', cars=cars, balance=balance, discount=discount,
                                settings=settings, sort=sort, user_level=user_level,
-                               wishlist_count=len(wish_ids),
-                               all_brands=all_brands,
-                               search_query=search_query,
-                               brand_filter=brand_filter,
-                               price_min=price_min,
-                               price_max=price_max,
-                               total_count=len(rows),
-                               total_filtered=total_filtered,
-                               total_pages=total_pages,
-                               current_page=page,
-                               page_numbers=page_numbers,
-                               per_page=PER_PAGE,
+                               wishlist_count=len(wish_ids), all_brands=all_brands,
+                               search_query=search_query, brand_filter=brand_filter,
+                               price_min=price_min, price_max=price_max,
+                               total_count=len(rows), total_filtered=total_filtered,
+                               total_pages=total_pages, current_page=page,
+                               page_numbers=page_numbers, per_page=PER_PAGE,
                                query_keep=query_keep,
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
         return '<h2 style="color:red;">Ошибка в /shop:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
+
+
+@app.route('/shop/buy/<int:car_id>', methods=['POST'])
+@login_required
+def shop_buy(car_id):
+    _, msg = buy_car(session['user_id'], car_id)
+    flash(msg)
+    return redirect(url_for('shop'))
+
+
+@app.route('/shop/wishlist/<int:car_id>', methods=['POST'])
+@login_required
+def shop_wishlist_toggle(car_id):
+    added = toggle_wishlist(session['user_id'], car_id)
+    flash('❤ Добавлено в желаемое' if added else 'Убрано из желаемого')
+    return redirect(request.referrer or url_for('shop'))
+
+
+@app.route('/shop/wishlist')
+@login_required
+def wishlist_page():
+    items = get_wishlist_cars(session['user_id'])
+    balance = get_balance(session['user_id'])
+    ensure_discount()
+    discount = get_active_discount()
+    user_level = get_user_level_info(session['user_id'])['level']
+    for item in items:
+        final_price = item['price']
+        item['has_discount'] = False
+        if discount and discount['car_id'] == item['id']:
+            final_price = int(item['price'] * (100 - discount['discount_percent']) / 100)
+            item['has_discount'] = True
+        item['final_price'] = final_price
+        item['owned'] = has_car(session['user_id'], item['id'])
+        item['req_level'] = get_level_required_for_stars(item['rating'])
+        item['locked'] = user_level < item['req_level']
+    return render_template('wishlist.html', items=items, balance=balance,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/shop/add', methods=['GET', 'POST'])
+@admin_required
+def add_car_page():
+    if request.method == 'POST':
+        model = request.form.get('model', '').strip()
+        brand = request.form.get('brand', '').strip()[:40]
+        rating = request.form.get('rating', '3')
+        price = request.form.get('price', '500')
+        hp = request.form.get('horsepower', '').strip()
+        accel = request.form.get('acceleration', '').strip()
+        top = request.form.get('top_speed', '').strip()
+        is_exclusive = bool(request.form.get('is_exclusive'))
+        file = request.files.get('image')
+        if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 8: raise ValueError
+        except ValueError:
+            flash('Оценка 1–8'); return redirect(url_for('add_car_page'))
+        try:
+            price = int(price)
+            if price < 0: raise ValueError
+        except ValueError:
+            flash('Цена — число >= 0'); return redirect(url_for('add_car_page'))
+        hp = int(hp) if hp.isdigit() else None
+        top = int(top) if top.isdigit() else None
+        try: accel = float(accel) if accel else None
+        except ValueError: accel = None
+        if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
+        if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
+        add_car(model, brand, rating, price, hp, accel, top, is_exclusive, file.read(), file.mimetype)
+        flash(f'«{model}» добавлена!')
+        return redirect(url_for('shop'))
+    return render_template('add_car.html', user=session.get('username'), is_admin=True)
+
+
+@app.route('/shop/edit/<int:car_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_car_page(car_id):
+    car = get_car_full(car_id)
+    if not car: flash('Нет машины'); return redirect(url_for('shop'))
+    if request.method == 'POST':
+        model = request.form.get('model', '').strip()
+        brand = request.form.get('brand', '').strip()[:40]
+        rating = request.form.get('rating', '3')
+        price = request.form.get('price', '500')
+        hp = request.form.get('horsepower', '').strip()
+        accel = request.form.get('acceleration', '').strip()
+        top = request.form.get('top_speed', '').strip()
+        is_exclusive = bool(request.form.get('is_exclusive'))
+        if not model: flash('Впиши название'); return redirect(url_for('edit_car_page', car_id=car_id))
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 8: raise ValueError
+        except ValueError:
+            flash('Оценка 1–8'); return redirect(url_for('edit_car_page', car_id=car_id))
+        try:
+            price = int(price)
+            if price < 0: raise ValueError
+        except ValueError:
+            flash('Цена — число >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
+        hp = int(hp) if hp.isdigit() else None
+        top = int(top) if top.isdigit() else None
+        try: accel = float(accel) if accel else None
+        except ValueError: accel = None
+        update_car(car_id, model, brand, rating, price, hp, accel, top, is_exclusive)
+        flash('Машина обновлена')
+        return redirect(url_for('shop'))
+    return render_template('edit_car.html', car=car, user=session.get('username'), is_admin=True)
+
+
+@app.route('/shop/delete/<int:car_id>', methods=['POST'])
+@admin_required
+def delete_from_catalog(car_id):
+    delete_car_from_catalog(car_id)
+    flash('Удалено')
+    return redirect(url_for('shop'))
+
 
 # ---------- КАРТОЧКА МАШИНЫ ----------
 @app.route('/car/<int:car_id>')
@@ -3147,8 +3131,7 @@ def car_detail(car_id):
 @login_required
 def compare_page():
     all_cars = get_catalog()
-    c1 = request.args.get('c1', '')
-    c2 = request.args.get('c2', '')
+    c1 = request.args.get('c1', ''); c2 = request.args.get('c2', '')
     car1 = get_car_full(int(c1)) if c1.isdigit() else None
     car2 = get_car_full(int(c2)) if c2.isdigit() else None
     return render_template('compare.html', all_cars=all_cars, car1=car1, car2=car2,
@@ -3239,8 +3222,7 @@ def trades_page():
     outgoing = [t for t in get_outgoing_trades(session['user_id']) if t['status'] == 'pending']
     history = get_trade_history(session['user_id'])
     return render_template('trades.html', incoming=incoming, outgoing=outgoing, history=history,
-                           balance=get_balance(session['user_id']),
-                           my_id=session['user_id'],
+                           balance=get_balance(session['user_id']), my_id=session['user_id'],
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
 
@@ -3357,8 +3339,7 @@ def race_join(challenge_id):
     if not car_id.isdigit(): flash('Выбери свою машину'); return redirect(url_for('races_page'))
     ok, msg, info = join_race_challenge(challenge_id, session['user_id'], int(car_id), offer_car)
     flash(msg)
-    if ok and info:
-        return redirect(url_for('race_result', challenge_id=challenge_id))
+    if ok and info: return redirect(url_for('race_result', challenge_id=challenge_id))
     return redirect(url_for('races_page'))
 
 
@@ -3412,24 +3393,20 @@ def admin_give():
     import traceback
     try:
         all_cars = get_catalog()
-        user = None
-        user_owned = []
-        user_achievements = []
+        user = None; user_owned = []; user_achievements = []
         if request.method == 'POST':
             action = request.form.get('action', '')
             username = request.form.get('username', '').strip()
             if action == 'find':
                 u = get_user(username)
-                if not u:
-                    flash(f'Игрок «{username}» не найден')
+                if not u: flash(f'Игрок «{username}» не найден')
                 else:
                     user = get_user_profile(u[0])
                     user_owned = get_user_cars(u[0])
                     user_achievements = get_unlocked_keys(u[0])
             else:
                 u = get_user(username)
-                if not u:
-                    flash('Игрок не найден'); return redirect(url_for('admin_give'))
+                if not u: flash('Игрок не найден'); return redirect(url_for('admin_give'))
                 user_id = u[0]
                 user = get_user_profile(user_id)
                 user_owned = get_user_cars(user_id)
