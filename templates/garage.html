@@ -146,11 +146,13 @@
         .delete-form { position: absolute; top: 8px; right: 8px; z-index: 2; margin: 0; }
         .delete-btn {
             width: 34px; height: 34px; border-radius: 50%;
-            border: none; background: rgba(255, 255, 255, 0.95);
+            border: none; background: var(--white-glass);
             font-size: 16px; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             transition: all 0.2s ease; font-family: inherit; line-height: 1;
+        }
+        .delete-btn:hover { background: var(--card-bg-solid); transform: scale(1.12); box-shadow: var(--neon); }
         }
         .delete-btn:hover { background: #fff; transform: scale(1.12); box-shadow: 0 4px 12px rgba(255, 200, 0, 0.5); }
     </style>
