@@ -157,24 +157,24 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS music_enabled BOOLEAN DEFAULT FALSE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS vibration_enabled BOOLEAN DEFAULT TRUE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS dark_theme BOOLEAN DEFAULT FALSE')
-      c.execute('''CREATE TABLE IF NOT EXISTS notifications (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        type VARCHAR(30) NOT NULL,
-        title VARCHAR(200) NOT NULL,
-        text TEXT,
-        link VARCHAR(200),
-        is_read BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TEXT NOT NULL
+    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    type VARCHAR(30) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    text TEXT,
+    link VARCHAR(200),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL
     )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS news (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(200) NOT NULL,
-        content TEXT NOT NULL,
-        category VARCHAR(30) NOT NULL DEFAULT 'update',
-        is_published BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at TEXT NOT NULL
-    )''')
+  c.execute('''CREATE TABLE IF NOT EXISTS news (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  content TEXT NOT NULL,
+  category VARCHAR(30) NOT NULL DEFAULT 'update',
+  is_published BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TEXT NOT NULL
+  )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
