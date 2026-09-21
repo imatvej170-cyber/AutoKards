@@ -157,6 +157,24 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS music_enabled BOOLEAN DEFAULT FALSE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS vibration_enabled BOOLEAN DEFAULT TRUE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS dark_theme BOOLEAN DEFAULT FALSE')
+      c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        type VARCHAR(30) NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        text TEXT,
+        link VARCHAR(200),
+        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TEXT NOT NULL
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS news (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        content TEXT NOT NULL,
+        category VARCHAR(30) NOT NULL DEFAULT 'update',
+        is_published BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TEXT NOT NULL
+    )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
@@ -342,6 +360,10 @@ def add_xp(user_id, amount):
     conn.commit(); c.close(); conn.close()
     if leveled and coins_reward > 0:
         log_transaction(user_id, 'levelup', coins_reward, None, f'Уровень {level}')
+              create_notification(user_id, 'level_up',
+                            f'🎉 Новый уровень: {level}!',
+                            f'Ты получил {coins_reward} монет за повышение.',
+                            '/')
     return leveled, level, coins_reward
 
 
@@ -529,7 +551,105 @@ def count_users():
     c.execute('SELECT COUNT(*) FROM users')
     r = c.fetchone(); c.close(); conn.close()
     return r[0] if r else 0
+  
+# ---------- УВЕДОМЛЕНИЯ ----------
+def create_notification(user_id, ntype, title, text='', link=''):
+    """Создаёт уведомление для игрока."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO notifications (user_id, type, title, text, link, created_at)
+                 VALUES (%s, %s, %s, %s, %s, %s)''',
+              (user_id, ntype, title, text, link, datetime.now().isoformat()))
+    conn.commit(); c.close(); conn.close()
 
+
+def get_user_notifications(user_id, limit=50):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, type, title, text, link, is_read, created_at
+                 FROM notifications WHERE user_id = %s
+                 ORDER BY id DESC LIMIT %s''', (user_id, limit))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'type': r[1], 'title': r[2], 'text': r[3] or '',
+             'link': r[4] or '', 'is_read': bool(r[5]), 'created_at': r[6]} for r in rows]
+
+
+def count_unread_notifications(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM notifications WHERE user_id = %s AND is_read = FALSE', (user_id,))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def mark_notification_read(notif_id, user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE notifications SET is_read = TRUE WHERE id = %s AND user_id = %s',
+              (notif_id, user_id))
+    conn.commit(); c.close(); conn.close()
+
+
+def mark_all_notifications_read(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE notifications SET is_read = TRUE WHERE user_id = %s', (user_id,))
+    conn.commit(); c.close(); conn.close()
+
+
+def notify_all_users(title, text, link=''):
+    """Рассылает уведомление всем игрокам, кроме админов."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT id FROM users WHERE username != ALL(%s)', (list(ADMIN_USERNAMES) or [''],))
+    ids = [r[0] for r in c.fetchall()]
+    now = datetime.now().isoformat()
+    for uid in ids:
+        c.execute('''INSERT INTO notifications (user_id, type, title, text, link, created_at)
+                     VALUES (%s, 'news', %s, %s, %s, %s)''', (uid, title, text, link, now))
+    conn.commit(); c.close(); conn.close()
+    return len(ids)
+
+
+# ---------- НОВОСТИ ----------
+def get_news(only_published=True, limit=100):
+    conn = get_db(); c = conn.cursor()
+    if only_published:
+        c.execute('''SELECT id, title, content, category, is_published, created_at
+                     FROM news WHERE is_published = TRUE ORDER BY id DESC LIMIT %s''', (limit,))
+    else:
+        c.execute('''SELECT id, title, content, category, is_published, created_at
+                     FROM news ORDER BY id DESC LIMIT %s''', (limit,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'title': r[1], 'content': r[2], 'category': r[3],
+             'is_published': bool(r[4]), 'created_at': r[5]} for r in rows]
+
+
+def get_news_item(news_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT id, title, content, category, is_published, created_at FROM news WHERE id = %s',
+              (news_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row: return None
+    return {'id': row[0], 'title': row[1], 'content': row[2], 'category': row[3],
+            'is_published': bool(row[4]), 'created_at': row[5]}
+
+
+def create_news(title, content, category, is_published=True):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO news (title, content, category, is_published, created_at)
+                 VALUES (%s, %s, %s, %s, %s) RETURNING id''',
+              (title, content, category, is_published, datetime.now().isoformat()))
+    nid = c.fetchone()[0]
+    conn.commit(); c.close(); conn.close()
+    return nid
+
+
+def update_news(news_id, title, content, category, is_published):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''UPDATE news SET title = %s, content = %s, category = %s, is_published = %s
+                 WHERE id = %s''', (title, content, category, is_published, news_id))
+    conn.commit(); c.close(); conn.close()
+
+
+def delete_news(news_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM news WHERE id = %s', (news_id,))
+    conn.commit(); c.close(); conn.close()
 
 # ---------- НАСТРОЙКИ ВНЕШНЕГО ВИДА ----------
 def get_user_appearance(user_id):
@@ -845,6 +965,9 @@ def send_friend_request(from_id, to_username):
     c.execute('''INSERT INTO friendships (from_user_id, to_user_id, status, created_at)
                  VALUES (%s, %s, 'pending', %s)''', (from_id, to_id, datetime.now().isoformat()))
     conn.commit(); c.close(); conn.close()
+      create_notification(to_id, 'friend_request', f'Заявка в друзья от {get_username_by_id(from_id)}',
+                        'Открой раздел Друзья, чтобы принять или отклонить.',
+                        '/friends')
     return True, f'Заявка отправлена игроку {to_username}'
 
 
@@ -870,6 +993,13 @@ def reject_friend_request(request_id, user_id):
     if row[1] != 'pending': c.close(); conn.close(); return False, 'Уже обработана'
     c.execute('DELETE FROM friendships WHERE id = %s', (request_id,))
     conn.commit(); c.close(); conn.close()
+      conn2 = get_db(); c2 = conn2.cursor()
+    c2.execute('SELECT from_user_id FROM friendships WHERE id = %s', (request_id,))
+    fr = c2.fetchone(); c2.close(); conn2.close()
+    if fr:
+        create_notification(fr[0], 'friend_accept',
+                            f'{get_username_by_id(user_id)} принял заявку в друзья',
+                            '', f'/profile/{get_username_by_id(user_id)}')
     return True, 'Заявка отклонена'
 
 
@@ -1697,6 +1827,9 @@ def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
     if from_coins > 0:
         log_transaction(from_user_id, 'trade_reserve', -from_coins, from_car_id,
                         f'Заморожено для обмена с {to_username}')
+          create_notification(to_user_id, 'trade_new',
+                        f'Новое предложение обмена от {get_username_by_id(from_user_id)}',
+                        message or 'Без сообщения', f'/trades/{trade_id}')
     return True, trade_id
 
 
@@ -1820,6 +1953,9 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
     add_xp(user_id, XP_REWARDS.get('trade', 40))
     progress_quest(t['from_user_id'], 'trade_1', 1)
     progress_quest(user_id, 'trade_1', 1)
+    create_notification(t['from_user_id'], 'trade_accept',
+                        f'{get_username_by_id(user_id)} принял твой обмен',
+                        '', '/trades')
     return True, 'Обмен выполнен!'
 
 
@@ -1854,6 +1990,9 @@ def cancel_trade(trade_id, user_id):
     conn.commit(); c.close(); conn.close()
     if t['from_coins'] > 0:
         log_transaction(t['from_user_id'], 'trade_refund', t['from_coins'], None, 'Возврат из отменённого обмена')
+    create_notification(t['from_user_id'], 'trade_reject',
+                        f'{get_username_by_id(user_id)} отклонил твой обмен',
+                        '', '/trades')
     return True, 'Обмен отменён'
 
 
@@ -2011,6 +2150,11 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
         if uid == winner_id:
             progress_quest(uid, 'win_races_3', 1)
 
+    create_notification(author_id, 'race_joined',
+                        f'{get_username_by_id(user_id)} принял твой вызов на гонку',
+                        'Открой раздел Гонки, чтобы посмотреть результат.',
+                        '/races')
+
     return True, 'Гонка завершена!', {
         'winner_id': winner_id, 'challenge_id': challenge_id, 'car_transferred': car_transferred}
 
@@ -2148,11 +2292,19 @@ ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 
 
 @app.context_processor
-def inject_appearance():
+def inject_globals():
+    result = {'appearance': {'sound': True, 'music': False, 'vibration': True, 'dark': False},
+              'unread_notifications_global': 0}
     if 'user_id' in session:
         try:
-            return {'appearance': get_user_appearance(session['user_id'])}
+            result['appearance'] = get_user_appearance(session['user_id'])
         except Exception:
+            pass
+        try:
+            result['unread_notifications_global'] = count_unread_notifications(session['user_id'])
+        except Exception:
+            pass
+    return result
             pass
     return {'appearance': {'sound': True, 'music': False, 'vibration': True, 'dark': False}}
 
@@ -2174,7 +2326,9 @@ def index():
     quests_unclaimed = 0
     collections_ready = 0
     collections_total = 0
+    unread_notifications = 0
     if 'user_id' in session:
+      unread_notifications = count_unread_notifications(session['user_id'])
         flash_new_achievements(session['user_id'])
         profile = get_user_profile(session['user_id'])
         if profile:
@@ -2212,6 +2366,7 @@ def index():
         except Exception:
             pass
     return render_template('index.html',
+                           unread_notifications=unread_notifications,
                            user=session.get('username'), profile=profile,
                            favorite_car=favorite_car, cars_count=cars_count,
                            bonus_ready=bonus_ready, bonus_left=bonus_left,
@@ -2280,6 +2435,123 @@ def logout():
     session.pop('user_id', None); session.pop('username', None)
     return redirect(url_for('index'))
 
+# ---------- УВЕДОМЛЕНИЯ ----------
+@app.route('/notifications')
+@login_required
+def notifications_page():
+    notifs = get_user_notifications(session['user_id'], limit=100)
+    return render_template('notifications.html', notifications=notifs,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/notifications/read/<int:notif_id>')
+@login_required
+def notification_read(notif_id):
+    mark_notification_read(notif_id, session['user_id'])
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT link FROM notifications WHERE id = %s AND user_id = %s',
+              (notif_id, session['user_id']))
+    row = c.fetchone(); c.close(); conn.close()
+    if row and row[0]:
+        return redirect(row[0])
+    return redirect(url_for('notifications_page'))
+
+
+@app.route('/notifications/read_all', methods=['POST'])
+@login_required
+def notifications_read_all():
+    mark_all_notifications_read(session['user_id'])
+    flash('Все уведомления прочитаны')
+    return redirect(url_for('notifications_page'))
+
+
+# ---------- НОВОСТИ ----------
+@app.route('/news')
+def news_page():
+    items = get_news(only_published=True, limit=50)
+    return render_template('news.html', news=items,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/news/<int:news_id>')
+def news_view(news_id):
+    item = get_news_item(news_id)
+    if not item or (not item['is_published'] and not is_admin(session.get('username'))):
+        flash('Новость не найдена')
+        return redirect(url_for('news_page'))
+    return render_template('news_view.html', item=item,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+# ---------- АДМИН: НОВОСТИ ----------
+@app.route('/admin/news')
+@admin_required
+def admin_news():
+    items = get_news(only_published=False, limit=200)
+    return render_template('admin_news.html', news=items,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/news/new', methods=['GET', 'POST'])
+@admin_required
+def admin_news_new():
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()[:200]
+        content = request.form.get('content', '').strip()
+        category = request.form.get('category', 'update')
+        is_published = bool(request.form.get('is_published'))
+        notify = bool(request.form.get('notify'))
+
+        if not title or not content:
+            flash('Заполни заголовок и текст'); return redirect(url_for('admin_news_new'))
+
+        nid = create_news(title, content, category, is_published)
+
+        if notify and is_published:
+            count = notify_all_users(title, '📰 Новая новость на сайте', f'/news/{nid}')
+            flash(f'Новость создана и разослана {count} игрокам')
+        else:
+            flash('Новость создана')
+
+        return redirect(url_for('admin_news'))
+
+    return render_template('admin_news_form.html', mode='new', item=None,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/news/<int:news_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_news_edit(news_id):
+    item = get_news_item(news_id)
+    if not item:
+        flash('Не найдено'); return redirect(url_for('admin_news'))
+
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()[:200]
+        content = request.form.get('content', '').strip()
+        category = request.form.get('category', 'update')
+        is_published = bool(request.form.get('is_published'))
+
+        if not title or not content:
+            flash('Заполни заголовок и текст'); return redirect(url_for('admin_news_edit', news_id=news_id))
+
+        update_news(news_id, title, content, category, is_published)
+        flash('Новость обновлена')
+        return redirect(url_for('admin_news'))
+
+    return render_template('admin_news_form.html', mode='edit', item=item,
+                           user=session.get('username'), is_admin=True)
+
+
+@app.route('/admin/news/<int:news_id>/delete', methods=['POST'])
+@admin_required
+def admin_news_delete(news_id):
+    delete_news(news_id)
+    flash('Новость удалена')
+    return redirect(url_for('admin_news'))
 
 # ---------- ВНЕШНИЙ ВИД ----------
 @app.route('/appearance', methods=['GET', 'POST'])
