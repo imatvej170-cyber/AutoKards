@@ -19,7 +19,6 @@ if not DATABASE_URL:
     raise RuntimeError('Не найдена переменная DATABASE_URL.')
 DATABASE_URL = DATABASE_URL.replace('?sslmode=require', '').replace('&sslmode=require', '')
 
-# Лимит 100 МБ на загрузку (для bulk upload)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
 # ============ ЭКОНОМИКА ============
@@ -93,10 +92,12 @@ ACHIEVEMENTS = [
     {'key': 'cars_25',     'icon': '🏛️', 'title': 'Автомузей',        'desc': 'Собрать 25 машин',               'reward': 1000},
     {'key': 'cars_50',     'icon': '👑', 'title': 'Мега-коллекция',   'desc': 'Собрать 50 машин',               'reward': 2500},
     {'key': 'cars_100',    'icon': '🏆', 'title': 'Автолегенда',      'desc': 'Собрать 100 машин',              'reward': 5000},
+    {'key': 'cars_200',    'icon': '🌟', 'title': 'Автоимперия',      'desc': 'Собрать 200 машин',              'reward': 15000},
     {'key': 'rich_1000',   'icon': '💰', 'title': 'Богач',            'desc': 'Накопить 1000 монет',            'reward': 100},
     {'key': 'rich_5000',   'icon': '💎', 'title': 'Миллионер',        'desc': 'Накопить 5000 монет',            'reward': 500},
     {'key': 'rich_10000',  'icon': '🏦', 'title': 'Банкир',           'desc': 'Накопить 10 000 монет',          'reward': 1000},
     {'key': 'rich_50000',  'icon': '💼', 'title': 'Магнат',           'desc': 'Накопить 50 000 монет',          'reward': 3000},
+    {'key': 'rich_100000', 'icon': '🏛️', 'title': 'Олигарх',          'desc': 'Накопить 100 000 монет',         'reward': 10000},
     {'key': 'first_sell',  'icon': '💵', 'title': 'Первый обмен',     'desc': 'Продать первую машину',          'reward': 100},
     {'key': 'bonus_3',     'icon': '🎁', 'title': 'Бонус-охотник',    'desc': 'Забрать бонус 3 раза',           'reward': 200},
     {'key': 'bonus_7',     'icon': '📅', 'title': 'Верный игрок',     'desc': 'Забрать бонус 7 раз',            'reward': 500},
@@ -106,10 +107,12 @@ ACHIEVEMENTS = [
     {'key': 'spin_100',    'icon': '🎲', 'title': 'Лудоман',          'desc': 'Покрутить колесо 100 раз',       'reward': 3000},
     {'key': 'lucky_car',   'icon': '🍀', 'title': 'Счастливчик',      'desc': 'Выиграть машину в колесе',       'reward': 300},
     {'key': 'five_star',   'icon': '⭐', 'title': 'Пятизвёздочный',   'desc': 'Владеть машиной с 5★ или выше',  'reward': 300},
-    {'key': 'eight_star',  'icon': '🌟', 'title': 'Легенда',          'desc': 'Владеть машиной с 8★',           'reward': 2000},
+    {'key': 'seven_star',  'icon': '💫', 'title': 'Семизвёздочный',   'desc': 'Владеть машиной с 7★',           'reward': 1500},
+    {'key': 'eight_star',  'icon': '🌟', 'title': 'Легенда',          'desc': 'Владеть машиной с 8★',           'reward': 5000},
     {'key': 'premium',     'icon': '💎', 'title': 'VIP',              'desc': 'Крутить премиум-колесо',         'reward': 200},
     {'key': 'big_spender', 'icon': '🤑', 'title': 'Транжира',         'desc': 'Купить 10 машин',               'reward': 500},
     {'key': 'big_spender_50','icon':'💸', 'title': 'Тратитель',       'desc': 'Купить 50 машин',               'reward': 3000},
+    {'key': 'big_spender_100','icon':'💳','title': 'Меценат',         'desc': 'Купить 100 машин',              'reward': 10000},
     {'key': 'first_friend','icon': '🤝', 'title': 'Не один',          'desc': 'Добавить первого друга',         'reward': 150},
     {'key': 'friends_5',   'icon': '👥', 'title': 'Компания',         'desc': 'Собрать 5 друзей',               'reward': 500},
     {'key': 'level_5',     'icon': '📈', 'title': 'Расту',            'desc': 'Достичь 5 уровня',              'reward': 200},
@@ -150,6 +153,10 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_streak INTEGER DEFAULT 0')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 1')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS sound_enabled BOOLEAN DEFAULT TRUE')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS music_enabled BOOLEAN DEFAULT FALSE')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS vibration_enabled BOOLEAN DEFAULT TRUE')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS dark_theme BOOLEAN DEFAULT FALSE')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
@@ -524,6 +531,29 @@ def count_users():
     return r[0] if r else 0
 
 
+# ---------- НАСТРОЙКИ ВНЕШНЕГО ВИДА ----------
+def get_user_appearance(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COALESCE(sound_enabled, TRUE),
+                        COALESCE(music_enabled, FALSE),
+                        COALESCE(vibration_enabled, TRUE),
+                        COALESCE(dark_theme, FALSE)
+                 FROM users WHERE id = %s''', (user_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row:
+        return {'sound': True, 'music': False, 'vibration': True, 'dark': False}
+    return {'sound': bool(row[0]), 'music': bool(row[1]),
+            'vibration': bool(row[2]), 'dark': bool(row[3])}
+
+
+def update_user_appearance(user_id, sound, music, vibration, dark):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''UPDATE users SET sound_enabled = %s, music_enabled = %s,
+                 vibration_enabled = %s, dark_theme = %s WHERE id = %s''',
+              (sound, music, vibration, dark, user_id))
+    conn.commit(); c.close(); conn.close()
+
+
 # ---------- BULK UPLOAD ----------
 MIME_BY_EXT = {
     'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
@@ -532,7 +562,6 @@ MIME_BY_EXT = {
 
 
 def parse_bulk_csv(csv_bytes):
-    """Парсит CSV. Возвращает (rows, errors, headers)."""
     errors = []
     rows = []
     try:
@@ -553,74 +582,57 @@ def parse_bulk_csv(csv_bytes):
     if missing:
         return [], [f'В CSV не хватает колонок: {", ".join(sorted(missing))}'], headers
 
-    for i, raw in enumerate(reader, start=2):  # 2 = первая строка после заголовка
-        # Приводим ключи к нижнему регистру
+    for i, raw in enumerate(reader, start=2):
         row = {(k or '').strip().lower(): (v or '').strip() for k, v in raw.items()}
-
         model = row.get('model', '')
         brand = row.get('brand', '')
         image = row.get('image_filename', '')
-
         if not model and not brand and not image:
-            continue  # пустая строка
-
+            continue
         row_errors = []
         if not model: row_errors.append('пустое поле model')
         if len(model) > 60: row_errors.append('model длиннее 60 символов')
         if not image: row_errors.append('пустое поле image_filename')
-
         try:
             rating = int(row.get('rating', ''))
             if rating < 1 or rating > 8: raise ValueError()
         except (ValueError, TypeError):
             row_errors.append(f'rating "{row.get("rating", "")}" не 1–8')
             rating = 1
-
         try:
             price = int(row.get('price', ''))
             if price < 0: raise ValueError()
         except (ValueError, TypeError):
             row_errors.append(f'price "{row.get("price", "")}" не число')
             price = 0
-
         hp = None
         if row.get('horsepower'):
             try: hp = int(row['horsepower'])
             except ValueError: row_errors.append('horsepower не число')
-
         accel = None
         if row.get('acceleration'):
             try: accel = float(row['acceleration'])
             except ValueError: row_errors.append('acceleration не число')
-
         top = None
         if row.get('top_speed'):
             try: top = int(row['top_speed'])
             except ValueError: row_errors.append('top_speed не число')
-
         is_excl = row.get('is_exclusive', '').lower() in ('1', 'true', 'yes', 'да')
-
         if row_errors:
-            errors.append({'row': i, 'model': model or '(без названия)',
-                           'errors': row_errors})
+            errors.append({'row': i, 'model': model or '(без названия)', 'errors': row_errors})
             continue
-
-        rows.append({
-            'row': i, 'model': model, 'brand': brand, 'rating': rating,
-            'price': price, 'horsepower': hp, 'acceleration': accel,
-            'top_speed': top, 'image_filename': image, 'is_exclusive': is_excl,
-        })
-
+        rows.append({'row': i, 'model': model, 'brand': brand, 'rating': rating,
+                     'price': price, 'horsepower': hp, 'acceleration': accel,
+                     'top_speed': top, 'image_filename': image, 'is_exclusive': is_excl})
     return rows, errors, headers
 
 
 def extract_zip_images(zip_bytes):
-    """Возвращает dict: имя_файла_без_пути_в_lowercase → (bytes, mime)."""
     images = {}
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             for name in zf.namelist():
-                if name.endswith('/'): continue  # папка
+                if name.endswith('/'): continue
                 base = os.path.basename(name).lower()
                 if not base: continue
                 ext = base.rsplit('.', 1)[-1] if '.' in base else ''
@@ -631,18 +643,15 @@ def extract_zip_images(zip_bytes):
                     continue
                 images[base] = (data, MIME_BY_EXT[ext])
     except zipfile.BadZipFile:
-        return None, 'Не удалось прочитать ZIP-архив. Возможно, он повреждён.'
+        return None, 'Не удалось прочитать ZIP-архив.'
     return images, None
 
 
 def bulk_insert_cars(rows, images, skip_existing=True):
-    """Вставляет машины в БД. Возвращает статистику."""
     added = 0
     skipped_existing = 0
     skipped_no_image = 0
     errors = []
-
-    # Узнаём существующие model
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT LOWER(model) FROM cars')
     existing = {r[0] for r in c.fetchall()}
@@ -653,16 +662,13 @@ def bulk_insert_cars(rows, images, skip_existing=True):
         if skip_existing and model_lower in existing:
             skipped_existing += 1
             continue
-
         img_name = row['image_filename'].lower()
         if img_name not in images:
             skipped_no_image += 1
             errors.append({'row': row['row'], 'model': row['model'],
-                           'errors': [f'картинка «{row["image_filename"]}» не найдена в ZIP']})
+                           'errors': [f'картинка «{row["image_filename"]}» не найдена']})
             continue
-
         data, mime = images[img_name]
-
         try:
             conn = get_db(); c = conn.cursor()
             c.execute('''INSERT INTO cars (model, brand, rating, price, horsepower,
@@ -679,14 +685,9 @@ def bulk_insert_cars(rows, images, skip_existing=True):
         except Exception as e:
             errors.append({'row': row['row'], 'model': row['model'],
                            'errors': [f'ошибка БД: {str(e)[:120]}']})
-
-    return {
-        'added': added,
-        'skipped_existing': skipped_existing,
-        'skipped_no_image': skipped_no_image,
-        'errors': errors[:50],  # первые 50 ошибок
-        'errors_count': len(errors),
-    }
+    return {'added': added, 'skipped_existing': skipped_existing,
+            'skipped_no_image': skipped_no_image, 'errors': errors[:50],
+            'errors_count': len(errors)}
 
 
 # ---------- АДМИН: ВЫДАЧА ----------
@@ -1056,14 +1057,12 @@ def get_collection_progress(user_id, cid):
             if car['id'] in owned_ids and car['id'] not in bonus_claimed_ids:
                 bonus_available.append(car)
 
-    return {
-        'total': total, 'owned': owned_count,
-        'progress_pct': int(owned_count * 100 / total) if total else 0,
-        'completed': completed, 'main_claimed': main_claimed,
-        'bonus_claimed_ids': bonus_claimed_ids,
-        'bonus_available': bonus_available,
-        'owned_ids': owned_ids,
-    }
+    return {'total': total, 'owned': owned_count,
+            'progress_pct': int(owned_count * 100 / total) if total else 0,
+            'completed': completed, 'main_claimed': main_claimed,
+            'bonus_claimed_ids': bonus_claimed_ids,
+            'bonus_available': bonus_available,
+            'owned_ids': owned_ids}
 
 
 def get_all_collections_for_user(user_id):
@@ -1195,14 +1194,12 @@ def get_collection_achievements_for_user(user_id):
     for col in get_collections():
         key = f'col_{col["id"]}'
         rarity_info = COLLECTION_RARITY.get(col['rarity'], COLLECTION_RARITY['common'])
-        result.append({
-            'key': key, 'icon': rarity_info['icon'],
-            'title': f'Коллекционер: {col["name"]}',
-            'desc': f'Собрать коллекцию «{col["name"]}»',
-            'reward': COLLECTION_ACH_REWARD,
-            'unlocked': key in unlocked, 'is_collection': True,
-            'collection_id': col['id'],
-        })
+        result.append({'key': key, 'icon': rarity_info['icon'],
+                       'title': f'Коллекционер: {col["name"]}',
+                       'desc': f'Собрать коллекцию «{col["name"]}»',
+                       'reward': COLLECTION_ACH_REWARD,
+                       'unlocked': key in unlocked, 'is_collection': True,
+                       'collection_id': col['id']})
     return result
 
 
@@ -1254,14 +1251,18 @@ def check_achievements(user_id):
         'first_car':   cars_count >= 1, 'cars_5': cars_count >= 5,
         'cars_10':     cars_count >= 10, 'cars_25': cars_count >= 25,
         'cars_50':     cars_count >= 50, 'cars_100': cars_count >= 100,
+        'cars_200':    cars_count >= 200,
         'rich_1000':   balance >= 1000, 'rich_5000': balance >= 5000,
         'rich_10000':  balance >= 10000, 'rich_50000': balance >= 50000,
+        'rich_100000': balance >= 100000,
         'first_sell':  sells >= 1, 'bonus_3': bonuses >= 3,
         'bonus_7':     bonuses >= 7, 'bonus_30': bonuses >= 30,
         'spin_5':      spins >= 5, 'spin_20': spins >= 20, 'spin_100': spins >= 100,
         'lucky_car':   wheel_cars >= 1, 'five_star': max_rating >= 5,
-        'eight_star':  max_rating >= 8, 'premium': paid_spins >= 1,
+        'seven_star':  max_rating >= 7, 'eight_star': max_rating >= 8,
+        'premium':     paid_spins >= 1,
         'big_spender': buys >= 10, 'big_spender_50': buys >= 50,
+        'big_spender_100': buys >= 100,
         'first_friend': friends >= 1, 'friends_5': friends >= 5,
         'level_5':     level >= 5, 'level_10': level >= 10,
         'level_20':    level >= 20, 'level_30': level >= 30, 'level_50': level >= 50,
@@ -1364,6 +1365,13 @@ def get_catalog():
     c.execute('SELECT id, model, rating, price FROM cars ORDER BY id DESC')
     rows = c.fetchall(); c.close(); conn.close()
     return rows
+
+
+def get_all_brands():
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT DISTINCT brand FROM cars WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
+    rows = c.fetchall(); c.close(); conn.close()
+    return [r[0] for r in rows]
 
 
 def get_catalog_by_rating(min_r, max_r):
@@ -2127,6 +2135,16 @@ def admin_required(f):
 ALLOWED_MIME = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
 
 
+@app.context_processor
+def inject_appearance():
+    if 'user_id' in session:
+        try:
+            return {'appearance': get_user_appearance(session['user_id'])}
+        except Exception:
+            pass
+    return {'appearance': {'sound': True, 'music': False, 'vibration': True, 'dark': False}}
+
+
 # ================= МАРШРУТЫ =================
 @app.route('/')
 def index():
@@ -2251,6 +2269,25 @@ def logout():
     return redirect(url_for('index'))
 
 
+# ---------- ВНЕШНИЙ ВИД ----------
+@app.route('/appearance', methods=['GET', 'POST'])
+@login_required
+def appearance_page():
+    user_id = session['user_id']
+    if request.method == 'POST':
+        sound = bool(request.form.get('sound'))
+        music = bool(request.form.get('music'))
+        vibration = bool(request.form.get('vibration'))
+        dark = bool(request.form.get('dark'))
+        update_user_appearance(user_id, sound, music, vibration, dark)
+        flash('Настройки сохранены!')
+        return redirect(url_for('appearance_page'))
+    app_settings = get_user_appearance(user_id)
+    return render_template('appearance.html', settings=app_settings,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
 # ---------- КОЛЛЕКЦИИ ----------
 @app.route('/collections')
 @login_required
@@ -2321,42 +2358,31 @@ def admin_bulk_upload_process():
 
         csv_bytes = csv_file.read()
         zip_bytes = zip_file.read()
-
         rows, errors, headers = parse_bulk_csv(csv_bytes)
         if not rows and errors:
             return render_template('admin_bulk_upload.html',
                                    user=session.get('username'), is_admin=True,
                                    fatal_errors=errors, headers=headers,
                                    csv_name=csv_file.filename, zip_name=zip_file.filename)
-
         images, zip_err = extract_zip_images(zip_bytes)
         if zip_err:
             flash(zip_err); return redirect(url_for('admin_bulk_upload'))
 
         if dry_run:
-            # Только превью: посчитать, сколько будет добавлено/пропущено
             conn = get_db(); c = conn.cursor()
             c.execute('SELECT LOWER(model) FROM cars')
             existing = {r[0] for r in c.fetchall()}
             c.close(); conn.close()
-
-            will_add = 0
-            will_skip_dup = 0
-            will_skip_img = []
+            will_add = 0; will_skip_dup = 0; will_skip_img = []
             for row in rows:
                 if skip_existing and row['model'].lower() in existing:
-                    will_skip_dup += 1
-                    continue
+                    will_skip_dup += 1; continue
                 if row['image_filename'].lower() not in images:
-                    will_skip_img.append(row)
-                    continue
+                    will_skip_img.append(row); continue
                 will_add += 1
-
             return render_template('admin_bulk_upload.html',
                                    user=session.get('username'), is_admin=True,
-                                   preview=True,
-                                   total_rows=len(rows),
-                                   will_add=will_add,
+                                   preview=True, total_rows=len(rows), will_add=will_add,
                                    will_skip_dup=will_skip_dup,
                                    will_skip_img=will_skip_img[:30],
                                    will_skip_img_count=len(will_skip_img),
@@ -2364,26 +2390,21 @@ def admin_bulk_upload_process():
                                    csv_name=csv_file.filename, zip_name=zip_file.filename,
                                    images_count=len(images))
 
-        # Реальная загрузка
         result = bulk_insert_cars(rows, images, skip_existing=skip_existing)
         return render_template('admin_bulk_upload.html',
                                user=session.get('username'), is_admin=True,
-                               result=result,
-                               parse_errors=errors,
+                               result=result, parse_errors=errors,
                                csv_name=csv_file.filename, zip_name=zip_file.filename)
     except Exception:
-        return '<h2 style="color:red;">Ошибка в bulk upload:</h2><pre style="font-size:13px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
+        return '<h2 style="color:red;">Ошибка:</h2><pre style="font-size:13px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
 @app.route('/admin/bulk_upload/template.csv')
 @admin_required
 def admin_bulk_template():
-    """Скачать шаблон CSV."""
     csv_content = (
         "model,brand,rating,price,horsepower,acceleration,top_speed,image_filename,is_exclusive\n"
         "BMW M3 E46,BMW,5,5000,343,5.1,250,bmw_m3_e46.png,0\n"
-        "Toyota Supra A80,Toyota,7,15000,330,4.6,285,supra_a80.png,0\n"
-        "Bugatti Chiron,Bugatti,8,50000,1500,2.4,420,chiron.png,0\n"
     )
     resp = make_response(csv_content)
     resp.headers['Content-Type'] = 'text/csv; charset=utf-8'
@@ -2711,35 +2732,21 @@ def shop():
                   'FROM cars WHERE COALESCE(is_exclusive, FALSE) = FALSE ORDER BY id DESC')
         rows = c.fetchall(); c.close(); conn.close()
 
-        # Все бренды для выпадающего списка
         all_brands = get_all_brands()
 
-        # Парсим цену
-        try:
-            pmin = int(price_min) if price_min else None
-        except ValueError:
-            pmin = None
-        try:
-            pmax = int(price_max) if price_max else None
-        except ValueError:
-            pmax = None
+        try: pmin = int(price_min) if price_min else None
+        except ValueError: pmin = None
+        try: pmax = int(price_max) if price_max else None
+        except ValueError: pmax = None
 
         cars = []
         for row in rows:
             cid, model, rating, price, hp, brand, excl = row
             price = price or 0
-
-            # Фильтр по тексту
-            if search_query and search_query.lower() not in model.lower():
-                continue
-            # Фильтр по бренду
-            if brand_filter and (brand or '').lower() != brand_filter.lower():
-                continue
-            # Фильтр по цене
-            if pmin is not None and price < pmin:
-                continue
-            if pmax is not None and price > pmax:
-                continue
+            if search_query and search_query.lower() not in model.lower(): continue
+            if brand_filter and (brand or '').lower() != brand_filter.lower(): continue
+            if pmin is not None and price < pmin: continue
+            if pmax is not None and price > pmax: continue
 
             final_price = price
             has_disc = False
@@ -2761,7 +2768,6 @@ def shop():
         elif sort == 'rating_asc': cars.sort(key=lambda x: x['rating'])
         elif sort == 'hp_desc': cars.sort(key=lambda x: x['horsepower'], reverse=True)
 
-              # Формируем строку для сохранения фильтров при переключении сортировки
         query_parts = []
         if search_query: query_parts.append(f'q={search_query}')
         if brand_filter: query_parts.append(f'brand={brand_filter}')
@@ -2785,13 +2791,125 @@ def shop():
         return '<h2 style="color:red;">Ошибка в /shop:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
-def get_all_brands():
-    """Возвращает список уникальных брендов из каталога."""
-    conn = get_db(); c = conn.cursor()
-    c.execute("SELECT DISTINCT brand FROM cars WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
-    rows = c.fetchall(); c.close(); conn.close()
-    return [r[0] for r in rows]
+@app.route('/shop/buy/<int:car_id>', methods=['POST'])
+@login_required
+def shop_buy(car_id):
+    _, msg = buy_car(session['user_id'], car_id)
+    flash(msg)
+    return redirect(url_for('shop'))
 
+
+@app.route('/shop/wishlist/<int:car_id>', methods=['POST'])
+@login_required
+def shop_wishlist_toggle(car_id):
+    added = toggle_wishlist(session['user_id'], car_id)
+    flash('❤ Добавлено в желаемое' if added else 'Убрано из желаемого')
+    return redirect(request.referrer or url_for('shop'))
+
+
+@app.route('/shop/wishlist')
+@login_required
+def wishlist_page():
+    items = get_wishlist_cars(session['user_id'])
+    balance = get_balance(session['user_id'])
+    ensure_discount()
+    discount = get_active_discount()
+    user_level = get_user_level_info(session['user_id'])['level']
+    for item in items:
+        final_price = item['price']
+        item['has_discount'] = False
+        if discount and discount['car_id'] == item['id']:
+            final_price = int(item['price'] * (100 - discount['discount_percent']) / 100)
+            item['has_discount'] = True
+        item['final_price'] = final_price
+        item['owned'] = has_car(session['user_id'], item['id'])
+        item['req_level'] = get_level_required_for_stars(item['rating'])
+        item['locked'] = user_level < item['req_level']
+    return render_template('wishlist.html', items=items, balance=balance,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))
+
+
+@app.route('/shop/add', methods=['GET', 'POST'])
+@admin_required
+def add_car_page():
+    if request.method == 'POST':
+        model = request.form.get('model', '').strip()
+        brand = request.form.get('brand', '').strip()[:40]
+        rating = request.form.get('rating', '3')
+        price = request.form.get('price', '500')
+        hp = request.form.get('horsepower', '').strip()
+        accel = request.form.get('acceleration', '').strip()
+        top = request.form.get('top_speed', '').strip()
+        is_exclusive = bool(request.form.get('is_exclusive'))
+        file = request.files.get('image')
+        if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 8: raise ValueError
+        except ValueError:
+            flash('Оценка 1–8'); return redirect(url_for('add_car_page'))
+        try:
+            price = int(price)
+            if price < 0: raise ValueError
+        except ValueError:
+            flash('Цена — число >= 0'); return redirect(url_for('add_car_page'))
+        hp = int(hp) if hp.isdigit() else None
+        top = int(top) if top.isdigit() else None
+        try: accel = float(accel) if accel else None
+        except ValueError: accel = None
+        if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
+        if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
+        add_car(model, brand, rating, price, hp, accel, top, is_exclusive, file.read(), file.mimetype)
+        flash(f'«{model}» добавлена!')
+        return redirect(url_for('shop'))
+    return render_template('add_car.html', user=session.get('username'), is_admin=True)
+
+
+@app.route('/shop/edit/<int:car_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_car_page(car_id):
+    car = get_car_full(car_id)
+    if not car: flash('Нет машины'); return redirect(url_for('shop'))
+    if request.method == 'POST':
+        model = request.form.get('model', '').strip()
+        brand = request.form.get('brand', '').strip()[:40]
+        rating = request.form.get('rating', '3')
+        price = request.form.get('price', '500')
+        hp = request.form.get('horsepower', '').strip()
+        accel = request.form.get('acceleration', '').strip()
+        top = request.form.get('top_speed', '').strip()
+        is_exclusive = bool(request.form.get('is_exclusive'))
+        if not model: flash('Впиши название'); return redirect(url_for('edit_car_page', car_id=car_id))
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 8: raise ValueError
+        except ValueError:
+            flash('Оценка 1–8'); return redirect(url_for('edit_car_page', car_id=car_id))
+        try:
+            price = int(price)
+            if price < 0: raise ValueError
+        except ValueError:
+            flash('Цена — число >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
+        hp = int(hp) if hp.isdigit() else None
+        top = int(top) if top.isdigit() else None
+        try: accel = float(accel) if accel else None
+        except ValueError: accel = None
+        update_car(car_id, model, brand, rating, price, hp, accel, top, is_exclusive)
+        flash('Машина обновлена')
+        return redirect(url_for('shop'))
+    return render_template('edit_car.html', car=car, user=session.get('username'), is_admin=True)
+
+
+@app.route('/shop/delete/<int:car_id>', methods=['POST'])
+@admin_required
+def delete_from_catalog(car_id):
+    delete_car_from_catalog(car_id)
+    flash('Удалено')
+    return redirect(url_for('shop'))
+
+
+# ---------- КАРТОЧКА МАШИНЫ ----------
 @app.route('/car/<int:car_id>')
 def car_detail(car_id):
     car = get_car_full(car_id)
@@ -2807,6 +2925,7 @@ def car_detail(car_id):
                            req_level=req_level, locked=locked, user_level=user_level,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
+
 
 # ---------- СРАВНЕНИЕ ----------
 @app.route('/compare')
@@ -2831,20 +2950,16 @@ def wheel():
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
     paid_price = get_int_setting('paid_wheel_price', 1000)
-    paid_info = {
-        'car_chance': get_int_setting('paid_wheel_car_chance', 15),
-        'coin_min': get_int_setting('paid_wheel_coin_min', 100),
-        'coin_max': get_int_setting('paid_wheel_coin_max', 600),
-        'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
-        'car_max_rating': get_int_setting('paid_wheel_car_max_rating', 8),
-    }
-    free_info = {
-        'car_chance': get_int_setting('wheel_car_chance', 5),
-        'coin_min': get_int_setting('wheel_coin_min', 30),
-        'coin_max': get_int_setting('wheel_coin_max', 150),
-        'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
-        'car_max_rating': get_int_setting('wheel_car_max_rating', 4),
-    }
+    paid_info = {'car_chance': get_int_setting('paid_wheel_car_chance', 15),
+                 'coin_min': get_int_setting('paid_wheel_coin_min', 100),
+                 'coin_max': get_int_setting('paid_wheel_coin_max', 600),
+                 'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
+                 'car_max_rating': get_int_setting('paid_wheel_car_max_rating', 8)}
+    free_info = {'car_chance': get_int_setting('wheel_car_chance', 5),
+                 'coin_min': get_int_setting('wheel_coin_min', 30),
+                 'coin_max': get_int_setting('wheel_coin_max', 150),
+                 'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
+                 'car_max_rating': get_int_setting('wheel_car_max_rating', 4)}
     return render_template('wheel.html',
                            ready=ready, time_left=format_time_left(secs) if not ready else '',
                            result=result, balance=get_balance(session['user_id']),
