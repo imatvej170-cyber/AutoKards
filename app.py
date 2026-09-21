@@ -2761,6 +2761,14 @@ def shop():
         elif sort == 'rating_asc': cars.sort(key=lambda x: x['rating'])
         elif sort == 'hp_desc': cars.sort(key=lambda x: x['horsepower'], reverse=True)
 
+              # Формируем строку для сохранения фильтров при переключении сортировки
+        query_parts = []
+        if search_query: query_parts.append(f'q={search_query}')
+        if brand_filter: query_parts.append(f'brand={brand_filter}')
+        if price_min: query_parts.append(f'price_min={price_min}')
+        if price_max: query_parts.append(f'price_max={price_max}')
+        query_keep = ('&'.join(query_parts) + '&') if query_parts else ''
+
         return render_template('shop.html', cars=cars, balance=balance, discount=discount,
                                settings=settings, sort=sort, user_level=user_level,
                                wishlist_count=len(wish_ids),
@@ -2770,6 +2778,7 @@ def shop():
                                price_min=price_min,
                                price_max=price_max,
                                total_count=len(rows),
+                               query_keep=query_keep,
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
