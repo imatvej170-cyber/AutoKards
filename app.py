@@ -2044,42 +2044,54 @@ def count_active_challenges():
 
 # ---------- РЕЙТИНГ ----------
 def get_leaderboard(sort_by='cars', limit=50):
+    admin_list = list(ADMIN_USERNAMES) or ['']
     conn = get_db(); c = conn.cursor()
     if sort_by == 'balance':
         c.execute('''SELECT u.id, u.username, COALESCE(u.balance, 0) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+                     FROM users u
+                     WHERE u.username != ALL(%s)
+                     ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'races':
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM transactions t WHERE t.user_id = u.id AND t.type = 'race_win') as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+                     FROM users u
+                     WHERE u.username != ALL(%s)
+                     ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'achievements':
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+                     FROM users u
+                     WHERE u.username != ALL(%s)
+                     ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'level':
         c.execute('''SELECT u.id, u.username, COALESCE(u.level, 1) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u ORDER BY val DESC, u.xp DESC, u.id ASC LIMIT %s''', (limit,))
+                     FROM users u
+                     WHERE u.username != ALL(%s)
+                     ORDER BY val DESC, u.xp DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     elif sort_by == 'collections':
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_collections uc WHERE uc.user_id = u.id AND uc.main_claimed = TRUE) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+                     FROM users u
+                     WHERE u.username != ALL(%s)
+                     ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     else:
         c.execute('''SELECT u.id, u.username,
                      (SELECT COUNT(*) FROM user_cars uc WHERE uc.user_id = u.id) as val,
                      (u.avatar_data IS NOT NULL), COALESCE(u.level, 1)
-                     FROM users u ORDER BY val DESC, u.id ASC LIMIT %s''', (limit,))
+                     FROM users u
+                     WHERE u.username != ALL(%s)
+                     ORDER BY val DESC, u.id ASC LIMIT %s''', (admin_list, limit))
     rows = c.fetchall(); c.close(); conn.close()
     result = []
     for i, row in enumerate(rows, start=1):
         result.append({'rank': i, 'id': row[0], 'username': row[1],
                        'value': row[2] or 0, 'has_avatar': row[3], 'level': row[4]})
     return result
-
 
 # ---------- ПУБЛИЧНЫЙ ГАРАЖ ----------
 def get_public_ids(user_id):
