@@ -15,6 +15,7 @@
             </div>
             <div class="profile-name">{{ user }}</div>
 
+            {# ===== ПОЛОСКА УРОВНЯ ===== #}
             <div class="level-widget">
                 <div class="level-row">
                     <span class="level-badge">Ур. {{ level_info.level }}</span>
@@ -67,20 +68,20 @@
 
             <div class="profile-actions">
                 <a href="/settings" class="btn btn-primary">⚙ Профиль</a>
-                <a href="/appearance" class="btn btn-secondary">🎨 Вид и звук</a>
                 <a href="/profile/{{ user }}" class="btn btn-secondary">👤 Мой профиль</a>
                 <a href="/garage" class="btn btn-primary">🏁 Мой гараж</a>
                 <a href="/shop" class="btn btn-primary">🛒 Магазин</a>
                 <a href="/races" class="btn btn-primary">🏎️ Гонки{% if active_races_count %} ({{ active_races_count }}){% endif %}</a>
                 <a href="/rating" class="btn btn-primary">🏆 Рейтинг</a>
+                <a href="/collections" class="btn btn-primary">📦 Коллекции{% if collections_ready %} ({{ collections_ready }}){% endif %}</a>
                 <a href="/trades" class="btn btn-primary">🔄 Обмены{% if incoming_trades_count %} ({{ incoming_trades_count }}){% endif %}</a>
+                <a href="/quests" class="btn btn-primary">📋 Задания{% if quests_unclaimed %} ({{ quests_unclaimed }}){% endif %}</a>
+                <a href="/friends" class="btn btn-secondary">👥 Друзья{% if incoming_friend_requests %} ({{ incoming_friend_requests }}){% endif %}</a>
                 <a href="/shop/wishlist" class="btn btn-secondary">❤ Желаемое{% if wishlist_count %} ({{ wishlist_count }}){% endif %}</a>
                 <a href="/compare" class="btn btn-secondary">⚖️ Сравнить</a>
-                <a href="/collections" class="btn btn-primary">📦 Коллекции{% if collections_ready %} ({{ collections_ready }}){% endif %}</a>
                 <a href="/achievements" class="btn btn-secondary">🏆 Достижения</a>
-                <a href="/quests" class="btn btn-primary">📋 Задания{% if quests_unclaimed %} ({{ quests_unclaimed }}){% endif %}</a>
                 <a href="/journal" class="btn btn-secondary">📜 Журнал</a>
-                <a href="/friends" class="btn btn-primary">👥 Друзья{% if incoming_friend_requests %} ({{ incoming_friend_requests }}){% endif %}</a>
+                <a href="/appearance" class="btn btn-secondary">🎨 Вид и звук</a>
                 {% if is_admin %}
                     <a href="/admin/settings" class="btn btn-secondary">⚙ Админ</a>
                 {% endif %}
@@ -105,20 +106,31 @@
         .profile-avatar-wrap { margin-bottom: 18px; }
         .profile-avatar {
             width: 130px; height: 130px; border-radius: 50%; object-fit: cover;
-            border: 4px solid #ff8c1a; box-shadow: 0 8px 25px rgba(255, 140, 26, 0.35); background: #fff;
+            border: 4px solid var(--accent);
+            box-shadow: 0 8px 25px var(--shadow-strong);
+            background: var(--card-bg-solid);
         }
+        [data-theme="dark"] .profile-avatar { box-shadow: var(--neon-strong); }
         .profile-avatar-placeholder {
             display: flex; align-items: center; justify-content: center;
             font-size: 60px; font-weight: 900; color: #fff;
-            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            background: linear-gradient(135deg, var(--accent) 0%, #ffb347 100%);
         }
-        .profile-name { font-size: 34px; font-weight: 900; color: #ff8c1a; margin-bottom: 10px; }
+        .profile-name {
+            font-size: 34px; font-weight: 900; color: var(--accent);
+            text-shadow: var(--neon);
+            margin-bottom: 10px;
+        }
+
         .profile-stats { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
         .stat-pill {
-            font-size: 15px; font-weight: 700; color: #6b3d00;
-            background: #fff; padding: 8px 20px; border-radius: 30px;
-            border: 2px solid #ffd9a6; box-shadow: 0 3px 10px rgba(255, 140, 26, 0.1);
+            font-size: 15px; font-weight: 700; color: var(--text-secondary);
+            background: var(--card-bg); padding: 8px 20px; border-radius: 30px;
+            border: 2px solid var(--border);
+            box-shadow: 0 3px 10px var(--shadow);
         }
+        [data-theme="dark"] .stat-pill { box-shadow: 0 3px 10px rgba(0,0,0,0.4), 0 0 12px rgba(255,140,26,0.15); }
+
         .bonus-row {
             display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
             margin-bottom: 18px;
@@ -127,22 +139,30 @@
         .bonus-btn { padding: 14px 26px; font-size: 16px; animation: pulse 2s infinite; }
         .wheel-link { padding: 14px 26px; font-size: 16px; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+
         .bonus-wait {
-            font-size: 14px; color: #6b3d00; background: #fff5e6;
-            padding: 12px 20px; border-radius: 30px;
-            border: 1px dashed #ffd9a6;
+            font-size: 14px; color: var(--text-secondary);
+            background: var(--card-bg); padding: 12px 20px; border-radius: 30px;
+            border: 1px dashed var(--border);
         }
-        .bonus-wait strong { color: #ff8c1a; }
+        [data-theme="dark"] .bonus-wait { box-shadow: 0 0 15px rgba(255,140,26,0.15); }
+        .bonus-wait strong { color: var(--accent); }
+
         .profile-bio {
-            max-width: 550px; font-size: 17px; line-height: 1.6; color: #6b3d00;
-            background: rgba(255, 255, 255, 0.65); padding: 16px 24px;
-            border-radius: 16px; border: 1px solid #ffd9a6; margin-bottom: 22px; text-align: center;
+            max-width: 550px; font-size: 17px; line-height: 1.6;
+            color: var(--text-main);
+            background: var(--card-bg); padding: 16px 24px;
+            border-radius: 16px; border: 1px solid var(--border);
+            margin-bottom: 22px; text-align: center;
         }
-        .profile-bio-empty { color: #b08855; font-style: italic; }
+        [data-theme="dark"] .profile-bio { box-shadow: 0 0 15px rgba(255,140,26,0.1); }
+        .profile-bio-empty { color: var(--text-hint); font-style: italic; }
+
         .profile-fav { margin-bottom: 25px; text-align: center; }
         .profile-fav-label {
-            font-size: 14px; font-weight: 700; color: #ff8c1a;
+            font-size: 14px; font-weight: 700; color: var(--accent);
             letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase;
+            text-shadow: var(--neon);
         }
         .profile-fav-card {
             display: inline-flex; align-items: center; gap: 14px;
@@ -151,41 +171,46 @@
             box-shadow: 0 4px 15px var(--shadow);
         }
         [data-theme="dark"] .profile-fav-card { box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 20px rgba(255,140,26,0.2); }
-        }
         .profile-fav-card img { width: 90px; height: 60px; object-fit: contain; }
-        .profile-fav-name { font-size: 18px; font-weight: 700; color: #4a2c00; }
+        .profile-fav-name { font-size: 18px; font-weight: 700; color: var(--text-main); }
+
         .profile-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
         .profile-actions .btn { padding: 11px 20px; font-size: 14px; }
-        .level-widget {
-    width: 100%; max-width: 500px; margin-bottom: 16px;
-}
-.level-row {
-    display: flex; align-items: center; gap: 10px;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 10px 16px; border-radius: 30px;
-    border: 2px solid #ffd9a6;
-    box-shadow: 0 4px 15px rgba(255, 140, 26, 0.15);
-}
-.level-badge {
-    font-size: 14px; font-weight: 900; color: #fff;
-    background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
-    padding: 6px 14px; border-radius: 20px;
-    white-space: nowrap;
-}
-.level-bar {
-    flex: 1; height: 12px; background: #fff5e6;
-    border-radius: 10px; overflow: hidden;
-    border: 1px solid #ffd9a6;
-}
-.level-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #ff8c1a, #ffb347);
-    transition: width 0.5s;
-}
-.level-xp {
-    font-size: 12px; font-weight: 700; color: #6b3d00;
-    white-space: nowrap;
-}
+
+        /* ===== ПОЛОСКА УРОВНЯ ===== */
+        .level-widget { width: 100%; max-width: 500px; margin-bottom: 16px; }
+        .level-row {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--card-bg);
+            padding: 10px 16px; border-radius: 30px;
+            border: 2px solid var(--border);
+            box-shadow: 0 4px 15px var(--shadow);
+        }
+        [data-theme="dark"] .level-row { box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 15px rgba(255,140,26,0.15); }
+        .level-badge {
+            font-size: 14px; font-weight: 900; color: #fff;
+            background: linear-gradient(135deg, var(--accent) 0%, #ffb347 100%);
+            padding: 6px 14px; border-radius: 20px;
+            white-space: nowrap;
+        }
+        [data-theme="dark"] .level-badge { box-shadow: var(--neon); }
+        .level-bar {
+            flex: 1; height: 12px; background: var(--bg-gradient-1);
+            border-radius: 10px; overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .level-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #ffb347);
+            transition: width 0.5s;
+        }
+        [data-theme="dark"] .level-fill {
+            box-shadow: 0 0 10px rgba(255, 140, 26, 0.8), 0 0 20px rgba(255, 140, 26, 0.5);
+        }
+        .level-xp {
+            font-size: 12px; font-weight: 700; color: var(--text-secondary);
+            white-space: nowrap;
+        }
     </style>
 
 {% endblock %}
