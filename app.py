@@ -2792,6 +2792,22 @@ def get_all_brands():
     rows = c.fetchall(); c.close(); conn.close()
     return [r[0] for r in rows]
 
+@app.route('/car/<int:car_id>')
+def car_detail(car_id):
+    car = get_car_full(car_id)
+    if not car:
+        flash('Машина не найдена'); return redirect(url_for('index'))
+    owned = False
+    if 'user_id' in session:
+        owned = has_car(session['user_id'], car_id)
+    req_level = get_level_required_for_stars(car['rating'])
+    user_level = get_user_level_info(session['user_id'])['level'] if 'user_id' in session else 1
+    locked = user_level < req_level
+    return render_template('car_detail.html', car=car, owned=owned,
+                           req_level=req_level, locked=locked, user_level=user_level,
+                           user=session.get('username'),
+                           is_admin=is_admin(session.get('username')))э
+
 # ---------- СРАВНЕНИЕ ----------
 @app.route('/compare')
 @login_required
