@@ -13,40 +13,44 @@
         {% if is_admin %}<a href="/shop/add" class="btn btn-primary btn-small">+ Добавить</a>{% endif %}
     </div>
 
-    <div class="user-level-line">Твой уровень: <strong>{{ user_level }}</strong> · Всего машин в каталоге: <strong>{{ total_count }}</strong></div>
+    <div class="user-level-line">Твой уровень: <strong>{{ user_level }}</strong> · Всего в каталоге: <strong>{{ total_count }}</strong></div>
 
-    {# ===== ФОРМА ФИЛЬТРОВ ===== #}
+    {# ===== ФИЛЬТРЫ ===== #}
     <div class="filter-block">
         <form method="GET" action="/shop" class="filter-form">
             <div class="filter-row">
                 <div class="filter-group search-group">
-                    <label class="filter-label">🔍 Поиск по названию</label>
+                    <label class="filter-label">🔍 Поиск</label>
                     <input type="text" name="q" value="{{ search_query }}" placeholder="Например: BMW M5" class="form-input">
                 </div>
                 <div class="filter-group">
                     <label class="filter-label">🏷️ Бренд</label>
                     <select name="brand" class="form-select">
-                        <option value="">— Все бренды —</option>
+                        <option value="">— Все —</option>
                         {% for b in all_brands %}
                             <option value="{{ b }}" {% if brand_filter == b %}selected{% endif %}>{{ b }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="filter-group price-group">
-                    <label class="filter-label">💰 Цена от</label>
+                    <label class="filter-label">💰 От</label>
                     <input type="number" name="price_min" value="{{ price_min }}" min="0" placeholder="0" class="form-input">
                 </div>
                 <div class="filter-group price-group">
-                    <label class="filter-label">💰 Цена до</label>
-                    <input type="number" name="price_max" value="{{ price_max }}" min="0" placeholder="1000000" class="form-input">
+                    <label class="filter-label">💰 До</label>
+                    <input type="number" name="price_max" value="{{ price_max }}" min="0" placeholder="∞" class="form-input">
                 </div>
                 <div class="filter-actions">
                     <button type="submit" class="btn btn-primary btn-small">Применить</button>
                     {% if search_query or brand_filter or price_min or price_max %}
-                        <a href="/shop{% if sort and sort != 'new' %}?sort={{ sort }}{% endif %}" class="btn btn-secondary btn-small">Сбросить</a>
+                        <a href="/shop" class="btn btn-secondary btn-small">Сбросить</a>
                     {% endif %}
                 </div>
             </div>
+            {# Сохраняем сортировку при применении фильтров #}
+            {% if sort and sort != 'new' %}
+                <input type="hidden" name="sort" value="{{ sort }}">
+            {% endif %}
         </form>
 
         <div class="sort-bar">
@@ -62,8 +66,8 @@
 
     {% if discount %}
         <div class="discount-banner">
-            🔥 Скидка дня: машины с рейтингом от {{ settings.discount_min_rating }} до {{ settings.discount_max_rating }}★
-            получают <strong>−{{ discount.discount_percent }}%</strong>!
+            🔥 Скидка дня: {{ settings.discount_min_rating }}–{{ settings.discount_max_rating }}★
+            машины получают <strong>−{{ discount.discount_percent }}%</strong>!
         </div>
     {% endif %}
 
@@ -72,7 +76,13 @@
     {% endwith %}
 
     {% if cars %}
-        <div class="cars-count">Найдено: <strong>{{ cars|length }}</strong> машин</div>
+        <div class="cars-count">
+            Найдено: <strong>{{ total_filtered }}</strong>
+            {% if total_filtered > per_page %}
+                · страница <strong>{{ current_page }}</strong> из <strong>{{ total_pages }}</strong>
+            {% endif %}
+        </div>
+
         <div class="cars-grid">
             {% for car in cars %}
                 <div class="car-card {% if car.has_discount %}discounted{% endif %}">
@@ -80,7 +90,7 @@
 
                     <form method="POST" action="/shop/wishlist/{{ car.id }}" class="wish-form">
                         <button type="submit" class="wish-btn {% if car.wished %}active{% endif %}"
-                                title="{% if car.wished %}Убрать из желаемого{% else %}Добавить в желаемое{% endif %}">
+                                title="{% if car.wished %}Убрать{% else %}В желаемое{% endif %}">
                             {% if car.wished %}❤{% else %}♡{% endif %}
                         </button>
                     </form>
@@ -102,9 +112,7 @@
                     </a>
                     <div class="car-info">
                         <div class="car-model"><a href="/car/{{ car.id }}">{{ car.model }}</a></div>
-                        {% if car.brand %}
-                            <div class="car-brand">{{ car.brand }}</div>
-                        {% endif %}
+                        {% if car.brand %}<div class="car-brand">{{ car.brand }}</div>{% endif %}
                         <div class="car-stars">
                             {% for i in range(1, 9) %}
                                 <span class="star {% if i <= car.rating %}filled{% endif %}">★</span>
@@ -136,125 +144,145 @@
                 </div>
             {% endfor %}
         </div>
+
+        {# ===== ПАГИНАЦИЯ ===== #}
+        {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if current_page > 1 %}
+                    <a href="/shop?{{ query_keep }}page={{ current_page - 1 }}" class="page-btn">← Назад</a>
+                {% else %}
+                    <span class="page-btn disabled">← Назад</span>
+                {% endif %}
+
+                {% if page_numbers[0] > 1 %}
+                    <a href="/shop?{{ query_keep }}page=1" class="page-num">1</a>
+                    {% if page_numbers[0] > 2 %}<span class="page-dots">…</span>{% endif %}
+                {% endif %}
+
+                {% for n in page_numbers %}
+                    {% if n == current_page %}
+                        <span class="page-num active">{{ n }}</span>
+                    {% else %}
+                        <a href="/shop?{{ query_keep }}page={{ n }}" class="page-num">{{ n }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_numbers[-1] < total_pages %}
+                    {% if page_numbers[-1] < total_pages - 1 %}<span class="page-dots">…</span>{% endif %}
+                    <a href="/shop?{{ query_keep }}page={{ total_pages }}" class="page-num">{{ total_pages }}</a>
+                {% endif %}
+
+                {% if current_page < total_pages %}
+                    <a href="/shop?{{ query_keep }}page={{ current_page + 1 }}" class="page-btn">Вперёд →</a>
+                {% else %}
+                    <span class="page-btn disabled">Вперёд →</span>
+                {% endif %}
+            </div>
+
+            <form method="GET" action="/shop" class="goto-page-form">
+                {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+                {% if brand_filter %}<input type="hidden" name="brand" value="{{ brand_filter }}">{% endif %}
+                {% if price_min %}<input type="hidden" name="price_min" value="{{ price_min }}">{% endif %}
+                {% if price_max %}<input type="hidden" name="price_max" value="{{ price_max }}">{% endif %}
+                {% if sort and sort != 'new' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+                <label>Перейти на страницу:</label>
+                <input type="number" name="page" min="1" max="{{ total_pages }}" value="{{ current_page }}">
+                <button type="submit" class="btn btn-secondary btn-tiny">ОК</button>
+            </form>
+        {% endif %}
     {% else %}
         <p class="description">
-            По твоим фильтрам ничего не найдено.<br>
+            По фильтрам ничего не найдено.<br>
             <a href="/shop" style="color:#ff8c1a;font-weight:700;">Сбросить фильтры</a>
         </p>
     {% endif %}
 
     <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
 
-    {# ===== КНОПКА НАВЕРХ ===== #}
-    <a href="#" class="scroll-top" id="scrollTop" title="Наверх">↑</a>
-
-    <script>
-        // Показываем кнопку, когда пролистали вниз
-        const scrollBtn = document.getElementById('scrollTop');
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 400) {
-                scrollBtn.classList.add('visible');
-            } else {
-                scrollBtn.classList.remove('visible');
-            }
-        });
-        scrollBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-    </script>
-
     <style>
         .garage-header {
             display: flex; align-items: center; gap: 14px;
             margin-bottom: 18px; flex-wrap: wrap; justify-content: center;
         }
-        .garage-header h2 { font-size: 36px; color: #ff8c1a; }
+        .garage-header h2 { font-size: 36px; color: var(--accent); }
         .balance-pill {
-            font-size: 17px; font-weight: 700; color: #6b3d00;
-            background: #fff; padding: 10px 22px; border-radius: 30px;
-            border: 2px solid #ffd9a6;
+            font-size: 17px; font-weight: 700; color: var(--text-secondary);
+            background: var(--card-bg-solid); padding: 10px 22px; border-radius: 30px;
+            border: 2px solid var(--border);
         }
         .btn-small { padding: 10px 18px; font-size: 14px; }
         .btn-tiny { padding: 8px 22px; font-size: 14px; }
         .btn-tiny:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .user-level-line {
-            text-align: center; font-size: 14px; color: #6b3d00;
-            background: #fff5e6; padding: 10px 22px; border-radius: 30px;
-            border: 1px solid #ffd9a6; margin-bottom: 18px;
+            text-align: center; font-size: 14px; color: var(--text-secondary);
+            background: var(--card-bg); padding: 10px 22px; border-radius: 30px;
+            border: 1px solid var(--border); margin-bottom: 18px;
             max-width: 700px;
         }
-        .user-level-line strong { color: #ff8c1a; font-size: 16px; }
+        .user-level-line strong { color: var(--accent); font-size: 16px; }
 
-        /* ===== ФИЛЬТРЫ ===== */
         .filter-block {
             width: 100%; max-width: 1100px;
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #ffd9a6;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
             border-radius: 20px;
             padding: 18px 22px; margin-bottom: 20px;
-            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.12);
+            box-shadow: 0 6px 20px var(--shadow);
         }
         .filter-form { width: 100%; }
-        .filter-row {
-            display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
-        }
+        .filter-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
         .filter-group { display: flex; flex-direction: column; gap: 4px; }
         .search-group { flex: 2; min-width: 200px; }
         .price-group { flex: 0 0 130px; }
         .filter-group:not(.search-group):not(.price-group) { flex: 1; min-width: 180px; }
         .filter-label {
-            font-size: 12px; font-weight: 700; color: #6b3d00;
+            font-size: 12px; font-weight: 700; color: var(--text-secondary);
             letter-spacing: 0.5px;
         }
         .form-input, .form-select {
             padding: 10px 14px; font-size: 15px;
-            border: 2px solid #ffd9a6; border-radius: 12px;
-            font-family: inherit; background: #fff; color: #4a2c00;
+            border: 2px solid var(--border); border-radius: 12px;
+            font-family: inherit; background: var(--card-bg-solid); color: var(--text-main);
             width: 100%; box-sizing: border-box;
         }
-        .form-input:focus, .form-select:focus { outline: none; border-color: #ff8c1a; }
-        .filter-actions {
-            display: flex; gap: 8px; align-items: center;
-            padding-bottom: 0;
-        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
+        .filter-actions { display: flex; gap: 8px; align-items: center; }
 
         .sort-bar {
             display: flex; gap: 8px; flex-wrap: wrap;
             justify-content: center; align-items: center;
             margin-top: 16px; padding-top: 14px;
-            border-top: 1px dashed #ffd9a6;
+            border-top: 1px dashed var(--border);
         }
-        .sort-label { font-size: 13px; font-weight: 700; color: #6b3d00; margin-right: 4px; }
+        .sort-label { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-right: 4px; }
         .sort-chip {
             padding: 7px 14px; border-radius: 20px;
-            background: #fff; color: #6b3d00;
+            background: var(--card-bg-solid); color: var(--text-secondary);
             text-decoration: none; font-size: 13px; font-weight: 700;
-            border: 2px solid #ffd9a6;
+            border: 2px solid var(--border);
             transition: all 0.2s ease; white-space: nowrap;
         }
-        .sort-chip:hover { background: #fff5e6; border-color: #ff8c1a; }
+        .sort-chip:hover { background: var(--bg-gradient-2); border-color: var(--accent); }
         .sort-chip.active {
-            background: #ff8c1a; color: #fff; border-color: #ff8c1a;
-            box-shadow: 0 4px 12px rgba(255, 140, 26, 0.4);
+            background: var(--accent); color: #fff; border-color: var(--accent);
+            box-shadow: 0 4px 12px var(--shadow-strong);
         }
 
         .discount-banner {
-            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            background: linear-gradient(135deg, var(--accent) 0%, #ffb347 100%);
             color: #fff; padding: 14px 28px; border-radius: 30px;
             font-size: 16px; font-weight: 600; margin-bottom: 20px;
-            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.35);
+            box-shadow: 0 6px 20px var(--shadow-strong);
             max-width: 700px; text-align: center;
         }
-        .discount-banner strong { font-weight: 900; font-size: 18px; }
 
         .cars-count {
-            font-size: 14px; color: #6b3d00; margin-bottom: 14px;
-            background: #fff5e6; padding: 8px 18px; border-radius: 20px;
-            border: 1px solid #ffd9a6;
+            font-size: 14px; color: var(--text-secondary); margin-bottom: 14px;
+            background: var(--bg-gradient-1); padding: 8px 18px; border-radius: 20px;
+            border: 1px solid var(--border);
         }
-        .cars-count strong { color: #ff8c1a; font-size: 16px; }
+        .cars-count strong { color: var(--accent); font-size: 16px; }
 
         .cars-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -262,18 +290,18 @@
         }
         .car-card {
             position: relative;
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #ffd9a6; border-radius: 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--border); border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.15);
+            box-shadow: 0 6px 20px var(--shadow);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             display: flex; flex-direction: column;
         }
-        .car-card.discounted { border-color: #ff4d4d; box-shadow: 0 6px 22px rgba(255, 80, 80, 0.35); }
+        .car-card.discounted { border-color: #ff4d4d; }
         .car-card:hover {
             transform: translateY(-6px);
-            box-shadow: 0 12px 30px rgba(255, 140, 26, 0.3);
-            border-color: #ff8c1a;
+            box-shadow: 0 12px 30px var(--shadow-strong);
+            border-color: var(--accent);
         }
         .discount-badge {
             position: absolute; top: 10px; left: 50px; z-index: 2;
@@ -282,34 +310,33 @@
         }
         .car-image-link { text-decoration: none; display: block; }
         .car-image {
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
+            background: linear-gradient(135deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
             height: 150px; display: flex; align-items: center;
             justify-content: center; padding: 12px;
         }
         .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .car-info { padding: 15px 18px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; }
-        .car-model { font-size: 17px; font-weight: 700; color: #4a2c00; margin-bottom: 4px; }
+        .car-model { font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
         .car-model a { color: inherit; text-decoration: none; }
-        .car-model a:hover { color: #ff8c1a; }
+        .car-model a:hover { color: var(--accent); }
         .car-brand {
-            font-size: 11px; font-weight: 700; color: #b08855;
-            text-transform: uppercase; letter-spacing: 1px;
-            margin-bottom: 8px;
+            font-size: 11px; font-weight: 700; color: var(--text-hint);
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
         }
-        .car-stars { font-size: 17px; letter-spacing: 1px; color: #ffd9a6; margin-bottom: 10px; }
-        .car-stars .star.filled { color: #ff8c1a; }
+        .car-stars { font-size: 17px; letter-spacing: 1px; color: var(--border); margin-bottom: 10px; }
+        .car-stars .star.filled { color: var(--accent); }
         .car-price-block { margin-bottom: 14px; }
-        .car-price { font-size: 18px; font-weight: 900; color: #ff8c1a; }
-        .old-price { font-size: 15px; color: #b08855; text-decoration: line-through; }
+        .car-price { font-size: 18px; font-weight: 900; color: var(--accent); }
+        .old-price { font-size: 15px; color: var(--text-hint); text-decoration: line-through; }
         .new-price { font-size: 22px; font-weight: 900; color: #ff4d4d; }
         .car-action { margin-top: auto; }
         .owned-badge {
             display: inline-block; padding: 8px 16px; border-radius: 30px;
-            background: #e8f5e9; color: #2e7d32; font-weight: 700; font-size: 14px;
+            background: var(--success-bg); color: var(--success); font-weight: 700; font-size: 14px;
         }
         .locked-badge {
             display: inline-block; padding: 8px 16px; border-radius: 30px;
-            background: #fff3cd; color: #856404; font-weight: 700; font-size: 14px;
+            background: var(--warn-bg); color: var(--warn); font-weight: 700; font-size: 14px;
         }
         .wish-form { position: absolute; top: 8px; left: 8px; z-index: 3; margin: 0; }
         .wish-btn {
@@ -325,37 +352,64 @@
         .admin-form { margin: 0; }
         .admin-btn {
             width: 30px; height: 30px; border-radius: 50%; border: none;
-            background: rgba(255, 255, 255, 0.9); color: #ff8c1a;
+            background: rgba(255, 255, 255, 0.9); color: var(--accent);
             font-size: 15px; font-weight: 700; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             text-decoration: none; line-height: 1;
         }
-        .admin-btn:hover { background: #ff8c1a; color: #fff; }
+        .admin-btn:hover { background: var(--accent); color: #fff; }
 
-        /* ===== КНОПКА НАВЕРХ ===== */
-        .scroll-top {
-            position: fixed; bottom: 25px; right: 25px;
-            width: 52px; height: 52px;
-            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
-            color: #fff; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 26px; font-weight: 900;
-            text-decoration: none;
-            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.5);
-            opacity: 0; visibility: hidden;
-            transition: all 0.3s ease;
-            z-index: 100;
-            cursor: pointer;
+        /* ===== ПАГИНАЦИЯ ===== */
+        .pagination {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            justify-content: center; align-items: center;
+            margin-bottom: 18px;
         }
-        .scroll-top.visible { opacity: 1; visibility: visible; }
-        .scroll-top:hover { transform: translateY(-4px) scale(1.05); }
+        .page-btn, .page-num {
+            padding: 10px 16px; border-radius: 12px;
+            background: var(--card-bg-solid); color: var(--text-main);
+            text-decoration: none; font-weight: 700; font-size: 14px;
+            border: 2px solid var(--border);
+            transition: all 0.2s ease;
+            min-width: 20px; text-align: center;
+        }
+        .page-num { padding: 10px 14px; }
+        .page-btn:hover, .page-num:hover { background: var(--bg-gradient-2); border-color: var(--accent); }
+        .page-btn.disabled {
+            opacity: 0.4; cursor: not-allowed; pointer-events: none;
+        }
+        .page-num.active {
+            background: var(--accent); color: #fff; border-color: var(--accent);
+            box-shadow: 0 4px 12px var(--shadow-strong);
+        }
+        .page-dots {
+            font-size: 18px; color: var(--text-hint);
+            padding: 0 4px;
+        }
+
+        .goto-page-form {
+            display: flex; gap: 10px; align-items: center;
+            justify-content: center; flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .goto-page-form label {
+            font-size: 13px; font-weight: 700; color: var(--text-secondary);
+        }
+        .goto-page-form input {
+            width: 80px; padding: 8px 12px; font-size: 14px;
+            border: 2px solid var(--border); border-radius: 10px;
+            background: var(--card-bg-solid); color: var(--text-main);
+            font-family: inherit; text-align: center;
+        }
+        .goto-page-form input:focus { outline: none; border-color: var(--accent); }
 
         @media (max-width: 600px) {
             .filter-group { flex: 1 1 100%; }
             .price-group { flex: 1 1 45%; }
             .search-group { flex: 1 1 100%; }
             .filter-actions { flex: 1 1 100%; justify-content: center; }
-            .scroll-top { bottom: 15px; right: 15px; width: 46px; height: 46px; font-size: 22px; }
+            .page-btn { padding: 8px 12px; font-size: 13px; }
+            .page-num { padding: 8px 10px; font-size: 13px; }
         }
     </style>
 
