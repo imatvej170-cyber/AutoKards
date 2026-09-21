@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'new' %}Новая новость{% else %}Редактирование{% endif %} — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <h2 class="page-title">
+        {% if mode == 'new' %}📰 Новая новость{% else %}✎ Редактировать{% endif %}
+    </h2>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <form method="POST" class="form-box" style="max-width: 700px;"
+          action="{% if mode == 'new' %}/admin/news/new{% else %}/admin/news/{{ item.id }}/edit{% endif %}">
+
+        <label class="form-label">Заголовок</label>
+        <input type="text" name="title" maxlength="200" required class="form-input"
+               value="{{ item.title if item else '' }}"
+               placeholder="Например: Добавили 60 суперкаров!">
+
+        <label class="form-label">Категория</label>
+        <select name="category" class="form-select" required>
+            <option value="update" {% if item and item.category == 'update' %}selected{% endif %}>🚀 Обновление</option>
+            <option value="new_cars" {% if item and item.category == 'new_cars' %}selected{% endif %}>🚗 Новые машины</option>
+            <option value="event" {% if item and item.category == 'event' %}selected{% endif %}>🎉 Событие</option>
+            <option value="fix" {% if item and item.category == 'fix' %}selected{% endif %}>🔧 Исправление</option>
+        </select>
+
+        <label class="form-label">Текст новости</label>
+        <textarea name="content" rows="12" required class="form-textarea"
+                  placeholder="Опиши, что нового. Поддерживаются переносы строк.">{{ item.content if item else '' }}</textarea>
+
+        <label class="check-row">
+            <input type="checkbox" name="is_published" value="1"
+                   {% if not item or item.is_published %}checked{% endif %}>
+            Опубликовать (видно всем игрокам)
+        </label>
+
+        {% if mode == 'new' %}
+            <label class="check-row">
+                <input type="checkbox" name="notify" value="1">
+                📢 Разослать уведомление всем игрокам
+            </label>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                {% if mode == 'new' %}Создать{% else %}Сохранить{% endif %}
+            </button>
+            <a href="/admin/news" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+
+    <style>
+        .page-title { font-size: 28px; color: var(--accent); text-align: center; margin-bottom: 25px; text-shadow: var(--neon); }
+        .form-label {
+            display: block; text-align: left; font-size: 14px;
+            color: var(--text-secondary); margin-bottom: 6px; margin-top: 14px; font-weight: 700;
+        }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid var(--border); border-radius: 12px;
+            font-family: inherit; background: var(--card-bg-solid); color: var(--text-main);
+            box-sizing: border-box;
+        }
+        .form-textarea { resize: vertical; font-family: inherit; line-height: 1.6; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none; border-color: var(--accent); box-shadow: var(--neon);
+        }
+        .check-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            font-size: 14px; color: var(--text-main); font-weight: 600;
+            margin: 14px 0; text-align: left;
+        }
+        .check-row input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: var(--accent); margin-top: 2px;
+        }
+        .form-actions {
+            display: flex; gap: 12px; margin-top: 25px; justify-content: center;
+            flex-wrap: wrap;
+        }
+    </style>
+
+{% endblock %}
