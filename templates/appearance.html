@@ -68,6 +68,13 @@
             <button type="submit" class="btn btn-primary" style="width:100%; margin-top:20px;">
                 Сохранить
             </button>
+
+            <button type="button" class="btn btn-secondary" style="width:100%; margin-top:12px;"
+                    onclick="testVibration()">
+                📳 Проверить вибрацию
+            </button>
+
+            <p id="vibrationStatus" style="text-align:center; font-size:13px; color:#8a6538; margin-top:10px;"></p>
         </form>
 
         <p class="form-link"><a href="/">← На главную</a></p>
@@ -110,5 +117,19 @@
         .switch input:checked + .slider { background: var(--accent); }
         .switch input:checked + .slider:before { transform: translateX(24px); }
     </style>
-
+    <script>
+        function testVibration() {
+            const status = document.getElementById('vibrationStatus');
+            if (!navigator.vibrate) {
+                status.textContent = '❌ Этот браузер/устройство не поддерживает вибрацию (норма для ПК).';
+                return;
+            }
+            const ok = navigator.vibrate([100, 50, 100, 50, 200]);
+            if (ok) {
+                status.textContent = '✅ Вибрация сработала! Если не чувствуешь — проверь настройки телефона.';
+            } else {
+                status.textContent = '⚠️ Браузер отказал. Возможно, вибрация выключена в системе.';
+            }
+        }
+    </script>
 {% endblock %}
