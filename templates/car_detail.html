@@ -11,6 +11,7 @@
 
         <div class="car-detail-info">
             <h2 class="car-detail-name">{{ car.model }}</h2>
+            {% if car.brand %}<div class="car-detail-brand">{{ car.brand }}</div>{% endif %}
 
             <div class="car-detail-stars">
                 {% for i in range(1, 9) %}
@@ -49,11 +50,11 @@
                 {% if owned %}
                     <span class="owned-badge">✓ В твоём гараже</span>
                 {% endif %}
+                {% if locked and not owned %}
+                    <span class="locked-badge">🔒 Нужен {{ req_level }} уровень (у тебя {{ user_level }})</span>
+                {% endif %}
                 <a href="/compare?c1={{ car.id }}" class="btn btn-primary">⚖️ Сравнить</a>
                 <a href="javascript:history.back()" class="btn btn-secondary">← Назад</a>
-                {% if locked and not owned %}
-                <span class="locked-badge">🔒 Нужен {{ req_level }} уровень (у тебя {{ user_level }})</span>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -65,76 +66,99 @@
             max-width: 950px; width: 100%;
         }
         .car-detail-image {
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe0b3 100%);
-            border: 3px solid #ffd9a6; border-radius: 24px;
+            background: linear-gradient(135deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
+            border: 3px solid var(--border); border-radius: 24px;
             padding: 30px;
             flex: 1 1 380px; max-width: 480px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 12px 35px rgba(255, 140, 26, 0.2);
+            box-shadow: 0 12px 35px var(--shadow);
         }
+        [data-theme="dark"] .car-detail-image { box-shadow: 0 12px 35px rgba(0,0,0,0.5), 0 0 25px rgba(255,140,26,0.15); }
         .car-detail-image img {
             max-width: 100%; max-height: 260px; object-fit: contain;
         }
+
         .car-detail-info {
             flex: 1 1 380px; max-width: 480px;
             display: flex; flex-direction: column; gap: 16px;
             text-align: center;
         }
         .car-detail-name {
-            font-size: 32px; font-weight: 900; color: #4a2c00;
+            font-size: 32px; font-weight: 900; color: var(--text-main);
             line-height: 1.2;
         }
+        [data-theme="dark"] .car-detail-name { text-shadow: var(--neon); }
+
+        .car-detail-brand {
+            font-size: 13px; font-weight: 700; color: var(--text-hint);
+            text-transform: uppercase; letter-spacing: 2px;
+            margin-top: -8px;
+        }
+
         .car-detail-stars {
-            font-size: 26px; letter-spacing: 3px; color: #ffd9a6;
+            font-size: 26px; letter-spacing: 3px; color: var(--border);
         }
         .car-detail-stars .star.filled {
-            color: #ff8c1a; text-shadow: 0 0 8px rgba(255, 140, 26, 0.5);
+            color: var(--accent);
+            text-shadow: 0 0 8px rgba(255, 140, 26, 0.5);
+        }
+        [data-theme="dark"] .car-detail-stars .star.filled {
+            text-shadow: var(--neon);
         }
         .rating-num {
-            font-size: 16px; color: #b08855; margin-left: 8px;
+            font-size: 16px; color: var(--text-hint); margin-left: 8px;
             vertical-align: middle; letter-spacing: 0;
         }
+
         .car-detail-price {
-            font-size: 24px; font-weight: 900; color: #ff8c1a;
-            background: rgba(255, 255, 255, 0.7); padding: 10px 24px;
-            border-radius: 30px; border: 2px solid #ffd9a6;
+            font-size: 24px; font-weight: 900; color: var(--accent);
+            background: var(--card-bg); padding: 10px 24px;
+            border-radius: 30px; border: 2px solid var(--border);
             display: inline-block; align-self: center;
         }
+        [data-theme="dark"] .car-detail-price { box-shadow: var(--neon); }
+
         .specs {
             display: grid; grid-template-columns: 1fr;
             gap: 12px; margin-top: 10px;
         }
         .spec {
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #ffd9a6; border-radius: 16px;
+            background: var(--card-bg);
+            border: 2px solid var(--border); border-radius: 16px;
             padding: 14px 22px;
             display: flex; align-items: center; gap: 16px;
             text-align: left;
-            box-shadow: 0 4px 15px rgba(255, 140, 26, 0.1);
+            box-shadow: 0 4px 15px var(--shadow);
         }
+        [data-theme="dark"] .spec { box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 12px rgba(255,140,26,0.1); }
         .spec-icon { font-size: 28px; width: 40px; text-align: center; }
-        .spec-label { flex: 1; font-size: 15px; color: #6b3d00; font-weight: 600; }
+        .spec-label { flex: 1; font-size: 15px; color: var(--text-secondary); font-weight: 600; }
         .spec-value {
-            font-size: 18px; font-weight: 900; color: #ff8c1a;
+            font-size: 18px; font-weight: 900; color: var(--accent);
             white-space: nowrap;
         }
+        [data-theme="dark"] .spec-value { text-shadow: var(--neon); }
+
         .car-detail-actions {
             display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
             margin-top: 10px;
         }
         .owned-badge {
             display: inline-block; padding: 12px 24px; border-radius: 30px;
-            background: #e8f5e9; color: #2e7d32; font-weight: 700; font-size: 15px;
+            background: var(--success-bg); color: var(--success);
+            font-weight: 700; font-size: 15px;
             align-self: center;
         }
+        .locked-badge {
+            display: inline-block; padding: 12px 24px; border-radius: 30px;
+            background: var(--warn-bg); color: var(--warn);
+            font-weight: 700; font-size: 15px;
+        }
+
         @media (max-width: 700px) {
             .car-detail { gap: 25px; }
             .car-detail-name { font-size: 26px; }
         }
-        .locked-badge {
-    display: inline-block; padding: 12px 24px; border-radius: 30px;
-    background: #fff3cd; color: #856404; font-weight: 700; font-size: 15px;
-}
     </style>
 
 {% endblock %}
