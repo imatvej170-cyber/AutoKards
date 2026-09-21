@@ -313,7 +313,14 @@
 
         function vibrate(pattern) {
             if (!USER_SETTINGS.vibration) return;
-            if (navigator.vibrate) navigator.vibrate(pattern);
+            if (!navigator.vibrate) return;
+            try {
+                // Некоторые телефоны игнорируют вибрацию <30мс, делаем минимум 30
+                let p = pattern;
+                if (typeof pattern === 'number') p = Math.max(pattern, 30);
+                else if (Array.isArray(pattern)) p = pattern.map(v => Math.max(v, 30));
+                navigator.vibrate(p);
+            } catch (e) {}
         }
 
         // Универсальные звуки
