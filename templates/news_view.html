@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="news-full">
+        <div class="news-badge cat-{{ item.category }}">
+            {% if item.category == 'update' %}🚀 Обновление
+            {% elif item.category == 'new_cars' %}🚗 Новые машины
+            {% elif item.category == 'event' %}🎉 Событие
+            {% elif item.category == 'fix' %}🔧 Исправление
+            {% else %}📢 Новость{% endif %}
+        </div>
+
+        {% if not item.is_published %}
+            <div class="draft-badge">📝 Черновик — видно только админам</div>
+        {% endif %}
+
+        <h2 class="news-full-title">{{ item.title }}</h2>
+        <div class="news-full-date">{{ item.created_at[:16].replace('T', ' ') }}</div>
+
+        <div class="news-full-content">{{ item.content }}</div>
+
+        {% if is_admin %}
+            <div class="admin-actions-row">
+                <a href="/admin/news/{{ item.id }}/edit" class="btn btn-primary btn-small">✎ Редактировать</a>
+            </div>
+        {% endif %}
+
+        <p class="form-link" style="margin-top: 30px;">
+            <a href="/news">← Ко всем новостям</a>
+        </p>
+    </div>
+
+    <style>
+        .news-full {
+            width: 100%; max-width: 800px;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 22px;
+            padding: 30px 40px;
+            text-align: left;
+        }
+        [data-theme="dark"] .news-full { box-shadow: 0 8px 30px rgba(0,0,0,0.4), 0 0 25px rgba(255,140,26,0.1); }
+
+        .news-badge {
+            display: inline-block;
+            font-size: 13px; font-weight: 900;
+            padding: 5px 14px; border-radius: 20px;
+            margin-bottom: 15px;
+        }
+        .cat-update .news-badge,
+        .news-badge.cat-update { background: rgba(255, 140, 26, 0.2); color: var(--accent); }
+        .cat-new_cars .news-badge,
+        .news-badge.cat-new_cars { background: rgba(76, 175, 80, 0.2); color: var(--success); }
+        .cat-event .news-badge,
+        .news-badge.cat-event { background: rgba(156, 39, 176, 0.2); color: #ce93d8; }
+        .cat-fix .news-badge,
+        .news-badge.cat-fix { background: rgba(33, 150, 243, 0.2); color: #64b5f6; }
+
+        .draft-badge {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warn);
+            padding: 6px 14px; border-radius: 20px;
+            font-size: 13px; font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .news-full-title {
+            font-size: 30px; font-weight: 900;
+            color: var(--text-main);
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+        [data-theme="dark"] .news-full-title { text-shadow: var(--neon); }
+
+        .news-full-date {
+            font-size: 13px; color: var(--text-hint);
+            margin-bottom: 22px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .news-full-content {
+            font-size: 16px; line-height: 1.8;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            margin-bottom: 25px;
+        }
+
+        .admin-actions-row {
+            display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+        }
+        .btn-small { padding: 10px 22px; font-size: 15px; }
+    </style>
+
+{% endblock %}
