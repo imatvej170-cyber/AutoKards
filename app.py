@@ -2699,6 +2699,10 @@ def shop():
         balance = get_balance(session['user_id'])
         settings = {k: get_setting(k) for k in DEFAULT_SETTINGS}
         sort = request.args.get('sort', 'new')
+        search_query = request.args.get('q', '').strip()
+        brand_filter = request.args.get('brand', '').strip()
+        price_min = request.args.get('price_min', '').strip()
+        price_max = request.args.get('price_max', '').strip()
         wish_ids = get_wishlist_ids(session['user_id'])
         user_level = get_user_level_info(session['user_id'])['level']
 
@@ -2707,10 +2711,36 @@ def shop():
                   'FROM cars WHERE COALESCE(is_exclusive, FALSE) = FALSE ORDER BY id DESC')
         rows = c.fetchall(); c.close(); conn.close()
 
+        # Все бренды для выпадающего списка
+        all_brands = get_all_brands()
+
+        # Парсим цену
+        try:
+            pmin = int(price_min) if price_min else None
+        except ValueError:
+            pmin = None
+        try:
+            pmax = int(price_max) if price_max else None
+        except ValueError:
+            pmax = None
+
         cars = []
         for row in rows:
             cid, model, rating, price, hp, brand, excl = row
             price = price or 0
+
+            # Фильтр по тексту
+            if search_query and search_query.lower() not in model.lower():
+                continue
+            # Фильтр по бренду
+            if brand_filter and (brand or '').lower() != brand_filter.lower():
+                continue
+            # Фильтр по цене
+            if pmin is not None and price < pmin:
+                continue
+            if pmax is not None and price > pmax:
+                continue
+
             final_price = price
             has_disc = False
             if discount and discount['car_id'] == cid:
@@ -2734,147 +2764,24 @@ def shop():
         return render_template('shop.html', cars=cars, balance=balance, discount=discount,
                                settings=settings, sort=sort, user_level=user_level,
                                wishlist_count=len(wish_ids),
+                               all_brands=all_brands,
+                               search_query=search_query,
+                               brand_filter=brand_filter,
+                               price_min=price_min,
+                               price_max=price_max,
+                               total_count=len(rows),
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
         return '<h2 style="color:red;">Ошибка в /shop:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
 
 
-@app.route('/shop/buy/<int:car_id>', methods=['POST'])
-@login_required
-def shop_buy(car_id):
-    _, msg = buy_car(session['user_id'], car_id)
-    flash(msg)
-    return redirect(url_for('shop'))
-
-
-@app.route('/shop/wishlist/<int:car_id>', methods=['POST'])
-@login_required
-def shop_wishlist_toggle(car_id):
-    added = toggle_wishlist(session['user_id'], car_id)
-    flash('❤ Добавлено в желаемое' if added else 'Убрано из желаемого')
-    return redirect(request.referrer or url_for('shop'))
-
-
-@app.route('/shop/wishlist')
-@login_required
-def wishlist_page():
-    items = get_wishlist_cars(session['user_id'])
-    balance = get_balance(session['user_id'])
-    ensure_discount()
-    discount = get_active_discount()
-    user_level = get_user_level_info(session['user_id'])['level']
-    for item in items:
-        final_price = item['price']
-        item['has_discount'] = False
-        if discount and discount['car_id'] == item['id']:
-            final_price = int(item['price'] * (100 - discount['discount_percent']) / 100)
-            item['has_discount'] = True
-        item['final_price'] = final_price
-        item['owned'] = has_car(session['user_id'], item['id'])
-        item['req_level'] = get_level_required_for_stars(item['rating'])
-        item['locked'] = user_level < item['req_level']
-    return render_template('wishlist.html', items=items, balance=balance,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
-
-
-@app.route('/shop/add', methods=['GET', 'POST'])
-@admin_required
-def add_car_page():
-    if request.method == 'POST':
-        model = request.form.get('model', '').strip()
-        brand = request.form.get('brand', '').strip()[:40]
-        rating = request.form.get('rating', '3')
-        price = request.form.get('price', '500')
-        hp = request.form.get('horsepower', '').strip()
-        accel = request.form.get('acceleration', '').strip()
-        top = request.form.get('top_speed', '').strip()
-        is_exclusive = bool(request.form.get('is_exclusive'))
-        file = request.files.get('image')
-        if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
-        try:
-            rating = int(rating)
-            if rating < 1 or rating > 8: raise ValueError
-        except ValueError:
-            flash('Оценка 1–8'); return redirect(url_for('add_car_page'))
-        try:
-            price = int(price)
-            if price < 0: raise ValueError
-        except ValueError:
-            flash('Цена — число >= 0'); return redirect(url_for('add_car_page'))
-        hp = int(hp) if hp.isdigit() else None
-        top = int(top) if top.isdigit() else None
-        try: accel = float(accel) if accel else None
-        except ValueError: accel = None
-        if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
-        if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
-        add_car(model, brand, rating, price, hp, accel, top, is_exclusive, file.read(), file.mimetype)
-        flash(f'«{model}» добавлена!')
-        return redirect(url_for('shop'))
-    return render_template('add_car.html', user=session.get('username'), is_admin=True)
-
-
-@app.route('/shop/edit/<int:car_id>', methods=['GET', 'POST'])
-@admin_required
-def edit_car_page(car_id):
-    car = get_car_full(car_id)
-    if not car: flash('Нет машины'); return redirect(url_for('shop'))
-    if request.method == 'POST':
-        model = request.form.get('model', '').strip()
-        brand = request.form.get('brand', '').strip()[:40]
-        rating = request.form.get('rating', '3')
-        price = request.form.get('price', '500')
-        hp = request.form.get('horsepower', '').strip()
-        accel = request.form.get('acceleration', '').strip()
-        top = request.form.get('top_speed', '').strip()
-        is_exclusive = bool(request.form.get('is_exclusive'))
-        if not model: flash('Впиши название'); return redirect(url_for('edit_car_page', car_id=car_id))
-        try:
-            rating = int(rating)
-            if rating < 1 or rating > 8: raise ValueError
-        except ValueError:
-            flash('Оценка 1–8'); return redirect(url_for('edit_car_page', car_id=car_id))
-        try:
-            price = int(price)
-            if price < 0: raise ValueError
-        except ValueError:
-            flash('Цена — число >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
-        hp = int(hp) if hp.isdigit() else None
-        top = int(top) if top.isdigit() else None
-        try: accel = float(accel) if accel else None
-        except ValueError: accel = None
-        update_car(car_id, model, brand, rating, price, hp, accel, top, is_exclusive)
-        flash('Машина обновлена')
-        return redirect(url_for('shop'))
-    return render_template('edit_car.html', car=car, user=session.get('username'), is_admin=True)
-
-
-@app.route('/shop/delete/<int:car_id>', methods=['POST'])
-@admin_required
-def delete_from_catalog(car_id):
-    delete_car_from_catalog(car_id)
-    flash('Удалено')
-    return redirect(url_for('shop'))
-
-
-# ---------- КАРТОЧКА МАШИНЫ ----------
-@app.route('/car/<int:car_id>')
-def car_detail(car_id):
-    car = get_car_full(car_id)
-    if not car:
-        flash('Машина не найдена'); return redirect(url_for('index'))
-    owned = False
-    if 'user_id' in session:
-        owned = has_car(session['user_id'], car_id)
-    req_level = get_level_required_for_stars(car['rating'])
-    user_level = get_user_level_info(session['user_id'])['level'] if 'user_id' in session else 1
-    locked = user_level < req_level
-    return render_template('car_detail.html', car=car, owned=owned,
-                           req_level=req_level, locked=locked, user_level=user_level,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
-
+def get_all_brands():
+    """Возвращает список уникальных брендов из каталога."""
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT DISTINCT brand FROM cars WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
+    rows = c.fetchall(); c.close(); conn.close()
+    return [r[0] for r in rows]
 
 # ---------- СРАВНЕНИЕ ----------
 @app.route('/compare')
