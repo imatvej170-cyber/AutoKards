@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Настройки вида — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box" style="max-width: 520px;">
+        <h2>🎨 Внешний вид и звук</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/appearance" id="appearanceForm">
+
+            <div class="setting-row">
+                <div class="setting-icon">🔊</div>
+                <div class="setting-info">
+                    <div class="setting-title">Звуковые эффекты</div>
+                    <div class="setting-desc">Клик, покупка, победа</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" name="sound" value="1" id="soundToggle"
+                           {% if settings.sound %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-icon">🎵</div>
+                <div class="setting-info">
+                    <div class="setting-title">Фоновая музыка</div>
+                    <div class="setting-desc">Играет по кругу, пока ты на сайте</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" name="music" value="1" id="musicToggle"
+                           {% if settings.music %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-icon">📳</div>
+                <div class="setting-info">
+                    <div class="setting-title">Тактильная отдача</div>
+                    <div class="setting-desc">Вибрация при нажатии (на телефоне)</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" name="vibration" value="1" id="vibrationToggle"
+                           {% if settings.vibration %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-icon">🌙</div>
+                <div class="setting-info">
+                    <div class="setting-title">Тёмная тема</div>
+                    <div class="setting-desc">Для комфорта глаз вечером</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" name="dark" value="1" id="darkToggle"
+                           {% if settings.dark %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%; margin-top:20px;">
+                Сохранить
+            </button>
+        </form>
+
+        <p class="form-link"><a href="/">← На главную</a></p>
+    </div>
+
+    <style>
+        .setting-row {
+            display: flex; align-items: center; gap: 16px;
+            padding: 16px 4px; border-bottom: 1px solid var(--border);
+            text-align: left;
+        }
+        .setting-row:last-of-type { border-bottom: none; }
+        .setting-icon { font-size: 28px; width: 40px; text-align: center; }
+        .setting-info { flex: 1; }
+        .setting-title { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 3px; }
+        .setting-desc { font-size: 13px; color: var(--text-hint); }
+
+        /* Переключатель */
+        .switch {
+            position: relative; display: inline-block;
+            width: 52px; height: 28px; flex-shrink: 0;
+        }
+        .switch input { display: none; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #ccc;
+            border-radius: 28px;
+            transition: 0.3s;
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 22px; width: 22px;
+            left: 3px; bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.3s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .switch input:checked + .slider { background: var(--accent); }
+        .switch input:checked + .slider:before { transform: translateX(24px); }
+    </style>
+
+{% endblock %}
