@@ -347,15 +347,25 @@
             transition: all 0.2s;
         }
         .wish-btn.active { color: #ff4d6d; }
-        .wish-btn:hover { transform: scale(1.15); }
+                .wish-btn {
+            width: 34px; height: 34px; border-radius: 50%; border: none;
+            background: var(--white-glass); font-size: 18px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); color: #e0a0a0;
+            transition: all 0.2s;
+        }
+        .wish-btn.active { color: #ff4d6d; }
+        .wish-btn:hover { transform: scale(1.15); box-shadow: var(--neon); }
         .admin-actions { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; gap: 6px; }
         .admin-form { margin: 0; }
         .admin-btn {
             width: 30px; height: 30px; border-radius: 50%; border: none;
-            background: rgba(255, 255, 255, 0.9); color: var(--accent);
+            background: var(--white-glass); color: var(--accent);
             font-size: 15px; font-weight: 700; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             text-decoration: none; line-height: 1;
+        }
+        .admin-btn:hover { background: var(--accent); color: #fff; box-shadow: var(--neon); }
         }
         .admin-btn:hover { background: var(--accent); color: #fff; }
 
