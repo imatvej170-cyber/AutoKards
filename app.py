@@ -2736,8 +2736,16 @@ def shop():
         brand_filter = request.args.get('brand', '').strip()
         price_min = request.args.get('price_min', '').strip()
         price_max = request.args.get('price_max', '').strip()
+        page = request.args.get('page', '1').strip()
         wish_ids = get_wishlist_ids(session['user_id'])
         user_level = get_user_level_info(session['user_id'])['level']
+
+        try:
+            page = max(1, int(page))
+        except ValueError:
+            page = 1
+
+        PER_PAGE = 24  # машин на страницу
 
         conn = get_db(); c = conn.cursor()
         c.execute('SELECT id, model, rating, price, horsepower, brand, COALESCE(is_exclusive, FALSE) '
@@ -2751,7 +2759,8 @@ def shop():
         try: pmax = int(price_max) if price_max else None
         except ValueError: pmax = None
 
-        cars = []
+        # Фильтруем
+        filtered = []
         for row in rows:
             cid, model, rating, price, hp, brand, excl = row
             price = price or 0
@@ -2759,7 +2768,35 @@ def shop():
             if brand_filter and (brand or '').lower() != brand_filter.lower(): continue
             if pmin is not None and price < pmin: continue
             if pmax is not None and price > pmax: continue
+            filtered.append(row)
 
+        # Сортируем
+        def price_final(r):
+            cid, model, rating, price, hp, brand, excl = r
+            p = price or 0
+            if discount and discount['car_id'] == cid:
+                return int(p * (100 - discount['discount_percent']) / 100)
+            return p
+
+        if sort == 'price_asc': filtered.sort(key=price_final)
+        elif sort == 'price_desc': filtered.sort(key=price_final, reverse=True)
+        elif sort == 'rating_desc': filtered.sort(key=lambda r: r[2], reverse=True)
+        elif sort == 'rating_asc': filtered.sort(key=lambda r: r[2])
+        elif sort == 'hp_desc': filtered.sort(key=lambda r: r[4] or 0, reverse=True)
+        # 'new' оставляем как есть (по id DESC)
+
+        total_filtered = len(filtered)
+        total_pages = max(1, (total_filtered + PER_PAGE - 1) // PER_PAGE)
+        if page > total_pages: page = total_pages
+        start_idx = (page - 1) * PER_PAGE
+        end_idx = start_idx + PER_PAGE
+        page_rows = filtered[start_idx:end_idx]
+
+        # Собираем данные для шаблона
+        cars = []
+        for row in page_rows:
+            cid, model, rating, price, hp, brand, excl = row
+            price = price or 0
             final_price = price
             has_disc = False
             if discount and discount['car_id'] == cid:
@@ -2774,18 +2811,26 @@ def shop():
                          'wished': cid in wish_ids,
                          'locked': locked, 'req_level': req_level})
 
-        if sort == 'price_asc': cars.sort(key=lambda x: x['final_price'])
-        elif sort == 'price_desc': cars.sort(key=lambda x: x['final_price'], reverse=True)
-        elif sort == 'rating_desc': cars.sort(key=lambda x: x['rating'], reverse=True)
-        elif sort == 'rating_asc': cars.sort(key=lambda x: x['rating'])
-        elif sort == 'hp_desc': cars.sort(key=lambda x: x['horsepower'], reverse=True)
-
+        # Строка фильтров для сохранения при сортировке/пагинации
         query_parts = []
         if search_query: query_parts.append(f'q={search_query}')
         if brand_filter: query_parts.append(f'brand={brand_filter}')
         if price_min: query_parts.append(f'price_min={price_min}')
         if price_max: query_parts.append(f'price_max={price_max}')
+        if sort and sort != 'new': query_parts.append(f'sort={sort}')
         query_keep = ('&'.join(query_parts) + '&') if query_parts else ''
+
+        # Список номеров страниц для навигации (максимум 7 видимых)
+        page_numbers = []
+        if total_pages <= 7:
+            page_numbers = list(range(1, total_pages + 1))
+        else:
+            if page <= 4:
+                page_numbers = list(range(1, 8))
+            elif page >= total_pages - 3:
+                page_numbers = list(range(total_pages - 6, total_pages + 1))
+            else:
+                page_numbers = list(range(page - 3, page + 4))
 
         return render_template('shop.html', cars=cars, balance=balance, discount=discount,
                                settings=settings, sort=sort, user_level=user_level,
@@ -2796,130 +2841,16 @@ def shop():
                                price_min=price_min,
                                price_max=price_max,
                                total_count=len(rows),
+                               total_filtered=total_filtered,
+                               total_pages=total_pages,
+                               current_page=page,
+                               page_numbers=page_numbers,
+                               per_page=PER_PAGE,
                                query_keep=query_keep,
                                user=session.get('username'),
                                is_admin=is_admin(session.get('username')))
     except Exception:
         return '<h2 style="color:red;">Ошибка в /shop:</h2><pre style="font-size:14px;padding:20px;background:#fff0f0;white-space:pre-wrap;">' + traceback.format_exc() + '</pre>', 500
-
-
-@app.route('/shop/buy/<int:car_id>', methods=['POST'])
-@login_required
-def shop_buy(car_id):
-    _, msg = buy_car(session['user_id'], car_id)
-    flash(msg)
-    return redirect(url_for('shop'))
-
-
-@app.route('/shop/wishlist/<int:car_id>', methods=['POST'])
-@login_required
-def shop_wishlist_toggle(car_id):
-    added = toggle_wishlist(session['user_id'], car_id)
-    flash('❤ Добавлено в желаемое' if added else 'Убрано из желаемого')
-    return redirect(request.referrer or url_for('shop'))
-
-
-@app.route('/shop/wishlist')
-@login_required
-def wishlist_page():
-    items = get_wishlist_cars(session['user_id'])
-    balance = get_balance(session['user_id'])
-    ensure_discount()
-    discount = get_active_discount()
-    user_level = get_user_level_info(session['user_id'])['level']
-    for item in items:
-        final_price = item['price']
-        item['has_discount'] = False
-        if discount and discount['car_id'] == item['id']:
-            final_price = int(item['price'] * (100 - discount['discount_percent']) / 100)
-            item['has_discount'] = True
-        item['final_price'] = final_price
-        item['owned'] = has_car(session['user_id'], item['id'])
-        item['req_level'] = get_level_required_for_stars(item['rating'])
-        item['locked'] = user_level < item['req_level']
-    return render_template('wishlist.html', items=items, balance=balance,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
-
-
-@app.route('/shop/add', methods=['GET', 'POST'])
-@admin_required
-def add_car_page():
-    if request.method == 'POST':
-        model = request.form.get('model', '').strip()
-        brand = request.form.get('brand', '').strip()[:40]
-        rating = request.form.get('rating', '3')
-        price = request.form.get('price', '500')
-        hp = request.form.get('horsepower', '').strip()
-        accel = request.form.get('acceleration', '').strip()
-        top = request.form.get('top_speed', '').strip()
-        is_exclusive = bool(request.form.get('is_exclusive'))
-        file = request.files.get('image')
-        if not model: flash('Впиши название'); return redirect(url_for('add_car_page'))
-        try:
-            rating = int(rating)
-            if rating < 1 or rating > 8: raise ValueError
-        except ValueError:
-            flash('Оценка 1–8'); return redirect(url_for('add_car_page'))
-        try:
-            price = int(price)
-            if price < 0: raise ValueError
-        except ValueError:
-            flash('Цена — число >= 0'); return redirect(url_for('add_car_page'))
-        hp = int(hp) if hp.isdigit() else None
-        top = int(top) if top.isdigit() else None
-        try: accel = float(accel) if accel else None
-        except ValueError: accel = None
-        if not file or file.filename == '': flash('Выбери картинку'); return redirect(url_for('add_car_page'))
-        if file.mimetype not in ALLOWED_MIME: flash('Формат PNG/JPG/WEBP/GIF'); return redirect(url_for('add_car_page'))
-        add_car(model, brand, rating, price, hp, accel, top, is_exclusive, file.read(), file.mimetype)
-        flash(f'«{model}» добавлена!')
-        return redirect(url_for('shop'))
-    return render_template('add_car.html', user=session.get('username'), is_admin=True)
-
-
-@app.route('/shop/edit/<int:car_id>', methods=['GET', 'POST'])
-@admin_required
-def edit_car_page(car_id):
-    car = get_car_full(car_id)
-    if not car: flash('Нет машины'); return redirect(url_for('shop'))
-    if request.method == 'POST':
-        model = request.form.get('model', '').strip()
-        brand = request.form.get('brand', '').strip()[:40]
-        rating = request.form.get('rating', '3')
-        price = request.form.get('price', '500')
-        hp = request.form.get('horsepower', '').strip()
-        accel = request.form.get('acceleration', '').strip()
-        top = request.form.get('top_speed', '').strip()
-        is_exclusive = bool(request.form.get('is_exclusive'))
-        if not model: flash('Впиши название'); return redirect(url_for('edit_car_page', car_id=car_id))
-        try:
-            rating = int(rating)
-            if rating < 1 or rating > 8: raise ValueError
-        except ValueError:
-            flash('Оценка 1–8'); return redirect(url_for('edit_car_page', car_id=car_id))
-        try:
-            price = int(price)
-            if price < 0: raise ValueError
-        except ValueError:
-            flash('Цена — число >= 0'); return redirect(url_for('edit_car_page', car_id=car_id))
-        hp = int(hp) if hp.isdigit() else None
-        top = int(top) if top.isdigit() else None
-        try: accel = float(accel) if accel else None
-        except ValueError: accel = None
-        update_car(car_id, model, brand, rating, price, hp, accel, top, is_exclusive)
-        flash('Машина обновлена')
-        return redirect(url_for('shop'))
-    return render_template('edit_car.html', car=car, user=session.get('username'), is_admin=True)
-
-
-@app.route('/shop/delete/<int:car_id>', methods=['POST'])
-@admin_required
-def delete_from_catalog(car_id):
-    delete_car_from_catalog(car_id)
-    flash('Удалено')
-    return redirect(url_for('shop'))
-
 
 # ---------- КАРТОЧКА МАШИНЫ ----------
 @app.route('/car/<int:car_id>')
