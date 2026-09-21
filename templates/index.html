@@ -146,9 +146,11 @@
         }
         .profile-fav-card {
             display: inline-flex; align-items: center; gap: 14px;
-            background: rgba(255, 255, 255, 0.9); border: 2px solid #ffd9a6;
+            background: var(--card-bg); border: 2px solid var(--border);
             border-radius: 16px; padding: 12px 22px 12px 12px;
-            box-shadow: 0 4px 15px rgba(255, 140, 26, 0.15);
+            box-shadow: 0 4px 15px var(--shadow);
+        }
+        [data-theme="dark"] .profile-fav-card { box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 20px rgba(255,140,26,0.2); }
         }
         .profile-fav-card img { width: 90px; height: 60px; object-fit: contain; }
         .profile-fav-name { font-size: 18px; font-weight: 700; color: #4a2c00; }
