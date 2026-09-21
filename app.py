@@ -2806,7 +2806,7 @@ def car_detail(car_id):
     return render_template('car_detail.html', car=car, owned=owned,
                            req_level=req_level, locked=locked, user_level=user_level,
                            user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))э
+                           is_admin=is_admin(session.get('username')))
 
 # ---------- СРАВНЕНИЕ ----------
 @app.route('/compare')
