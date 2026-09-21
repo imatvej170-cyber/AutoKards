@@ -13,7 +13,52 @@
         {% if is_admin %}<a href="/shop/add" class="btn btn-primary btn-small">+ Добавить</a>{% endif %}
     </div>
 
-    <div class="user-level-line">Твой уровень: <strong>{{ user_level }}</strong></div>
+    <div class="user-level-line">Твой уровень: <strong>{{ user_level }}</strong> · Всего машин в каталоге: <strong>{{ total_count }}</strong></div>
+
+    {# ===== ФОРМА ФИЛЬТРОВ ===== #}
+    <div class="filter-block">
+        <form method="GET" action="/shop" class="filter-form">
+            <div class="filter-row">
+                <div class="filter-group search-group">
+                    <label class="filter-label">🔍 Поиск по названию</label>
+                    <input type="text" name="q" value="{{ search_query }}" placeholder="Например: BMW M5" class="form-input">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">🏷️ Бренд</label>
+                    <select name="brand" class="form-select">
+                        <option value="">— Все бренды —</option>
+                        {% for b in all_brands %}
+                            <option value="{{ b }}" {% if brand_filter == b %}selected{% endif %}>{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group price-group">
+                    <label class="filter-label">💰 Цена от</label>
+                    <input type="number" name="price_min" value="{{ price_min }}" min="0" placeholder="0" class="form-input">
+                </div>
+                <div class="filter-group price-group">
+                    <label class="filter-label">💰 Цена до</label>
+                    <input type="number" name="price_max" value="{{ price_max }}" min="0" placeholder="1000000" class="form-input">
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary btn-small">Применить</button>
+                    {% if search_query or brand_filter or price_min or price_max %}
+                        <a href="/shop{% if sort and sort != 'new' %}?sort={{ sort }}{% endif %}" class="btn btn-secondary btn-small">Сбросить</a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+
+        <div class="sort-bar">
+            <span class="sort-label">Сортировка:</span>
+            <a href="/shop?{{ query_keep }}sort=new"          class="sort-chip {% if sort == 'new' %}active{% endif %}">🆕 Новые</a>
+            <a href="/shop?{{ query_keep }}sort=price_asc"    class="sort-chip {% if sort == 'price_asc' %}active{% endif %}">💰 Дешёвые</a>
+            <a href="/shop?{{ query_keep }}sort=price_desc"   class="sort-chip {% if sort == 'price_desc' %}active{% endif %}">💰 Дорогие</a>
+            <a href="/shop?{{ query_keep }}sort=rating_desc"  class="sort-chip {% if sort == 'rating_desc' %}active{% endif %}">⭐ Крутые</a>
+            <a href="/shop?{{ query_keep }}sort=rating_asc"   class="sort-chip {% if sort == 'rating_asc' %}active{% endif %}">⭐ Слабые</a>
+            <a href="/shop?{{ query_keep }}sort=hp_desc"      class="sort-chip {% if sort == 'hp_desc' %}active{% endif %}">🐎 Мощные</a>
+        </div>
+    </div>
 
     {% if discount %}
         <div class="discount-banner">
@@ -22,28 +67,16 @@
         </div>
     {% endif %}
 
-    <div class="sort-bar">
-        <span class="sort-label">Сортировка:</span>
-        <a href="/shop?sort=new"          class="sort-chip {% if sort == 'new' %}active{% endif %}">🆕 Новые</a>
-        <a href="/shop?sort=price_asc"    class="sort-chip {% if sort == 'price_asc' %}active{% endif %}">💰 Дешёвые</a>
-        <a href="/shop?sort=price_desc"   class="sort-chip {% if sort == 'price_desc' %}active{% endif %}">💰 Дорогие</a>
-        <a href="/shop?sort=rating_desc"  class="sort-chip {% if sort == 'rating_desc' %}active{% endif %}">⭐ Крутые</a>
-        <a href="/shop?sort=rating_asc"   class="sort-chip {% if sort == 'rating_asc' %}active{% endif %}">⭐ Слабые</a>
-        <a href="/shop?sort=hp_desc"      class="sort-chip {% if sort == 'hp_desc' %}active{% endif %}">🐎 Мощные</a>
-    </div>
-
     {% with messages = get_flashed_messages() %}
         {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     {% if cars %}
+        <div class="cars-count">Найдено: <strong>{{ cars|length }}</strong> машин</div>
         <div class="cars-grid">
             {% for car in cars %}
                 <div class="car-card {% if car.has_discount %}discounted{% endif %}">
-
-                    {% if car.has_discount %}
-                        <div class="discount-badge">−{{ discount.discount_percent }}%</div>
-                    {% endif %}
+                    {% if car.has_discount %}<div class="discount-badge">−{{ discount.discount_percent }}%</div>{% endif %}
 
                     <form method="POST" action="/shop/wishlist/{{ car.id }}" class="wish-form">
                         <button type="submit" class="wish-btn {% if car.wished %}active{% endif %}"
@@ -64,7 +97,7 @@
 
                     <a href="/car/{{ car.id }}" class="car-image-link">
                         <div class="car-image">
-                            <img src="/car_image/{{ car.id }}" alt="{{ car.model }}">
+                            <img src="/car_image/{{ car.id }}" alt="{{ car.model }}" loading="lazy">
                         </div>
                     </a>
                     <div class="car-info">
@@ -104,10 +137,32 @@
             {% endfor %}
         </div>
     {% else %}
-        <p class="description">Магазин пуст.</p>
+        <p class="description">
+            По твоим фильтрам ничего не найдено.<br>
+            <a href="/shop" style="color:#ff8c1a;font-weight:700;">Сбросить фильтры</a>
+        </p>
     {% endif %}
 
     <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    {# ===== КНОПКА НАВЕРХ ===== #}
+    <a href="#" class="scroll-top" id="scrollTop" title="Наверх">↑</a>
+
+    <script>
+        // Показываем кнопку, когда пролистали вниз
+        const scrollBtn = document.getElementById('scrollTop');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 400) {
+                scrollBtn.classList.add('visible');
+            } else {
+                scrollBtn.classList.remove('visible');
+            }
+        });
+        scrollBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    </script>
 
     <style>
         .garage-header {
@@ -125,25 +180,57 @@
         .btn-tiny:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .user-level-line {
-            text-align: center; font-size: 15px; color: #6b3d00;
+            text-align: center; font-size: 14px; color: #6b3d00;
             background: #fff5e6; padding: 10px 22px; border-radius: 30px;
             border: 1px solid #ffd9a6; margin-bottom: 18px;
+            max-width: 700px;
         }
-        .user-level-line strong { color: #ff8c1a; font-size: 18px; }
+        .user-level-line strong { color: #ff8c1a; font-size: 16px; }
+
+        /* ===== ФИЛЬТРЫ ===== */
+        .filter-block {
+            width: 100%; max-width: 1100px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #ffd9a6;
+            border-radius: 20px;
+            padding: 18px 22px; margin-bottom: 20px;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.12);
+        }
+        .filter-form { width: 100%; }
+        .filter-row {
+            display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; }
+        .search-group { flex: 2; min-width: 200px; }
+        .price-group { flex: 0 0 130px; }
+        .filter-group:not(.search-group):not(.price-group) { flex: 1; min-width: 180px; }
+        .filter-label {
+            font-size: 12px; font-weight: 700; color: #6b3d00;
+            letter-spacing: 0.5px;
+        }
+        .form-input, .form-select {
+            padding: 10px 14px; font-size: 15px;
+            border: 2px solid #ffd9a6; border-radius: 12px;
+            font-family: inherit; background: #fff; color: #4a2c00;
+            width: 100%; box-sizing: border-box;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: #ff8c1a; }
+        .filter-actions {
+            display: flex; gap: 8px; align-items: center;
+            padding-bottom: 0;
+        }
 
         .sort-bar {
             display: flex; gap: 8px; flex-wrap: wrap;
             justify-content: center; align-items: center;
-            margin-bottom: 22px; padding: 12px 20px;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 30px; border: 1px solid #ffd9a6;
-            max-width: 850px;
+            margin-top: 16px; padding-top: 14px;
+            border-top: 1px dashed #ffd9a6;
         }
-        .sort-label { font-size: 14px; font-weight: 700; color: #6b3d00; margin-right: 6px; }
+        .sort-label { font-size: 13px; font-weight: 700; color: #6b3d00; margin-right: 4px; }
         .sort-chip {
-            padding: 8px 16px; border-radius: 20px;
+            padding: 7px 14px; border-radius: 20px;
             background: #fff; color: #6b3d00;
-            text-decoration: none; font-size: 14px; font-weight: 700;
+            text-decoration: none; font-size: 13px; font-weight: 700;
             border: 2px solid #ffd9a6;
             transition: all 0.2s ease; white-space: nowrap;
         }
@@ -156,11 +243,18 @@
         .discount-banner {
             background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
             color: #fff; padding: 14px 28px; border-radius: 30px;
-            font-size: 16px; font-weight: 600; margin-bottom: 22px;
+            font-size: 16px; font-weight: 600; margin-bottom: 20px;
             box-shadow: 0 6px 20px rgba(255, 140, 26, 0.35);
             max-width: 700px; text-align: center;
         }
         .discount-banner strong { font-weight: 900; font-size: 18px; }
+
+        .cars-count {
+            font-size: 14px; color: #6b3d00; margin-bottom: 14px;
+            background: #fff5e6; padding: 8px 18px; border-radius: 20px;
+            border: 1px solid #ffd9a6;
+        }
+        .cars-count strong { color: #ff8c1a; font-size: 16px; }
 
         .cars-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -181,12 +275,10 @@
             box-shadow: 0 12px 30px rgba(255, 140, 26, 0.3);
             border-color: #ff8c1a;
         }
-        .car-card.discounted:hover { border-color: #ff4d4d; }
         .discount-badge {
             position: absolute; top: 10px; left: 50px; z-index: 2;
             background: #ff4d4d; color: #fff; font-weight: 900;
             padding: 6px 14px; border-radius: 20px; font-size: 14px;
-            box-shadow: 0 3px 10px rgba(255, 80, 80, 0.5);
         }
         .car-image-link { text-decoration: none; display: block; }
         .car-image {
@@ -196,22 +288,21 @@
         }
         .car-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .car-info { padding: 15px 18px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; }
-        .car-model { font-size: 18px; font-weight: 700; color: #4a2c00; margin-bottom: 4px; }
-        .car-model a { color: inherit; text-decoration: none; transition: color 0.2s; }
+        .car-model { font-size: 17px; font-weight: 700; color: #4a2c00; margin-bottom: 4px; }
+        .car-model a { color: inherit; text-decoration: none; }
         .car-model a:hover { color: #ff8c1a; }
         .car-brand {
-            font-size: 12px; font-weight: 700; color: #b08855;
+            font-size: 11px; font-weight: 700; color: #b08855;
             text-transform: uppercase; letter-spacing: 1px;
             margin-bottom: 8px;
         }
         .car-stars { font-size: 17px; letter-spacing: 1px; color: #ffd9a6; margin-bottom: 10px; }
-        .car-stars .star.filled { color: #ff8c1a; text-shadow: 0 0 5px rgba(255, 140, 26, 0.5); }
+        .car-stars .star.filled { color: #ff8c1a; }
         .car-price-block { margin-bottom: 14px; }
         .car-price { font-size: 18px; font-weight: 900; color: #ff8c1a; }
-        .old-price { font-size: 15px; color: #b08855; text-decoration: line-through; margin-bottom: 2px; }
+        .old-price { font-size: 15px; color: #b08855; text-decoration: line-through; }
         .new-price { font-size: 22px; font-weight: 900; color: #ff4d4d; }
         .car-action { margin-top: auto; }
-        .car-action form { margin: 0; }
         .owned-badge {
             display: inline-block; padding: 8px 16px; border-radius: 30px;
             background: #e8f5e9; color: #2e7d32; font-weight: 700; font-size: 14px;
@@ -220,35 +311,52 @@
             display: inline-block; padding: 8px 16px; border-radius: 30px;
             background: #fff3cd; color: #856404; font-weight: 700; font-size: 14px;
         }
-
         .wish-form { position: absolute; top: 8px; left: 8px; z-index: 3; margin: 0; }
         .wish-btn {
-            width: 34px; height: 34px; border-radius: 50%;
-            border: none; background: rgba(255, 255, 255, 0.95);
-            font-size: 18px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            transition: all 0.2s ease; font-family: inherit; line-height: 1;
-            color: #e0a0a0;
+            width: 34px; height: 34px; border-radius: 50%; border: none;
+            background: rgba(255, 255, 255, 0.95); font-size: 18px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); color: #e0a0a0;
+            transition: all 0.2s;
         }
         .wish-btn.active { color: #ff4d6d; }
-        .wish-btn:hover { transform: scale(1.15); background: #fff; }
-
-        .admin-actions {
-            position: absolute; top: 8px; right: 8px; z-index: 3;
-            display: flex; gap: 6px;
-        }
+        .wish-btn:hover { transform: scale(1.15); }
+        .admin-actions { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; gap: 6px; }
         .admin-form { margin: 0; }
         .admin-btn {
             width: 30px; height: 30px; border-radius: 50%; border: none;
             background: rgba(255, 255, 255, 0.9); color: #ff8c1a;
             font-size: 15px; font-weight: 700; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease; font-family: inherit;
             text-decoration: none; line-height: 1;
         }
-        .admin-btn:hover { background: #ff8c1a; color: #fff; transform: scale(1.1); }
+        .admin-btn:hover { background: #ff8c1a; color: #fff; }
+
+        /* ===== КНОПКА НАВЕРХ ===== */
+        .scroll-top {
+            position: fixed; bottom: 25px; right: 25px;
+            width: 52px; height: 52px;
+            background: linear-gradient(135deg, #ff8c1a 0%, #ffb347 100%);
+            color: #fff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; font-weight: 900;
+            text-decoration: none;
+            box-shadow: 0 6px 20px rgba(255, 140, 26, 0.5);
+            opacity: 0; visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 100;
+            cursor: pointer;
+        }
+        .scroll-top.visible { opacity: 1; visibility: visible; }
+        .scroll-top:hover { transform: translateY(-4px) scale(1.05); }
+
+        @media (max-width: 600px) {
+            .filter-group { flex: 1 1 100%; }
+            .price-group { flex: 1 1 45%; }
+            .search-group { flex: 1 1 100%; }
+            .filter-actions { flex: 1 1 100%; justify-content: center; }
+            .scroll-top { bottom: 15px; right: 15px; width: 46px; height: 46px; font-size: 22px; }
+        }
     </style>
 
 {% endblock %}
