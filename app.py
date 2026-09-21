@@ -168,13 +168,13 @@ def init_db():
     created_at TEXT NOT NULL
     )''')
   c.execute('''CREATE TABLE IF NOT EXISTS news (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR(200) NOT NULL,
-  content TEXT NOT NULL,
-  category VARCHAR(30) NOT NULL DEFAULT 'update',
-  is_published BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TEXT NOT NULL
-  )''')
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(200) NOT NULL,
+      content TEXT NOT NULL,
+      category VARCHAR(30) NOT NULL DEFAULT 'update',
+      is_published BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TEXT NOT NULL
+    )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
