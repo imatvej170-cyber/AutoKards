@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.pve-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+.pve-title {
+    font-size: 32px; font-weight: 800; text-align: center;
+    background: linear-gradient(90deg, #ff8a00, #ffb347);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+}
+.pve-sub { text-align: center; color: #888; margin-bottom: 22px; font-size: 14px; }
+
+.pve-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 26px;
+}
+.stat-card {
+    background: rgba(255,138,0,0.08);
+    border: 1px solid rgba(255,138,0,0.25);
+    border-radius: 14px; padding: 14px 16px; text-align: center;
+}
+.stat-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 20px; font-weight: 700; color: #ff8a00; margin-top: 4px; }
+.stat-value.warn { color: #ff4d4d; }
+
+.pve-section-title {
+    font-size: 18px; font-weight: 700; margin: 26px 0 12px;
+    display: flex; align-items: center; gap: 8px;
+}
+
+.cars-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+}
+.car-pick {
+    background: rgba(255,255,255,0.03);
+    border: 2px solid rgba(255,138,0,0.15);
+    border-radius: 14px; padding: 14px; cursor: pointer;
+    transition: all 0.2s; position: relative;
+}
+.car-pick:hover { border-color: rgba(255,138,0,0.5); transform: translateY(-2px); }
+.car-pick input { display: none; }
+.car-pick.selected {
+    border-color: #ff8a00;
+    box-shadow: 0 0 18px rgba(255,138,0,0.45), inset 0 0 12px rgba(255,138,0,0.08);
+    background: rgba(255,138,0,0.1);
+}
+.car-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.car-brand { font-size: 12px; color: #999; margin-bottom: 8px; }
+.car-stars { color: #ffb347; font-size: 13px; margin-bottom: 6px; letter-spacing: 1px; }
+.car-specs { font-size: 12px; color: #aaa; line-height: 1.6; }
+
+.diff-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.diff-btn {
+    background: rgba(255,255,255,0.03);
+    border: 2px solid rgba(255,138,0,0.2);
+    border-radius: 14px; padding: 16px 12px; cursor: pointer;
+    text-align: center; transition: all 0.2s;
+}
+.diff-btn:hover { transform: translateY(-2px); }
+.diff-btn.selected { border-width: 2px; }
+.diff-btn input { display: none; }
+.diff-btn.easy.selected { border-color: #4caf50; box-shadow: 0 0 18px rgba(76,175,80,0.45); }
+.diff-btn.medium.selected { border-color: #ffb347; box-shadow: 0 0 18px rgba(255,179,71,0.45); }
+.diff-btn.hard.selected { border-color: #ff4d4d; box-shadow: 0 0 18px rgba(255,77,77,0.45); }
+.diff-name { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.diff-reward { font-size: 12px; color: #999; }
+
+.go-btn {
+    display: block; width: 100%; max-width: 420px;
+    margin: 30px auto 0; padding: 18px;
+    background: linear-gradient(135deg, #ff8a00, #ffb347);
+    color: #1a1a1a; font-size: 20px; font-weight: 800;
+    border: none; border-radius: 16px; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(255,138,0,0.5);
+    transition: all 0.2s; letter-spacing: 1px;
+}
+.go-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(255,138,0,0.7); }
+.go-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.empty-msg {
+    text-align: center; padding: 40px 20px; color: #888;
+    background: rgba(255,255,255,0.03); border-radius: 14px;
+}
+
+.warn-banner {
+    background: rgba(255,77,77,0.12); border: 1px solid rgba(255,77,77,0.4);
+    color: #ff8080; padding: 12px 16px; border-radius: 12px;
+    text-align: center; margin-bottom: 20px; font-size: 14px;
+}
+</style>
+
+<div class="pve-wrap">
+    <div class="pve-title">🏁 PvE Гонки</div>
+    <div class="pve-sub">Гоняй против ботов. Побеждай. Зарабатывай монеты. Без онлайна друзей.</div>
+
+    {% if races_today >= daily_races %}
+        <div class="warn-banner">⚠️ Дневной лимит гонок исчерпан ({{ races_today }}/{{ daily_races }}). Возвращайся завтра!</div>
+    {% elif coins_today >= daily_coins %}
+        <div class="warn-banner">⚠️ Дневной лимит монет исчерпан ({{ coins_today }}/{{ daily_coins }}). Возвращайся завтра!</div>
+    {% endif %}
+
+    <div class="pve-stats">
+        <div class="stat-card">
+            <div class="stat-label">💰 Баланс</div>
+            <div class="stat-value">{{ balance }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">🏁 Гонок за 24ч</div>
+            <div class="stat-value {% if races_today >= daily_races %}warn{% endif %}">{{ races_today }} / {{ daily_races }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">💸 Монет за 24ч</div>
+            <div class="stat-value {% if coins_today >= daily_coins %}warn{% endif %}">{{ coins_today }} / {{ daily_coins }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">🏆 Звёзд в гараже</div>
+            <div class="stat-value">{{ total_stars }}★ (×{{ garage_mult }})</div>
+        </div>
+    </div>
+
+    {% if not cars %}
+        <div class="empty-msg">
+            У тебя пока нет машин. Купи первую в <a href="{{ url_for('shop') }}" style="color:#ff8a00;">магазине</a>!
+        </div>
+    {% else %}
+    <form method="POST" action="{{ url_for('pve_race') }}" id="pveForm">
+
+        <div class="pve-section-title">🚗 Выбери машину</div>
+        <div class="cars-grid">
+            {% for c in cars %}
+            <label class="car-pick" onclick="selectCar(this)">
+                <input type="radio" name="car_id" value="{{ c[0] }}" {% if loop.first %}checked{% endif %}>
+                <div class="car-name">{{ c[1] }}</div>
+                <div class="car-brand">{{ c[2] or '—' }}</div>
+                <div class="car-stars">{{ '★' * c[3] }}</div>
+                <div class="car-specs">
+                    🐎 {{ c[4] }} hp<br>
+                    ⏱ {{ c[5] }} с<br>
+                    🏎 {{ c[6] }} км/ч
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="pve-section-title" style="margin-top:30px;">🎯 Выбери сложность</div>
+        <div class="diff-grid">
+            <label class="diff-btn easy" onclick="selectDiff(this)">
+                <input type="radio" name="difficulty" value="easy">
+                <div class="diff-name">🟢 Лёгкий</div>
+                <div class="diff-reward">80–150 монет</div>
+            </label>
+            <label class="diff-btn medium selected" onclick="selectDiff(this)">
+                <input type="radio" name="difficulty" value="medium" checked>
+                <div class="diff-name">🟡 Средний</div>
+                <div class="diff-reward">200–350 монет</div>
+            </label>
+            <label class="diff-btn hard" onclick="selectDiff(this)">
+                <input type="radio" name="difficulty" value="hard">
+                <div class="diff-name">🔴 Сложный</div>
+                <div class="diff-reward">450–800 монет</div>
+            </label>
+        </div>
+
+        <button type="submit" class="go-btn" {% if races_today >= daily_races or coins_today >= daily_coins %}disabled{% endif %}>
+            🏁 В ГОНКУ
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+function selectCar(el) {
+    document.querySelectorAll('.car-pick').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+}
+function selectDiff(el) {
+    document.querySelectorAll('.diff-btn').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+}
+// выделяем первую машину сразу
+window.addEventListener('DOMContentLoaded', () => {
+    const first = document.querySelector('.car-pick');
+    if (first) first.classList.add('selected');
+});
+</script>
+
+{% endblock %}
