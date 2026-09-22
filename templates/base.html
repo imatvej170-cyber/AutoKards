@@ -312,8 +312,9 @@
             white-space: nowrap;
         }
 
-        /* ==================== ГЛОБАЛЬНЫЕ ПРАВИЛА ТЁМНОЙ ТЕМЫ ==================== */
-        /* Перекрывает белые фоны во всех шаблонах автоматически */
+        /* ==================== ГЛОБАЛЬНАЯ ТЁМНАЯ ТЕМА ==================== */
+
+        /* 1. ПЛАШКИ И КАРТОЧКИ — ФОН */
         [data-theme="dark"] .car-card,
         [data-theme="dark"] .achievement-card,
         [data-theme="dark"] .ach-card,
@@ -327,32 +328,156 @@
         [data-theme="dark"] .news-card,
         [data-theme="dark"] .admin-row,
         [data-theme="dark"] .admin-news-row,
-        [data-theme="dark"] .admin-news-list,
         [data-theme="dark"] .collection-card,
         [data-theme="dark"] .news-full,
-        [data-theme="dark"] .trade-card.history,
         [data-theme="dark"] .side,
         [data-theme="dark"] .action-box,
         [data-theme="dark"] .message-box,
         [data-theme="dark"] .bonus-quest,
-        [data-theme="dark"] .profile-main,
         [data-theme="dark"] .profile-bio,
         [data-theme="dark"] .profile-fav-card,
-        [data-theme="dark"] .rank-row,
         [data-theme="dark"] .stat-box,
         [data-theme="dark"] .wheel-info,
         [data-theme="dark"] .create-block,
         [data-theme="dark"] .race-card,
         [data-theme="dark"] .quest-card,
         [data-theme="dark"] .result-side,
-        [data-theme="dark"] .result-summary {
+        [data-theme="dark"] .result-summary,
+        [data-theme="dark"] .search-block,
+        [data-theme="dark"] .settings-box,
+        [data-theme="dark"] .compare-col,
+        [data-theme="dark"] .specs-compare,
+        [data-theme="dark"] .journal-wrap,
+        [data-theme="dark"] .user-info-card,
+        [data-theme="dark"] .current-discount,
+        [data-theme="dark"] .no-cars-hint,
+        [data-theme="dark"] .bonus-wait,
+        [data-theme="dark"] .stat-pill,
+        [data-theme="dark"] .balance-pill,
+        [data-theme="dark"] .count-pill,
+        [data-theme="dark"] .info-pill,
+        [data-theme="dark"] .stats-pill,
+        [data-theme="dark"] .user-level-line,
+        [data-theme="dark"] .section-pill,
+        [data-theme="dark"] .total-info,
+        [data-theme="dark"] .action-box,
+        [data-theme="dark"] .result-box,
+        [data-theme="dark"] .cooldown-box,
+        [data-theme="dark"] .slider-value,
+        [data-theme="dark"] .my-rank,
+        [data-theme="dark"] .profile-count,
+        [data-theme="dark"] .trade-message,
+        [data-theme="dark"] .spec-label,
+        [data-theme="dark"] .notice-box,
+        [data-theme="dark"] .claimed-notice,
+        [data-theme="dark"] .not-ready-notice {
             background: var(--card-bg) !important;
             border-color: var(--border) !important;
-            color: var(--text-main);
         }
 
-        /* Кнопки-вторички, input, select, textarea в тёмной теме */
-        [data-theme="dark"] .btn-secondary,
+        /* 2. ГРАДИЕНТЫ И ФОНЫ ПОД КАРТИНКАМИ */
+        [data-theme="dark"] .car-image,
+        [data-theme="dark"] .car-detail-image,
+        [data-theme="dark"] .compare-image,
+        [data-theme="dark"] .trade-car,
+        [data-theme="dark"] .reward-image,
+        [data-theme="dark"] .bonus-car-img,
+        [data-theme="dark"] .car-preview,
+        [data-theme="dark"] .side-car img {
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a2a45 100%) !important;
+        }
+
+        /* 3. ТЕКСТ — ОСНОВНОЙ */
+        [data-theme="dark"] .car-model,
+        [data-theme="dark"] .car-model a,
+        [data-theme="dark"] .collection-name,
+        [data-theme="dark"] .profile-fav-name,
+        [data-theme="dark"] .compare-name,
+        [data-theme="dark"] .side-model,
+        [data-theme="dark"] .result-name,
+        [data-theme="dark"] .result-model,
+        [data-theme="dark"] .trade-from,
+        [data-theme="dark"] .friend-name,
+        [data-theme="dark"] .leader-name,
+        [data-theme="dark"] .leader-name a,
+        [data-theme="dark"] .user-name,
+        [data-theme="dark"] .ach-title,
+        [data-theme="dark"] .setting-title,
+        [data-theme="dark"] .form-label,
+        [data-theme="dark"] .notif-title,
+        [data-theme="dark"] .news-title,
+        [data-theme="dark"] .reward-value,
+        [data-theme="dark"] .bonus-model,
+        [data-theme="dark"] .car-refund,
+        [data-theme="dark"] .stat-num,
+        [data-theme="dark"] .stat-label,
+        [data-theme="dark"] .rarity-badge,
+        [data-theme="dark"] .collection-progress-text,
+        [data-theme="dark"] .wheel-title,
+        [data-theme="dark"] .section-h,
+        [data-theme="dark"] .section-title,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .total-users,
+        [data-theme="dark"] .total-info,
+        [data-theme="dark"] .action-title,
+        [data-theme="dark"] .message-text,
+        [data-theme="dark"] .trade-car div,
+        [data-theme="dark"] .side-car div,
+        [data-theme="dark"] .spec-value,
+        [data-theme="dark"] .side-title,
+        [data-theme="dark"] .side-coins,
+        [data-theme="dark"] .result-amount,
+        [data-theme="dark"] .rating-num,
+        [data-theme="dark"] .col-name,
+        [data-theme="dark"] .car-detail-name,
+        [data-theme="dark"] .car-detail-brand,
+        [data-theme="dark"] .car-detail-price,
+        [data-theme="dark"] .balance-line,
+        [data-theme="dark"] .waiting-text,
+        [data-theme="dark"] .bonus-title,
+        [data-theme="dark"] .bonus-rewards,
+        [data-theme="dark"] .reward-coins,
+        [data-theme="dark"] .reward-xp,
+        [data-theme="dark"] .reward-label,
+        [data-theme="dark"] .reward-card,
+        [data-theme="dark"] .stat-value,
+        [data-theme="dark"] .hint,
+        [data-theme="dark"] .my-rank strong,
+        [data-theme="dark"] .profile-count strong,
+        [data-theme="dark"] .admin-name,
+        [data-theme="dark"] .admin-meta,
+        [data-theme="dark"] .admin-desc,
+        [data-theme="dark"] .admin-news-title,
+        [data-theme="dark"] .admin-news-meta,
+        [data-theme="dark"] .trade-model,
+        [data-theme="dark"] .trade-side-label,
+        [data-theme="dark"] .message-label,
+        [data-theme="dark"] .car-check-item,
+        [data-theme="dark"] .car-check-item span {
+            color: var(--text-main) !important;
+        }
+
+        /* 4. ТЕКСТ — ВТОРОСТЕПЕННЫЙ */
+        [data-theme="dark"] .collection-desc,
+        [data-theme="dark"] .spec-label,
+        [data-theme="dark"] .setting-desc,
+        [data-theme="dark"] .notif-text,
+        [data-theme="dark"] .notif-date,
+        [data-theme="dark"] .news-preview,
+        [data-theme="dark"] .news-date,
+        [data-theme="dark"] .ach-desc,
+        [data-theme="dark"] .car-brand,
+        [data-theme="dark"] .friend-stats,
+        [data-theme="dark"] .trade-from strong,
+        [data-theme="dark"] .trade-from,
+        [data-theme="dark"] .col-desc,
+        [data-theme="dark"] .progress-text,
+        [data-theme="dark"] .rating-num,
+        [data-theme="dark"] .hint {
+            color: var(--text-secondary) !important;
+        }
+
+        /* 5. ИНПУТЫ, СЕЛЕКТЫ, TEXTAREA */
         [data-theme="dark"] .form-select,
         [data-theme="dark"] .form-input,
         [data-theme="dark"] .form-file,
@@ -362,104 +487,70 @@
         [data-theme="dark"] input[type="number"],
         [data-theme="dark"] input[type="password"],
         [data-theme="dark"] input[type="file"],
+        [data-theme="dark"] input[type="email"],
         [data-theme="dark"] textarea {
             background: var(--card-bg-solid) !important;
             color: var(--text-main) !important;
             border-color: var(--border) !important;
         }
+        [data-theme="dark"] select option {
+            background: var(--card-bg-solid) !important;
+            color: var(--text-main) !important;
+        }
+        [data-theme="dark"] input::placeholder,
+        [data-theme="dark"] textarea::placeholder {
+            color: var(--text-hint) !important;
+            opacity: 0.7;
+        }
 
-        /* Белые плашки/строчки */
+        /* 6. КНОПКИ-ЧИПЫ И ВКЛАДКИ */
+        [data-theme="dark"] .page-btn,
+        [data-theme="dark"] .page-num,
         [data-theme="dark"] .sort-chip,
         [data-theme="dark"] .filter-chip,
         [data-theme="dark"] .tab,
-        [data-theme="dark"] .page-btn,
-        [data-theme="dark"] .page-num,
-        [data-theme="dark"] .category-badge,
-        [data-theme="dark"] .achievements-grid,
-        [data-theme="dark"] .leaderboard,
-        [data-theme="dark"] .users-list,
-        [data-theme="dark"] .trades-list,
-        [data-theme="dark"] .notif-list,
-        [data-theme="dark"] .news-list,
-        [data-theme="dark"] .admin-list,
-        [data-theme="dark"] .admin-news-list,
-        [data-theme="dark"] .cars-grid,
-        [data-theme="dark"] .car-image {
-            color: var(--text-main);
-        }
-
-        /* Info-плашки и статистика */
-        [data-theme="dark"] .stat-pill,
-        [data-theme="dark"] .balance-pill,
-        [data-theme="dark"] .count-pill,
-        [data-theme="dark"] .info-pill,
-        [data-theme="dark"] .stats-pill,
-        [data-theme="dark"] .user-level-line,
-        [data-theme="dark"] .section-pill,
-        [data-theme="dark"] .total-info {
+        [data-theme="dark"] .btn-secondary {
             background: var(--card-bg-solid) !important;
-            color: var(--text-secondary) !important;
-            border-color: var(--border) !important;
-            box-shadow: 0 0 15px rgba(255, 140, 26, 0.15);
-        }
-
-        /* Строки рейтинга */
-        [data-theme="dark"] .leader-row.me {
-            background: linear-gradient(135deg, rgba(255, 140, 26, 0.15) 0%, rgba(255, 179, 71, 0.1) 100%) !important;
-            border-color: var(--accent) !important;
-        }
-
-        /* Настройки профиля — строки */
-        [data-theme="dark"] .setting-row {
-            border-color: var(--border) !important;
-        }
-
-        /* Просмотр обмена — белые блоки */
-        [data-theme="dark"] .side,
-        [data-theme="dark"] .message-box,
-        [data-theme="dark"] .action-box {
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 140, 26, 0.1) !important;
-        }
-
-        /* Сравнение машин */
-        [data-theme="dark"] .compare-col,
-        [data-theme="dark"] .specs-compare,
-        [data-theme="dark"] .spec-row {
-            background: var(--card-bg) !important;
-            border-color: var(--border) !important;
-        }
-        [data-theme="dark"] .spec-label {
-            background: var(--card-bg-solid) !important;
-            color: var(--text-secondary) !important;
-        }
-
-        /* Админ-коллекции */
-        [data-theme="dark"] .admin-collections-list,
-        [data-theme="dark"] .car-check-list,
-        [data-theme="dark"] .car-check-item:hover {
-            background: var(--card-bg-solid) !important;
-        }
-        [data-theme="dark"] .car-check-item {
             color: var(--text-main) !important;
+            border-color: var(--border) !important;
         }
-        [data-theme="dark"] .car-check-list {
+        [data-theme="dark"] .page-num.active,
+        [data-theme="dark"] .sort-chip.active,
+        [data-theme="dark"] .filter-chip.active,
+        [data-theme="dark"] .tab.active {
+            background: var(--accent) !important;
+            color: #fff !important;
+            border-color: var(--accent) !important;
+            box-shadow: var(--neon) !important;
+        }
+
+        /* 7. МЕЛКИЕ КНОПКИ В КАРТОЧКАХ */
+        [data-theme="dark"] .fav-btn,
+        [data-theme="dark"] .delete-btn,
+        [data-theme="dark"] .admin-btn,
+        [data-theme="dark"] .wish-btn {
+            background: var(--card-bg-solid) !important;
+            color: var(--accent) !important;
+        }
+        [data-theme="dark"] .fav-btn.active,
+        [data-theme="dark"] .wish-btn.active {
+            color: var(--accent) !important;
+        }
+
+        /* 8. СТРОКИ РЕЙТИНГА */
+        [data-theme="dark"] .leader-row.me {
+            background: linear-gradient(135deg, rgba(255, 140, 26, 0.2) 0%, rgba(255, 179, 71, 0.15) 100%) !important;
+            border-color: var(--accent) !important;
+            box-shadow: var(--neon) !important;
+        }
+
+        /* 9. ПРОСМОТР ОБМЕНОВ — старые */
+        [data-theme="dark"] .trade-card.history {
+            background: var(--card-bg) !important;
             border-color: var(--border) !important;
         }
 
-        /* Друзья */
-        [data-theme="dark"] .search-block,
-        [data-theme="dark"] .user-avatar-letter {
-            background: var(--card-bg) !important;
-        }
-
-        /* Строки в рейтинге */
-        [data-theme="dark"] .leader-row {
-            background: var(--card-bg) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* ==================== РЕДКОСТИ КОЛЛЕКЦИЙ ==================== */
-        /* Обычная — белое свечение */
+        /* 10. РЕДКОСТИ КОЛЛЕКЦИЙ */
         .collection-card.rarity-common,
         .admin-row.rarity-common,
         .collection-header.rarity-common {
@@ -472,7 +563,6 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.35), 0 6px 20px rgba(0, 0, 0, 0.4) !important;
         }
 
-        /* Редкая — синее свечение */
         .collection-card.rarity-rare,
         .admin-row.rarity-rare,
         .collection-header.rarity-rare {
@@ -485,7 +575,6 @@
             box-shadow: 0 0 25px rgba(66, 165, 245, 0.8), 0 0 45px rgba(66, 165, 245, 0.4), 0 6px 20px rgba(0, 0, 0, 0.4) !important;
         }
 
-        /* Легендарная — жёлтое (золотое) свечение */
         .collection-card.rarity-legendary,
         .admin-row.rarity-legendary,
         .collection-header.rarity-legendary {
@@ -496,6 +585,18 @@
         [data-theme="dark"] .admin-row.rarity-legendary,
         [data-theme="dark"] .collection-header.rarity-legendary {
             box-shadow: 0 0 25px rgba(255, 215, 0, 0.9), 0 0 50px rgba(255, 215, 0, 0.5), 0 0 80px rgba(255, 215, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        /* 11. ЖЁСТКОЕ ПЕРЕКРЫТИЕ ЛЮБЫХ ГРАДИЕНТОВ */
+        [data-theme="dark"] .car-image,
+        [data-theme="dark"] .car-detail-image,
+        [data-theme="dark"] .compare-image,
+        [data-theme="dark"] .trade-car,
+        [data-theme="dark"] .reward-image,
+        [data-theme="dark"] .bonus-car-img,
+        [data-theme="dark"] .car-preview {
+            background-image: linear-gradient(135deg, #1a1a2e 0%, #2a2a45 100%) !important;
+            background-color: transparent !important;
         }
 
         @media (max-width: 600px) {
