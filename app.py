@@ -1944,7 +1944,6 @@ def do_spin_paid(user_id):
     c.execute('UPDATE users SET last_paid_spin_at = %s WHERE id = %s',
               (datetime.now().isoformat(), user_id))
     conn.commit(); c.close(); conn.close()
-
     min_r = get_int_setting('paid_wheel_car_min_rating', 5)
     max_r = get_int_setting('paid_wheel_car_max_rating', 7)
     conn = get_db(); c = conn.cursor()
@@ -1954,10 +1953,8 @@ def do_spin_paid(user_id):
                  ORDER BY rating''', (min_r, max_r, user_id))
     candidates = c.fetchall()
     c.close(); conn.close()
-
     add_xp(user_id, XP_REWARDS.get('wheel_paid', 25))
     progress_quest(user_id, 'spin_wheel_1', 1)
-
     if not candidates:
         conn = get_db(); c = conn.cursor()
         c.execute('SELECT AVG(price) FROM cars WHERE rating BETWEEN %s AND %s', (min_r, max_r))
@@ -1968,23 +1965,21 @@ def do_spin_paid(user_id):
         log_transaction(user_id, 'paid_wheel_coins', amount, None,
                         'Премиум-колесо: всё собрано, выданы монеты')
         return {'type': 'coins', 'paid': True, 'amount': amount}
-
     weights = {5: 50, 6: 35, 7: 15}
     weighted = []
     for car in candidates:
         car_id, model, rating, car_price = car
         w = weights.get(rating, 10)
         weighted.extend([car] * w)
-
     chosen = random.choice(weighted)
     car_id, model, rating, car_price = chosen
-
     conn = get_db(); c = conn.cursor()
     c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
               (user_id, car_id, datetime.now().isoformat()))
     conn.commit(); c.close(); conn.close()
     log_transaction(user_id, 'paid_wheel_car', 0, car_id, f'Премиум-колесо: {model}')
     return {'type': 'car', 'paid': True, 'car_id': car_id, 'model': model, 'rating': rating}
+
 
 # ---------- ОБМЕНЫ ----------
 def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
