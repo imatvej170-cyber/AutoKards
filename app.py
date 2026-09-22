@@ -24,7 +24,7 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 # ============ ЭКОНОМИКА ============
 START_BALANCE = 500
 DAILY_BONUS = 100
-SELL_RATE = 0.7
+SELL_RATE = 0.5
 BONUS_COOLDOWN = 86400
 BONUS_STREAK_MAX = 30
 BONUS_STREAK_STEP = 25
@@ -36,8 +36,8 @@ PASSIVE_INCOME_COOLDOWN = 86400
 RACE_LUCK_CHANCE = 20
 RACE_TIMEOUT_MIN = 15
 RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8: 1600}
-RACE_REWARD_TABLE = {1: 300, 2: 200, 3: 150, 4: 100}
-RACE_REWARD_DAILY_CAP = 1500
+RACE_REWARD_TABLE = {1: 200, 2: 150, 3: 100, 4: 50}
+RACE_REWARD_DAILY_CAP = 800
 
 # ============ УРОВНИ ============
 MAX_LEVEL = 100
@@ -82,7 +82,7 @@ DEFAULT_SETTINGS = {
     'wheel_enabled': '1', 'wheel_coin_min': '300', 'wheel_coin_max': '1500',
     'wheel_car_chance': '8', 'wheel_car_min_rating': '1', 'wheel_car_max_rating': '4',
     'wheel_cooldown_hours': '24',
-    'paid_wheel_enabled': '1', 'paid_wheel_price': '3000',
+    'paid_wheel_enabled': '1', 'paid_wheel_price': '9000',
     'paid_wheel_car_min_rating': '5', 'paid_wheel_car_max_rating': '7',
 }
 
@@ -152,6 +152,7 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INTEGER')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_bonus_at TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_spin_at TEXT')
+  c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_paid_spin_at TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_passive_income TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_streak INTEGER DEFAULT 0')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0')
@@ -419,7 +420,7 @@ def xp_for_level(level):
 
 
 def level_reward_coins(level):
-    return 1000 + level * 300
+    return 200 + level * 100
 
 
 def get_user_level_info(user_id):
@@ -1920,11 +1921,29 @@ def do_spin_free(user_id):
 
 
 def do_spin_paid(user_id):
-    price = get_int_setting('paid_wheel_price', 3000)
+    # Проверка кулдауна 24 часа
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if row and row[0]:
+        try:
+            last = datetime.fromisoformat(row[0])
+            if (datetime.now() - last).total_seconds() < 86400:
+                return {'error': 'Премиум-колесо доступно раз в 24 часа'}
+        except (ValueError, TypeError):
+            pass
+
+    price = get_int_setting('paid_wheel_price', 8000)
     if get_balance(user_id) < price:
         return {'error': f'Нужно {price} монет'}
     add_coins(user_id, -price)
     log_transaction(user_id, 'paid_wheel_spend', -price, None, 'Премиум-колесо')
+
+    # Записываем время спина (кулдаун)
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE users SET last_paid_spin_at = %s WHERE id = %s',
+              (datetime.now().isoformat(), user_id))
+    conn.commit(); c.close(); conn.close()
     min_r = get_int_setting('paid_wheel_car_min_rating', 5)
     max_r = get_int_setting('paid_wheel_car_max_rating', 7)
     conn = get_db(); c = conn.cursor()
@@ -3437,6 +3456,20 @@ def wheel():
     ready, secs = can_spin(session['user_id'])
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
+  paid_ready = True
+paid_time_left = ''
+conn = get_db(); c = conn.cursor()
+c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (session['user_id'],))
+row = c.fetchone(); c.close(); conn.close()
+if row and row[0]:
+    try:
+        last = datetime.fromisoformat(row[0])
+        diff = 86400 - (datetime.now() - last).total_seconds()
+        if diff > 0:
+            paid_ready = False
+            paid_time_left = format_time_left(int(diff))
+    except (ValueError, TypeError):
+        pass
     paid_price = get_int_setting('paid_wheel_price', 3000)
     paid_info = {
         'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
@@ -3454,8 +3487,10 @@ def wheel():
                            result=result, balance=get_balance(session['user_id']),
                            paid_enabled=paid_enabled, paid_price=paid_price,
                            paid_info=paid_info, free_info=free_info,
+                           paid_ready=paid_ready, paid_time_left=paid_time_left,
                            user=session.get('username'),
                            is_admin=is_admin(session.get('username')))
+  
 
 
 @app.route('/wheel/spin', methods=['POST'])
