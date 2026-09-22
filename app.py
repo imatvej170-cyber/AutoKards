@@ -176,7 +176,7 @@ def init_db():
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS brand VARCHAR(40)')
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS is_exclusive BOOLEAN DEFAULT FALSE')
 
-  c.execute('''CREATE TABLE IF NOT EXISTS pve_races (
+    c.execute('''CREATE TABLE IF NOT EXISTS pve_races (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     car_id INTEGER NOT NULL,
