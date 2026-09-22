@@ -30,11 +30,14 @@ BONUS_STREAK_MAX = 30
 BONUS_STREAK_STEP = 25
 BONUS_STREAK_MAX_AMOUNT = 500
 STREAK_BREAK_HOURS = 48
+PASSIVE_INCOME_COOLDOWN = 86400  # 24 часа
 
 # ============ ГОНКИ ============
 RACE_LUCK_CHANCE = 20
 RACE_TIMEOUT_MIN = 15
 RACE_MIN_BET_TABLE = {1: 25, 2: 100, 3: 225, 4: 400, 5: 625, 6: 900, 7: 1225, 8: 1600}
+RACE_REWARD_TABLE = {1: 300, 2: 200, 3: 150, 4: 100}  # за 1/2/3/4+ победу дня
+RACE_REWARD_DAILY_CAP = 1500
 
 # ============ УРОВНИ ============
 MAX_LEVEL = 100
@@ -76,12 +79,13 @@ ADMIN_USERNAMES = {'AppleAT', 'Arbu3k52'}
 DEFAULT_SETTINGS = {
     'discount_enabled': '1', 'discount_min_rating': '1', 'discount_max_rating': '3',
     'discount_percent': '50',
-    'wheel_enabled': '1', 'wheel_coin_min': '30', 'wheel_coin_max': '150',
-    'wheel_car_chance': '5', 'wheel_car_min_rating': '1', 'wheel_car_max_rating': '4',
+    # Бесплатное колесо
+    'wheel_enabled': '1', 'wheel_coin_min': '300', 'wheel_coin_max': '1500',
+    'wheel_car_chance': '8', 'wheel_car_min_rating': '1', 'wheel_car_max_rating': '4',
     'wheel_cooldown_hours': '24',
-    'paid_wheel_enabled': '1', 'paid_wheel_price': '1000',
-    'paid_wheel_coin_min': '100', 'paid_wheel_coin_max': '600',
-    'paid_wheel_car_chance': '15', 'paid_wheel_car_min_rating': '5', 'paid_wheel_car_max_rating': '8',
+    # Премиум-колесо
+    'paid_wheel_enabled': '1', 'paid_wheel_price': '3000',
+    'paid_wheel_car_min_rating': '5', 'paid_wheel_car_max_rating': '7',
 }
 
 # ============ ДОСТИЖЕНИЯ ============
@@ -150,6 +154,7 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INTEGER')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_bonus_at TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_spin_at TEXT')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_passive_income TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_streak INTEGER DEFAULT 0')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 1')
@@ -279,6 +284,17 @@ def init_db():
     for k, v in DEFAULT_SETTINGS.items():
         c.execute('INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING', (k, v))
 
+    # Одноразовая миграция экономики
+    c.execute("SELECT value FROM settings WHERE key = 'settings_version_economy'")
+    if not c.fetchone():
+        c.execute("UPDATE settings SET value = '300' WHERE key = 'wheel_coin_min'")
+        c.execute("UPDATE settings SET value = '1500' WHERE key = 'wheel_coin_max'")
+        c.execute("UPDATE settings SET value = '8' WHERE key = 'wheel_car_chance'")
+        c.execute("UPDATE settings SET value = '3000' WHERE key = 'paid_wheel_price'")
+        c.execute("UPDATE settings SET value = '5' WHERE key = 'paid_wheel_car_min_rating'")
+        c.execute("UPDATE settings SET value = '7' WHERE key = 'paid_wheel_car_max_rating'")
+        c.execute("INSERT INTO settings (key, value) VALUES ('settings_version_economy', '1') ON CONFLICT (key) DO NOTHING")
+
     conn.commit()
     c.close()
     conn.close()
@@ -312,7 +328,8 @@ def xp_for_level(level):
 
 
 def level_reward_coins(level):
-    return 100 + level * 30
+    """Бонус за новый уровень ×10 от прежнего."""
+    return 1000 + level * 300
 
 
 def get_user_level_info(user_id):
@@ -360,6 +377,77 @@ def add_xp(user_id, amount):
 
 def get_level_required_for_stars(stars):
     return STAR_LEVEL_REQ.get(stars, 1)
+
+
+# ---------- ПАССИВНЫЙ ДОХОД ----------
+def can_collect_passive(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT last_passive_income FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone(); c.close(); conn.close()
+    if not row or not row[0]: return True
+    try:
+        last = datetime.fromisoformat(row[0])
+    except (ValueError, TypeError):
+        return True
+    return (datetime.now() - last).total_seconds() >= PASSIVE_INCOME_COOLDOWN
+
+
+def collect_passive_income(user_id):
+    """Собирает пассивный доход: 1 монета за каждую машину в гараже."""
+    cars_count = count_user_cars(user_id)
+    if cars_count <= 0:
+        # Всё равно обновим метку времени
+        conn = get_db(); c = conn.cursor()
+        c.execute('UPDATE users SET last_passive_income = %s WHERE id = %s',
+                  (datetime.now().isoformat(), user_id))
+        conn.commit(); c.close(); conn.close()
+        return 0
+    add_coins(user_id, cars_count)
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE users SET last_passive_income = %s WHERE id = %s',
+              (datetime.now().isoformat(), user_id))
+    conn.commit(); c.close(); conn.close()
+    log_transaction(user_id, 'passive_income', cars_count, None,
+                    f'Пассивный доход с {cars_count} машин')
+    return cars_count
+
+
+# ---------- НАГРАДЫ ЗА ГОНКИ ----------
+def give_race_reward(user_id):
+    """Награда за победу в гонке. Возвращает сумму (может быть 0)."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    conn = get_db(); c = conn.cursor()
+    # Сколько уже выдали сегодня
+    c.execute('''SELECT COALESCE(SUM(amount), 0) FROM transactions
+                 WHERE user_id = %s AND type = 'race_reward'
+                 AND created_at LIKE %s''', (user_id, today + '%'))
+    already = c.fetchone()[0] or 0
+    # Сколько побед сегодня (транзакция race_win уже должна быть записана)
+    c.execute('''SELECT COUNT(*) FROM transactions
+                 WHERE user_id = %s AND type = 'race_win'
+                 AND created_at LIKE %s''', (user_id, today + '%'))
+    wins_today = c.fetchone()[0] or 0
+    c.close(); conn.close()
+
+    if already >= RACE_REWARD_DAILY_CAP:
+        return 0
+
+    if wins_today <= 1:
+        reward = RACE_REWARD_TABLE[1]
+    elif wins_today == 2:
+        reward = RACE_REWARD_TABLE[2]
+    elif wins_today == 3:
+        reward = RACE_REWARD_TABLE[3]
+    else:
+        reward = RACE_REWARD_TABLE[4]
+
+    reward = min(reward, RACE_REWARD_DAILY_CAP - already)
+    if reward <= 0:
+        return 0
+    add_coins(user_id, reward)
+    log_transaction(user_id, 'race_reward', reward, None,
+                    f'Награда за победу в гонке (#{wins_today} за сегодня)')
+    return reward
 
 
 # ---------- УВЕДОМЛЕНИЯ ----------
@@ -677,23 +765,23 @@ def parse_bulk_csv(csv_bytes):
     except UnicodeDecodeError:
         try: text = csv_bytes.decode('cp1251')
         except UnicodeDecodeError:
-            return [], ['Не удалось прочитать CSV. Сохрани в UTF-8 или Windows-1251.'], []
+            return [], ['Не удалось прочитать CSV.'], []
     reader = csv.DictReader(io.StringIO(text))
     if not reader.fieldnames:
-        return [], ['CSV пустой или не содержит заголовков.'], []
+        return [], ['CSV пустой.'], []
     headers = [h.strip().lower() for h in reader.fieldnames]
     required = {'model', 'brand', 'rating', 'price', 'image_filename'}
     missing = required - set(headers)
     if missing:
-        return [], [f'В CSV не хватает колонок: {", ".join(sorted(missing))}'], headers
+        return [], [f'Не хватает колонок: {", ".join(sorted(missing))}'], headers
     for i, raw in enumerate(reader, start=2):
         row = {(k or '').strip().lower(): (v or '').strip() for k, v in raw.items()}
         model = row.get('model', ''); brand = row.get('brand', ''); image = row.get('image_filename', '')
         if not model and not brand and not image: continue
         row_errors = []
-        if not model: row_errors.append('пустое поле model')
-        if len(model) > 60: row_errors.append('model длиннее 60 символов')
-        if not image: row_errors.append('пустое поле image_filename')
+        if not model: row_errors.append('пустое model')
+        if len(model) > 60: row_errors.append('model > 60')
+        if not image: row_errors.append('пустое image_filename')
         try:
             rating = int(row.get('rating', ''))
             if rating < 1 or rating > 8: raise ValueError()
@@ -707,15 +795,15 @@ def parse_bulk_csv(csv_bytes):
         hp = None
         if row.get('horsepower'):
             try: hp = int(row['horsepower'])
-            except ValueError: row_errors.append('horsepower не число')
+            except ValueError: row_errors.append('hp не число')
         accel = None
         if row.get('acceleration'):
             try: accel = float(row['acceleration'])
-            except ValueError: row_errors.append('acceleration не число')
+            except ValueError: row_errors.append('accel не число')
         top = None
         if row.get('top_speed'):
             try: top = int(row['top_speed'])
-            except ValueError: row_errors.append('top_speed не число')
+            except ValueError: row_errors.append('top не число')
         is_excl = row.get('is_exclusive', '').lower() in ('1', 'true', 'yes', 'да')
         if row_errors:
             errors.append({'row': i, 'model': model or '(без названия)', 'errors': row_errors})
@@ -740,7 +828,7 @@ def extract_zip_images(zip_bytes):
                 except Exception: continue
                 images[base] = (data, MIME_BY_EXT[ext])
     except zipfile.BadZipFile:
-        return None, 'Не удалось прочитать ZIP-архив.'
+        return None, 'Не удалось прочитать ZIP.'
     return images, None
 
 
@@ -916,7 +1004,7 @@ def get_friend_status(user_a, user_b):
 
 def send_friend_request(from_id, to_username):
     to_user = get_user(to_username)
-    if not to_user: return False, 'Игрок с таким ником не найден'
+    if not to_user: return False, 'Игрок не найден'
     to_id = to_user[0]
     if to_id == from_id: return False, 'Нельзя добавить себя'
     status = get_friend_status(from_id, to_id)
@@ -1701,36 +1789,26 @@ def can_spin(user_id):
     return False, int(cooldown - diff)
 
 
-def do_spin(user_id, paid=False):
-    if paid:
-        price = get_int_setting('paid_wheel_price', 1000)
-        if get_balance(user_id) < price: return {'error': f'Нужно {price} монет'}
-        add_coins(user_id, -price)
-        log_transaction(user_id, 'paid_wheel_spend', -price, None, 'Премиум-колесо')
-        car_chance = get_int_setting('paid_wheel_car_chance', 15)
-        coin_min = get_int_setting('paid_wheel_coin_min', 100)
-        coin_max = get_int_setting('paid_wheel_coin_max', 600)
-        min_r = get_int_setting('paid_wheel_car_min_rating', 5)
-        max_r = get_int_setting('paid_wheel_car_max_rating', 8)
-        coins_tx, car_tx = 'paid_wheel_coins', 'paid_wheel_car'
-        prefix = 'Премиум-колесо'; xp_key = 'wheel_paid'
-    else:
-        ready, _ = can_spin(user_id)
-        if not ready: return {'error': 'Колесо пока недоступно'}
-        conn = get_db(); c = conn.cursor()
-        c.execute('UPDATE users SET last_spin_at = %s WHERE id = %s',
-                  (datetime.now().isoformat(), user_id))
-        conn.commit(); c.close(); conn.close()
-        car_chance = get_int_setting('wheel_car_chance', 5)
-        coin_min = get_int_setting('wheel_coin_min', 30)
-        coin_max = get_int_setting('wheel_coin_max', 150)
-        min_r = get_int_setting('wheel_car_min_rating', 1)
-        max_r = get_int_setting('wheel_car_max_rating', 4)
-        coins_tx, car_tx = 'wheel_coins', 'wheel_car'
-        prefix = 'Колесо'; xp_key = 'wheel_free'
+def do_spin_free(user_id):
+    """Бесплатное колесо: монеты 300-1500 или машина 1-4★ (8%)."""
+    ready, _ = can_spin(user_id)
+    if not ready:
+        return {'error': 'Колесо пока недоступно'}
 
-    add_xp(user_id, XP_REWARDS.get(xp_key, 15))
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE users SET last_spin_at = %s WHERE id = %s',
+              (datetime.now().isoformat(), user_id))
+    conn.commit(); c.close(); conn.close()
+
+    car_chance = get_int_setting('wheel_car_chance', 8)
+    coin_min = get_int_setting('wheel_coin_min', 300)
+    coin_max = get_int_setting('wheel_coin_max', 1500)
+    min_r = get_int_setting('wheel_car_min_rating', 1)
+    max_r = get_int_setting('wheel_car_max_rating', 4)
+
+    add_xp(user_id, XP_REWARDS.get('wheel_free', 15))
     progress_quest(user_id, 'spin_wheel_1', 1)
+
     roll = random.randint(1, 100)
     if roll <= car_chance:
         candidates = [c for c in get_catalog_by_rating(min_r, max_r) if not has_car(user_id, c[0])]
@@ -1740,19 +1818,75 @@ def do_spin(user_id, paid=False):
             c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
                       (user_id, chosen[0], datetime.now().isoformat()))
             conn.commit(); c.close(); conn.close()
-            log_transaction(user_id, car_tx, 0, chosen[0], f'{prefix}: {chosen[1]}')
-            return {'type': 'car', 'paid': paid, 'car_id': chosen[0],
+            log_transaction(user_id, 'wheel_car', 0, chosen[0], f'Колесо: {chosen[1]}')
+            return {'type': 'car', 'paid': False, 'car_id': chosen[0],
                     'model': chosen[1], 'rating': chosen[2]}
+
     amount = random.randint(coin_min, coin_max)
     add_coins(user_id, amount)
-    log_transaction(user_id, coins_tx, amount, None, f'{prefix}: монеты')
-    return {'type': 'coins', 'paid': paid, 'amount': amount}
+    log_transaction(user_id, 'wheel_coins', amount, None, 'Колесо: монеты')
+    return {'type': 'coins', 'paid': False, 'amount': amount}
+
+
+def do_spin_paid(user_id):
+    """Премиум-колесо: 3000 монет, гарантированная машина 5-7★."""
+    price = get_int_setting('paid_wheel_price', 3000)
+    if get_balance(user_id) < price:
+        return {'error': f'Нужно {price} монет'}
+
+    add_coins(user_id, -price)
+    log_transaction(user_id, 'paid_wheel_spend', -price, None, 'Премиум-колесо')
+
+    min_r = get_int_setting('paid_wheel_car_min_rating', 5)
+    max_r = get_int_setting('paid_wheel_car_max_rating', 7)
+
+    # Все машины 5-7★, которых нет у игрока
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, model, rating, price FROM cars
+                 WHERE rating BETWEEN %s AND %s
+                 AND id NOT IN (SELECT car_id FROM user_cars WHERE user_id = %s)
+                 ORDER BY rating''', (min_r, max_r, user_id))
+    candidates = c.fetchall()
+    c.close(); conn.close()
+
+    add_xp(user_id, XP_REWARDS.get('wheel_paid', 25))
+    progress_quest(user_id, 'spin_wheel_1', 1)
+
+    if not candidates:
+        # Всё собрано — даём 50% от средней цены 5-7★
+        conn = get_db(); c = conn.cursor()
+        c.execute('SELECT AVG(price) FROM cars WHERE rating BETWEEN %s AND %s', (min_r, max_r))
+        avg = c.fetchone()[0] or 20000
+        c.close(); conn.close()
+        amount = int(avg * 0.5)
+        add_coins(user_id, amount)
+        log_transaction(user_id, 'paid_wheel_coins', amount, None,
+                        'Премиум-колесо: всё собрано, выданы монеты')
+        return {'type': 'coins', 'paid': True, 'amount': amount}
+
+    # Взвешенный рандом: 5★ — 50%, 6★ — 35%, 7★ — 15%
+    weights = {5: 50, 6: 35, 7: 15}
+    weighted = []
+    for car in candidates:
+        car_id, model, rating, car_price = car
+        w = weights.get(rating, 10)
+        weighted.extend([car] * w)
+
+    chosen = random.choice(weighted)
+    car_id, model, rating, car_price = chosen
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
+              (user_id, car_id, datetime.now().isoformat()))
+    conn.commit(); c.close(); conn.close()
+    log_transaction(user_id, 'paid_wheel_car', 0, car_id, f'Премиум-колесо: {model}')
+    return {'type': 'car', 'paid': True, 'car_id': car_id, 'model': model, 'rating': rating}
 
 
 # ---------- ОБМЕНЫ ----------
 def create_trade(from_user_id, to_username, from_car_id, from_coins, message):
     to_user = get_user(to_username)
-    if not to_user: return False, 'Игрок с таким ником не найден'
+    if not to_user: return False, 'Игрок не найден'
     to_user_id = to_user[0]
     if to_user_id == from_user_id: return False, 'Нельзя самому себе'
     if not has_car(from_user_id, from_car_id): return False, 'У тебя нет этой машины'
@@ -1840,49 +1974,98 @@ def accept_trade(trade_id, user_id, to_car_id, to_coins):
     if to_coins < 0: return False, 'Монеты не могут быть отрицательными'
     if get_balance(user_id) < to_coins: return False, f'У тебя только {get_balance(user_id)} монет'
     if not has_car(t['from_user_id'], t['from_car_id']): return False, 'У отправителя уже нет этой машины'
-    if has_car(user_id, t['from_car_id']): return False, 'У тебя уже есть эта машина'
     if to_car_id:
         if not has_car(user_id, to_car_id): return False, 'У тебя нет этой машины'
-        if has_car(t['from_user_id'], to_car_id): return False, 'У отправителя уже есть эта машина'
+
+    from_car_info = get_car_info(t['from_car_id'])
+    to_car_info = get_car_info(to_car_id) if to_car_id else None
+
+    # Проверяем дубли
+    receiver_gets_dupe = has_car(user_id, t['from_car_id'])
+    sender_gets_dupe = has_car(t['from_user_id'], to_car_id) if to_car_id else False
 
     conn = get_db(); c = conn.cursor()
-    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (t['from_user_id'], t['from_car_id']))
-    c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)
-                 ON CONFLICT (user_id, car_id) DO NOTHING''',
-              (user_id, t['from_car_id'], datetime.now().isoformat()))
-    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (t['from_user_id'], t['from_car_id']))
-    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (t['from_user_id'], t['from_car_id']))
+
+    # ==== Забираем машину у отправителя ====
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
+    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s',
+              (t['from_user_id'], t['from_car_id']))
     c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
               (t['from_user_id'], t['from_car_id']))
-    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, t['from_car_id']))
+
+    dupe_refunds = []
+
+    # ==== Отдаём получателю (или монеты при дубле) ====
+    if receiver_gets_dupe:
+        ref = from_car_info[3] or 0
+        if ref > 0:
+            c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                      (ref, user_id))
+            dupe_refunds.append((user_id, ref, t['from_car_id'],
+                                 f'Дубль «{from_car_info[1]}» при обмене — 100% стоимости'))
+    else:
+        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
+                     VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+                  (user_id, t['from_car_id'], datetime.now().isoformat()))
+        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s',
+                  (user_id, t['from_car_id']))
+
+    # ==== Забираем машину у получателя (если есть) ====
     if to_car_id:
         c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
-        c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)
-                     ON CONFLICT (user_id, car_id) DO NOTHING''',
-                  (t['from_user_id'], to_car_id, datetime.now().isoformat()))
         c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
         c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, to_car_id))
         c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
                   (user_id, to_car_id))
-        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (t['from_user_id'], to_car_id))
+
+        if sender_gets_dupe:
+            ref = to_car_info[3] or 0
+            if ref > 0:
+                c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                          (ref, t['from_user_id']))
+                dupe_refunds.append((t['from_user_id'], ref, to_car_id,
+                                     f'Дубль «{to_car_info[1]}» при обмене — 100% стоимости'))
+        else:
+            c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
+                         VALUES (%s, %s, %s) ON CONFLICT (user_id, car_id) DO NOTHING''',
+                      (t['from_user_id'], to_car_id, datetime.now().isoformat()))
+            c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s',
+                      (t['from_user_id'], to_car_id))
+
+    # ==== Перевод монет (разница) ====
     diff = t['from_coins'] - to_coins
     if diff > 0:
         c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (diff, user_id))
     elif diff < 0:
-        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (-diff, t['from_user_id']))
+        c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s',
+                  (-diff, t['from_user_id']))
+
     c.execute('''UPDATE trades SET to_car_id = %s, to_coins = %s,
                  status = 'completed', resolved_at = %s WHERE id = %s''',
               (to_car_id, to_coins, datetime.now().isoformat(), trade_id))
     conn.commit(); c.close(); conn.close()
-    other_name = get_username_by_id(user_id); my_name = get_username_by_id(t['from_user_id'])
-    log_transaction(t['from_user_id'], 'trade', -t['from_coins'] + to_coins, t['from_car_id'], f'Обмен с {other_name}')
+
+    other_name = get_username_by_id(user_id)
+    my_name = get_username_by_id(t['from_user_id'])
+    log_transaction(t['from_user_id'], 'trade', -t['from_coins'] + to_coins,
+                    t['from_car_id'], f'Обмен с {other_name}')
     log_transaction(user_id, 'trade', t['from_coins'] - to_coins, to_car_id, f'Обмен с {my_name}')
+
+    for uid, amt, cid, desc in dupe_refunds:
+        log_transaction(uid, 'trade_duplicate', amt, cid, desc)
+
     add_xp(t['from_user_id'], XP_REWARDS.get('trade', 40))
     add_xp(user_id, XP_REWARDS.get('trade', 40))
     progress_quest(t['from_user_id'], 'trade_1', 1)
     progress_quest(user_id, 'trade_1', 1)
     create_notification(t['from_user_id'], 'trade_accept',
                         f'{get_username_by_id(user_id)} принял твой обмен', '', '/trades')
+
+    if dupe_refunds:
+        return True, 'Обмен выполнен! Вместо дублей начислены монеты (100% стоимости).'
     return True, 'Обмен выполнен!'
 
 
@@ -2050,22 +2233,37 @@ def join_race_challenge(challenge_id, user_id, my_car_id, offer_car):
                  WHERE id = %s''',
               (user_id, my_car_id, winner_id, datetime.now().isoformat(), challenge_id))
     conn.commit(); c.close(); conn.close()
+
     log_transaction(author_id, 'race_win' if winner_id == author_id else 'race_lose',
                     bet if winner_id == author_id else -bet, author_car_id,
                     'Гонка: победа' if winner_id == author_id else 'Гонка: поражение')
     log_transaction(user_id, 'race_win' if winner_id == user_id else 'race_lose',
                     bet if winner_id == user_id else -bet, my_car_id,
                     'Гонка: победа' if winner_id == user_id else 'Гонка: поражение')
+
+    # XP и награды
+    reward_author = 0
+    reward_user = 0
     for uid in (author_id, user_id):
-        if uid == winner_id: add_xp(uid, XP_REWARDS.get('race_win', 50))
-        else: add_xp(uid, XP_REWARDS.get('race_lose', 15))
+        if uid == winner_id:
+            add_xp(uid, XP_REWARDS.get('race_win', 50))
+            r = give_race_reward(uid)
+            if uid == author_id:
+                reward_author = r
+            else:
+                reward_user = r
+        else:
+            add_xp(uid, XP_REWARDS.get('race_lose', 15))
         progress_quest(uid, 'races_play_5', 1)
-        if uid == winner_id: progress_quest(uid, 'win_races_3', 1)
+        if uid == winner_id:
+            progress_quest(uid, 'win_races_3', 1)
+
     create_notification(author_id, 'race_joined',
                         f'{get_username_by_id(user_id)} принял твой вызов на гонку',
                         'Открой раздел Гонки, чтобы посмотреть результат.', '/races')
     return True, 'Гонка завершена!', {'winner_id': winner_id, 'challenge_id': challenge_id,
-                                       'car_transferred': car_transferred}
+                                       'car_transferred': car_transferred,
+                                       'race_reward': reward_author if winner_id == author_id else reward_user}
 
 
 def get_race(challenge_id):
@@ -2229,6 +2427,13 @@ def index():
     unread_notifications = 0
     if 'user_id' in session:
         flash_new_achievements(session['user_id'])
+
+        # Пассивный доход
+        if can_collect_passive(session['user_id']):
+            passive = collect_passive_income(session['user_id'])
+            if passive > 0:
+                flash(f'💰 Пассивный доход: +{passive} монет с {passive} машин!')
+
         profile = get_user_profile(session['user_id'])
         if profile:
             level_info = {'level': profile['level'], 'xp': profile['xp'],
@@ -3147,17 +3352,18 @@ def wheel():
     ready, secs = can_spin(session['user_id'])
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
-    paid_price = get_int_setting('paid_wheel_price', 1000)
-    paid_info = {'car_chance': get_int_setting('paid_wheel_car_chance', 15),
-                 'coin_min': get_int_setting('paid_wheel_coin_min', 100),
-                 'coin_max': get_int_setting('paid_wheel_coin_max', 600),
-                 'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
-                 'car_max_rating': get_int_setting('paid_wheel_car_max_rating', 8)}
-    free_info = {'car_chance': get_int_setting('wheel_car_chance', 5),
-                 'coin_min': get_int_setting('wheel_coin_min', 30),
-                 'coin_max': get_int_setting('wheel_coin_max', 150),
-                 'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
-                 'car_max_rating': get_int_setting('wheel_car_max_rating', 4)}
+    paid_price = get_int_setting('paid_wheel_price', 3000)
+    paid_info = {
+        'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
+        'car_max_rating': get_int_setting('paid_wheel_car_max_rating', 7),
+    }
+    free_info = {
+        'car_chance': get_int_setting('wheel_car_chance', 8),
+        'coin_min': get_int_setting('wheel_coin_min', 300),
+        'coin_max': get_int_setting('wheel_coin_max', 1500),
+        'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
+        'car_max_rating': get_int_setting('wheel_car_max_rating', 4),
+    }
     return render_template('wheel.html',
                            ready=ready, time_left=format_time_left(secs) if not ready else '',
                            result=result, balance=get_balance(session['user_id']),
@@ -3170,7 +3376,7 @@ def wheel():
 @app.route('/wheel/spin', methods=['POST'])
 @login_required
 def wheel_spin():
-    result = do_spin(session['user_id'], paid=False)
+    result = do_spin_free(session['user_id'])
     if 'error' in result: flash(result['error'])
     else: session['wheel_result'] = result
     return redirect(url_for('wheel'))
@@ -3181,7 +3387,7 @@ def wheel_spin():
 def wheel_spin_paid():
     if get_setting('paid_wheel_enabled') != '1':
         flash('Премиум-колесо отключено'); return redirect(url_for('wheel'))
-    result = do_spin(session['user_id'], paid=True)
+    result = do_spin_paid(session['user_id'])
     if 'error' in result: flash(result['error'])
     else: session['wheel_result'] = result
     return redirect(url_for('wheel'))
@@ -3464,8 +3670,7 @@ def admin_settings():
         for k in ['discount_min_rating', 'discount_max_rating', 'discount_percent',
                   'wheel_coin_min', 'wheel_coin_max', 'wheel_car_chance',
                   'wheel_car_min_rating', 'wheel_car_max_rating', 'wheel_cooldown_hours',
-                  'paid_wheel_price', 'paid_wheel_coin_min', 'paid_wheel_coin_max',
-                  'paid_wheel_car_chance', 'paid_wheel_car_min_rating', 'paid_wheel_car_max_rating']:
+                  'paid_wheel_price', 'paid_wheel_car_min_rating', 'paid_wheel_car_max_rating']:
             set_setting(k, request.form.get(k, get_setting(k)))
         for k in ['discount_enabled', 'wheel_enabled', 'paid_wheel_enabled']:
             set_setting(k, '1' if request.form.get(k) else '0')
