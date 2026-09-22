@@ -3456,7 +3456,7 @@ def wheel():
     ready, secs = can_spin(session['user_id'])
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
-  paid_ready = True
+    paid_ready = True
 paid_time_left = ''
 conn = get_db(); c = conn.cursor()
 c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (session['user_id'],))
