@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Админ: скидки — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="garage-header">
+        <h2>🏷️ Управление скидками</h2>
+        <a href="/admin/discounts/new" class="btn btn-primary btn-small">+ Создать скидку</a>
+        <a href="/admin/settings" class="btn btn-secondary btn-small">⚙ В админку</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {% if daily and daily_car %}
+        <div class="daily-block">
+            🔥 <strong>Скидка дня:</strong> «{{ daily_car[1] }}» — <strong>−{{ daily.discount_percent }}%</strong>
+            <form method="POST" action="/admin/discount/reroll" style="display:inline;margin-left:15px;">
+                <button type="submit" class="btn btn-secondary btn-tiny">🔄 Пересоздать</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if discounts %}
+        <div class="discounts-list">
+            {% for d in discounts %}
+                <div class="discount-row {% if not d.is_active %}inactive{% endif %}">
+                    <div class="discount-info">
+                        <div class="discount-name">
+                            {{ d.name }}
+                            {% if not d.is_active %}<span class="inactive-tag">выключена</span>{% endif %}
+                        </div>
+                        <div class="discount-meta">
+                            {% if d.discount_type == 'car' %}
+                                🚗 Одна машина
+                            {% else %}
+                                ⭐ Звёзды {{ d.rating_min }}–{{ d.rating_max }}
+                            {% endif %}
+                            · −{{ d.discount_percent }}%
+                            {% if d.expires_at %}
+                                · до {{ d.expires_at[:10] }}
+                            {% else %}
+                                · бессрочная
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="discount-actions">
+                        <a href="/admin/discounts/{{ d.id }}/edit" class="btn btn-primary btn-tiny">✎ Изменить</a>
+                        <form method="POST" action="/admin/discounts/{{ d.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Удалить скидку «{{ d.name }}»?');">
+                            <button type="submit" class="btn btn-danger btn-tiny">✕</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="description">Скидок пока нет. Создай первую!</p>
+    {% endif %}
+
+    <p class="form-link" style="margin-top: 30px;"><a href="/">← На главную</a></p>
+
+    <style>
+        .garage-header {
+            display: flex; align-items: center; gap: 14px;
+            margin-bottom: 25px; flex-wrap: wrap; justify-content: center;
+        }
+        .garage-header h2 { font-size: 30px; color: var(--accent); text-shadow: var(--neon); }
+        .btn-small { padding: 10px 18px; font-size: 14px; }
+        .btn-tiny { padding: 6px 14px; font-size: 13px; }
+
+        .daily-block {
+            background: var(--warn-bg); border: 2px solid var(--accent);
+            border-radius: 16px; padding: 14px 22px; margin-bottom: 20px;
+            font-size: 15px; color: var(--text-main);
+        }
+
+        .btn-danger {
+            background: #dc3545; color: #fff; border: none;
+            border-radius: 20px; cursor: pointer; font-family: inherit;
+        }
+        .btn-danger:hover { background: #c82333; }
+
+        .discounts-list {
+            display: flex; flex-direction: column; gap: 12px;
+            width: 100%; max-width: 900px;
+        }
+        .discount-row {
+            display: flex; align-items: center; gap: 16px;
+            background: var(--card-bg); border: 2px solid var(--border);
+            border-radius: 14px; padding: 14px 20px;
+        }
+        .discount-row.inactive { opacity: 0.5; }
+        .discount-info { flex: 1; text-align: left; }
+        .discount-name {
+            font-size: 16px; font-weight: 900; color: var(--text-main);
+            margin-bottom: 4px;
+        }
+        .inactive-tag {
+            font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 12px;
+            background: rgba(255, 193, 7, 0.2); color: var(--warn);
+            margin-left: 8px;
+        }
+        .discount-meta { font-size: 13px; color: var(--text-secondary); }
+        .discount-actions { display: flex; gap: 6px; align-items: center; }
+    </style>
+
+{% endblock %}
