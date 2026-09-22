@@ -79,8 +79,6 @@
             text-align: center;
             padding: 60px 20px;
         }
-
-        /* ===== ЛОГОТИП С НЕОНОМ ===== */
         .logo {
             font-size: clamp(48px, 10vw, 120px);
             font-weight: 900;
@@ -89,11 +87,9 @@
             text-shadow: var(--neon-strong);
             margin-bottom: 40px;
             text-transform: uppercase;
-            transition: text-shadow 0.4s ease;
         }
         .logo a { color: inherit; text-decoration: none; }
 
-        /* ===== КНОПКИ ===== */
         .btn {
             padding: 16px 45px;
             font-size: 20px;
@@ -128,7 +124,6 @@
             box-shadow: var(--neon);
         }
 
-        /* ===== ФОРМЫ ===== */
         .form-box {
             background: var(--card-bg);
             padding: 40px;
@@ -232,7 +227,6 @@
         }
         .footer-contacts a:hover { background: rgba(255, 255, 255, 0.3); transform: translateY(-2px); }
 
-        /* ===== ПЛАВАЮЩИЕ КНОПКИ ===== */
         .float-buttons {
             position: fixed;
             bottom: 25px;
@@ -269,7 +263,21 @@
             transform: scale(0.5);
         }
 
-        /* ===== ПОЛОСКА УРОВНЯ (внутри index) ===== */
+        .notif-btn { position: relative; }
+        .notif-count {
+            position: absolute;
+            top: -4px; right: -4px;
+            min-width: 22px; height: 22px;
+            padding: 0 6px; border-radius: 11px;
+            background: #ff4d4d; color: #fff;
+            font-size: 12px; font-weight: 900;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(255, 77, 77, 0.6);
+        }
+        [data-theme="dark"] .notif-count {
+            box-shadow: 0 0 10px rgba(255, 77, 77, 0.9), 0 2px 8px rgba(255, 77, 77, 0.6);
+        }
+
         .level-widget { width: 100%; max-width: 500px; margin-bottom: 16px; }
         .level-row {
             display: flex; align-items: center; gap: 10px;
@@ -304,19 +312,190 @@
             white-space: nowrap;
         }
 
-        /* ===== ОБЩИЕ ЭЛЕМЕНТЫ ===== */
-        .stat-pill, .balance-pill, .count-pill, .info-pill, .stats-pill, .user-level-line {
-            background: var(--card-bg-solid) !important;
-            color: var(--text-secondary) !important;
-            border: 2px solid var(--border) !important;
+        /* ==================== ГЛОБАЛЬНЫЕ ПРАВИЛА ТЁМНОЙ ТЕМЫ ==================== */
+        /* Перекрывает белые фоны во всех шаблонах автоматически */
+        [data-theme="dark"] .car-card,
+        [data-theme="dark"] .achievement-card,
+        [data-theme="dark"] .ach-card,
+        [data-theme="dark"] .trade-card,
+        [data-theme="dark"] .friend-card,
+        [data-theme="dark"] .user-row,
+        [data-theme="dark"] .leader-row,
+        [data-theme="dark"] .spec,
+        [data-theme="dark"] .form-box,
+        [data-theme="dark"] .notif-item,
+        [data-theme="dark"] .news-card,
+        [data-theme="dark"] .admin-row,
+        [data-theme="dark"] .admin-news-row,
+        [data-theme="dark"] .admin-news-list,
+        [data-theme="dark"] .collection-card,
+        [data-theme="dark"] .news-full,
+        [data-theme="dark"] .trade-card.history,
+        [data-theme="dark"] .side,
+        [data-theme="dark"] .action-box,
+        [data-theme="dark"] .message-box,
+        [data-theme="dark"] .bonus-quest,
+        [data-theme="dark"] .profile-main,
+        [data-theme="dark"] .profile-bio,
+        [data-theme="dark"] .profile-fav-card,
+        [data-theme="dark"] .rank-row,
+        [data-theme="dark"] .stat-box,
+        [data-theme="dark"] .wheel-info,
+        [data-theme="dark"] .create-block,
+        [data-theme="dark"] .race-card,
+        [data-theme="dark"] .quest-card,
+        [data-theme="dark"] .result-side,
+        [data-theme="dark"] .result-summary {
+            background: var(--card-bg) !important;
+            border-color: var(--border) !important;
+            color: var(--text-main);
         }
+
+        /* Кнопки-вторички, input, select, textarea в тёмной теме */
+        [data-theme="dark"] .btn-secondary,
+        [data-theme="dark"] .form-select,
+        [data-theme="dark"] .form-input,
+        [data-theme="dark"] .form-file,
+        [data-theme="dark"] .form-textarea,
+        [data-theme="dark"] select,
+        [data-theme="dark"] input[type="text"],
+        [data-theme="dark"] input[type="number"],
+        [data-theme="dark"] input[type="password"],
+        [data-theme="dark"] input[type="file"],
+        [data-theme="dark"] textarea {
+            background: var(--card-bg-solid) !important;
+            color: var(--text-main) !important;
+            border-color: var(--border) !important;
+        }
+
+        /* Белые плашки/строчки */
+        [data-theme="dark"] .sort-chip,
+        [data-theme="dark"] .filter-chip,
+        [data-theme="dark"] .tab,
+        [data-theme="dark"] .page-btn,
+        [data-theme="dark"] .page-num,
+        [data-theme="dark"] .category-badge,
+        [data-theme="dark"] .achievements-grid,
+        [data-theme="dark"] .leaderboard,
+        [data-theme="dark"] .users-list,
+        [data-theme="dark"] .trades-list,
+        [data-theme="dark"] .notif-list,
+        [data-theme="dark"] .news-list,
+        [data-theme="dark"] .admin-list,
+        [data-theme="dark"] .admin-news-list,
+        [data-theme="dark"] .cars-grid,
+        [data-theme="dark"] .car-image {
+            color: var(--text-main);
+        }
+
+        /* Info-плашки и статистика */
         [data-theme="dark"] .stat-pill,
         [data-theme="dark"] .balance-pill,
         [data-theme="dark"] .count-pill,
         [data-theme="dark"] .info-pill,
         [data-theme="dark"] .stats-pill,
-        [data-theme="dark"] .user-level-line {
-            box-shadow: 0 0 15px rgba(255, 140, 26, 0.2);
+        [data-theme="dark"] .user-level-line,
+        [data-theme="dark"] .section-pill,
+        [data-theme="dark"] .total-info {
+            background: var(--card-bg-solid) !important;
+            color: var(--text-secondary) !important;
+            border-color: var(--border) !important;
+            box-shadow: 0 0 15px rgba(255, 140, 26, 0.15);
+        }
+
+        /* Строки рейтинга */
+        [data-theme="dark"] .leader-row.me {
+            background: linear-gradient(135deg, rgba(255, 140, 26, 0.15) 0%, rgba(255, 179, 71, 0.1) 100%) !important;
+            border-color: var(--accent) !important;
+        }
+
+        /* Настройки профиля — строки */
+        [data-theme="dark"] .setting-row {
+            border-color: var(--border) !important;
+        }
+
+        /* Просмотр обмена — белые блоки */
+        [data-theme="dark"] .side,
+        [data-theme="dark"] .message-box,
+        [data-theme="dark"] .action-box {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 140, 26, 0.1) !important;
+        }
+
+        /* Сравнение машин */
+        [data-theme="dark"] .compare-col,
+        [data-theme="dark"] .specs-compare,
+        [data-theme="dark"] .spec-row {
+            background: var(--card-bg) !important;
+            border-color: var(--border) !important;
+        }
+        [data-theme="dark"] .spec-label {
+            background: var(--card-bg-solid) !important;
+            color: var(--text-secondary) !important;
+        }
+
+        /* Админ-коллекции */
+        [data-theme="dark"] .admin-collections-list,
+        [data-theme="dark"] .car-check-list,
+        [data-theme="dark"] .car-check-item:hover {
+            background: var(--card-bg-solid) !important;
+        }
+        [data-theme="dark"] .car-check-item {
+            color: var(--text-main) !important;
+        }
+        [data-theme="dark"] .car-check-list {
+            border-color: var(--border) !important;
+        }
+
+        /* Друзья */
+        [data-theme="dark"] .search-block,
+        [data-theme="dark"] .user-avatar-letter {
+            background: var(--card-bg) !important;
+        }
+
+        /* Строки в рейтинге */
+        [data-theme="dark"] .leader-row {
+            background: var(--card-bg) !important;
+            border-color: var(--border) !important;
+        }
+
+        /* ==================== РЕДКОСТИ КОЛЛЕКЦИЙ ==================== */
+        /* Обычная — белое свечение */
+        .collection-card.rarity-common,
+        .admin-row.rarity-common,
+        .collection-header.rarity-common {
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4), 0 6px 20px var(--shadow) !important;
+            border-color: #bdbdbd !important;
+        }
+        [data-theme="dark"] .collection-card.rarity-common,
+        [data-theme="dark"] .admin-row.rarity-common,
+        [data-theme="dark"] .collection-header.rarity-common {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.35), 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        /* Редкая — синее свечение */
+        .collection-card.rarity-rare,
+        .admin-row.rarity-rare,
+        .collection-header.rarity-rare {
+            box-shadow: 0 0 20px rgba(66, 165, 245, 0.6), 0 6px 20px rgba(66, 165, 245, 0.3) !important;
+            border-color: #42a5f5 !important;
+        }
+        [data-theme="dark"] .collection-card.rarity-rare,
+        [data-theme="dark"] .admin-row.rarity-rare,
+        [data-theme="dark"] .collection-header.rarity-rare {
+            box-shadow: 0 0 25px rgba(66, 165, 245, 0.8), 0 0 45px rgba(66, 165, 245, 0.4), 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        /* Легендарная — жёлтое (золотое) свечение */
+        .collection-card.rarity-legendary,
+        .admin-row.rarity-legendary,
+        .collection-header.rarity-legendary {
+            box-shadow: 0 0 20px rgba(255, 193, 7, 0.7), 0 6px 20px rgba(255, 193, 7, 0.3) !important;
+            border-color: #ffc107 !important;
+        }
+        [data-theme="dark"] .collection-card.rarity-legendary,
+        [data-theme="dark"] .admin-row.rarity-legendary,
+        [data-theme="dark"] .collection-header.rarity-legendary {
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.9), 0 0 50px rgba(255, 215, 0, 0.5), 0 0 80px rgba(255, 215, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.4) !important;
         }
 
         @media (max-width: 600px) {
@@ -325,27 +504,6 @@
             .btn { padding: 14px 32px; font-size: 17px; }
             .footer-contacts { flex-direction: column; gap: 12px; }
             .float-btn { width: 46px; height: 46px; font-size: 20px; }
-        }
-                .notif-btn { position: relative; }
-        .notif-count {
-            position: absolute;
-            top: -4px;
-            right: -4px;
-            min-width: 22px;
-            height: 22px;
-            padding: 0 6px;
-            border-radius: 11px;
-            background: #ff4d4d;
-            color: #fff;
-            font-size: 12px;
-            font-weight: 900;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(255, 77, 77, 0.6);
-        }
-        [data-theme="dark"] .notif-count {
-            box-shadow: 0 0 10px rgba(255, 77, 77, 0.9), 0 2px 8px rgba(255, 77, 77, 0.6);
         }
     </style>
 </head>
