@@ -3562,7 +3562,7 @@ if row and row[0]:
         'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
         'car_max_rating': get_int_setting('wheel_car_max_rating', 4),
     }
-  return render_template('wheel.html',
+    return render_template('wheel.html',
                          ready=ready, time_left=format_time_left(secs) if not ready else '',
                          result=result, balance=get_balance(session['user_id']),
                          paid_enabled=paid_enabled, paid_price=paid_price,
