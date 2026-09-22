@@ -3541,15 +3541,16 @@ def wheel():
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (session['user_id'],))
     row = c.fetchone(); c.close(); conn.close()
-if row and row[0]:
-    try:
-        last = datetime.fromisoformat(row[0])
-        diff = 86400 - (datetime.now() - last).total_seconds()
-        if diff > 0:
-            paid_ready = False
-            paid_time_left = format_time_left(int(diff))
-    except (ValueError, TypeError):
-        pass
+    row = c.fetchone(); c.close(); conn.close()
+    if row and row[0]:
+        try:
+            last = datetime.fromisoformat(row[0])
+            diff = 86400 - (datetime.now() - last).total_seconds()
+            if diff > 0:
+                paid_ready = False
+                paid_time_left = format_time_left(int(diff))
+        except (ValueError, TypeError):
+            pass
     paid_price = get_int_setting('paid_wheel_price', 3000)
     paid_info = {
         'car_min_rating': get_int_setting('paid_wheel_car_min_rating', 5),
