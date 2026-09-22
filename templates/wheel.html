@@ -72,7 +72,16 @@
                 💰 Монеты: {{ paid_info.coin_min }}–{{ paid_info.coin_max }}<br>
                 ⭐ Звёзды: {{ paid_info.car_min_rating }}–{{ paid_info.car_max_rating }}
             </div>
-            <form method="POST" action="/wheel/spin_paid" class="spin-form">
+            {% if paid_ready %}
+    <form method="POST" action="/wheel/spin_paid" class="spin-form">
+        <button type="submit" class="btn btn-primary btn-spin premium-btn"
+                {% if balance < paid_price %}disabled title="Не хватает монет"{% endif %}>
+            💎 Крутить за {{ paid_price }} 💰
+        </button>
+    </form>
+{% else %}
+    <div class="cooldown-box">💎 Через <strong>{{ paid_time_left }}</strong></div>
+{% endif %}
                 <button type="submit" class="btn btn-primary btn-spin premium-btn"
                         {% if balance < paid_price %}disabled title="Не хватает монет"{% endif %}>
                     💎 Крутить за {{ paid_price }} 💰
