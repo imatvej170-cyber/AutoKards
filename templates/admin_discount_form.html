@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'new' %}Новая скидка{% else %}Редактирование{% endif %} — AutoKards{% endblock %}
+{% block content %}
+
+    <h1 class="logo"><a href="/">AutoKards</a></h1>
+
+    <div class="form-box" style="max-width: 560px;">
+        <h2>{% if mode == 'new' %}🏷️ Новая скидка{% else %}✎ Редактирование{% endif %}</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}{% for msg in messages %}<div class="flash">{{ msg }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <form method="POST"
+              action="{% if mode == 'new' %}/admin/discounts/new{% else %}/admin/discounts/{{ discount.id }}/edit{% endif %}">
+
+            <label class="form-label">Название</label>
+            <input type="text" name="name" maxlength="100" required class="form-input"
+                   value="{{ discount.name if discount else '' }}"
+                   placeholder="Например: Первый месяц −20% на 5-6★">
+
+            <label class="form-label">Тип скидки</label>
+            <select name="discount_type" id="discountType" class="form-select"
+                    onchange="toggleType()">
+                <option value="rating" {% if not discount or discount.discount_type == 'rating' %}selected{% endif %}>
+                    ⭐ По звёздам (диапазон)
+                </option>
+                <option value="car" {% if discount and discount.discount_type == 'car' %}selected{% endif %}>
+                    🚗 Одна конкретная машина
+                </option>
+            </select>
+
+            <div id="ratingFields">
+                <label class="form-label">Звёзды от</label>
+                <input type="number" name="rating_min" min="1" max="8" class="form-input"
+                       value="{{ discount.rating_min if discount and discount.rating_min else 5 }}">
+
+                <label class="form-label">Звёзды до</label>
+                <input type="number" name="rating_max" min="1" max="8" class="form-input"
+                       value="{{ discount.rating_max if discount and discount.rating_max else 6 }}">
+            </div>
+
+            <div id="carFields" style="display:none;">
+                <label class="form-label">Машина</label>
+                <select name="car_id" class="form-select">
+                    <option value="">— Выбери машину —</option>
+                    {% for car in all_cars %}
+                        <option value="{{ car[0] }}"
+                            {% if discount and discount.car_id == car[0] %}selected{% endif %}>
+                            {{ car[1] }} ({{ car[2] }}★ · {{ car[3] }} 💰)
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <label class="form-label">Размер скидки (%)</label>
+            <input type="number" name="discount_percent" min="1" max="90"
+                   value="{{ discount.discount_percent if discount else 20 }}" class="form-input">
+
+            <label class="form-label">Дата окончания (пусто = бессрочная)</label>
+            <input type="text" name="expires_at" class="form-input"
+                   placeholder="2025-12-31T23:59"
+                   value="{{ discount.expires_at[:16] if discount and discount.expires_at else '' }}">
+
+            {% if mode == 'edit' %}
+                <label class="check-row">
+                    <input type="checkbox" name="is_active" value="1"
+                           {% if discount.is_active %}checked{% endif %}>
+                    Скидка активна
+                </label>
+            {% endif %}
+
+            <button type="submit" class="btn btn-primary" style="width:100%; margin-top:20px;">
+                {% if mode == 'new' %}Создать{% else %}Сохранить{% endif %}
+            </button>
+        </form>
+
+        <p class="form-link"><a href="/admin/discounts">← К скидкам</a></p>
+    </div>
+
+    <script>
+        function toggleType() {
+            const t = document.getElementById('discountType').value;
+            document.getElementById('ratingFields').style.display = (t === 'rating') ? 'block' : 'none';
+            document.getElementById('carFields').style.display = (t === 'car') ? 'block' : 'none';
+        }
+        toggleType();
+    </script>
+
+    <style>
+        .form-label {
+            display: block; text-align: left; font-size: 14px;
+            color: var(--text-secondary); margin-bottom: 6px; margin-top: 14px; font-weight: 700;
+        }
+        .form-input, .form-select {
+            width: 100%; padding: 12px 16px; font-size: 16px;
+            border: 2px solid var(--border); border-radius: 12px;
+            background: var(--card-bg-solid); color: var(--text-main);
+            font-family: inherit; box-sizing: border-box;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
+        .check-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            font-size: 14px; color: var(--text-main); font-weight: 600;
+            margin: 14px 0; text-align: left;
+        }
+        .check-row input[type="checkbox"] {
+            width: 18px; height: 18px; accent-color: var(--accent);
+        }
+    </style>
+
+{% endblock %}
