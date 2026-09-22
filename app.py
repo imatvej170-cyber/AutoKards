@@ -84,6 +84,9 @@ DEFAULT_SETTINGS = {
     'wheel_cooldown_hours': '24',
     'paid_wheel_enabled': '1', 'paid_wheel_price': '9000',
     'paid_wheel_car_min_rating': '5', 'paid_wheel_car_max_rating': '7',
+    'pve_daily_limit': '15000',       # макс монет в день с PvE
+    'pve_daily_races': '40',          # макс гонок в день
+    'pve_enabled': '1',               # вкл/выкл режим
 }
 
 # ============ ДОСТИЖЕНИЯ ============
@@ -172,6 +175,19 @@ def init_db():
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS top_speed INTEGER')
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS brand VARCHAR(40)')
     c.execute('ALTER TABLE cars ADD COLUMN IF NOT EXISTS is_exclusive BOOLEAN DEFAULT FALSE')
+
+  c.execute('''CREATE TABLE IF NOT EXISTS pve_races (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    car_id INTEGER NOT NULL,
+    difficulty TEXT NOT NULL,
+    player_score REAL NOT NULL,
+    bot_score REAL NOT NULL,
+    bot_rating INTEGER NOT NULL,
+    won BOOLEAN NOT NULL,
+    reward INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+)''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS user_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
@@ -1675,7 +1691,71 @@ def get_car_full(car_id):
             'horsepower': row[4], 'acceleration': row[5], 'top_speed': row[6],
             'brand': row[7] or '', 'is_exclusive': row[8]}
 
+# ─────────── PvE-ГОНКИ С БОТАМИ ───────────
 
+def car_power(car):
+    """Сила машины по характеристикам. Чем больше — тем сильнее."""
+    hp = float(car.get('horsepower') or 0)
+    acc = float(car.get('acceleration') or 15)
+    top = float(car.get('top_speed') or 150)
+    # Разгон: меньше секунд = лучше. 25 сек — дно, 0 сек — идеал.
+    acc_score = max(0, 25 - acc)
+    return hp * 0.4 + acc_score * 30 + top * 0.5
+
+
+def garage_bonus(user_id):
+    """Бонус сложности в зависимости от суммы звёзд гаража.
+    Защита от фарма: чем богаче гараж — тем сильнее боты даже на лёгком.
+    """
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COALESCE(SUM(c.rating), 0)
+                 FROM cars c
+                 JOIN user_cars uc ON uc.car_id = c.id
+                 WHERE uc.user_id = %s''', (user_id,))
+    total_stars = c.fetchone()[0] or 0
+    c.close(); conn.close()
+    # 0★ → 1.0, 300★ → 1.5, 600★+ → 1.5 (макс)
+    mult = 1 + min(total_stars / 600.0, 0.5)
+    return mult, total_stars
+
+
+def make_bot_score(player_power, difficulty, garage_mult):
+    """Считает силу бота с рандомом ±10%."""
+    mult_map = {'easy': 0.75, 'medium': 1.0, 'hard': 1.3}
+    base = player_power * mult_map.get(difficulty, 1.0) * garage_mult
+    return base * random.uniform(0.9, 1.1)
+
+
+def power_to_stars(power):
+    """Грубая оценка звёзд бота по силе — для отображения."""
+    stars = int(round(power / 200.0))
+    return max(1, min(8, stars))
+
+
+def calc_pve_reward(difficulty, player_rating, won):
+    """Награда за победу. Проигрыш — 0."""
+    if not won:
+        return 0
+    base = {
+        'easy':   random.randint(80, 150),
+        'medium': random.randint(200, 350),
+        'hard':   random.randint(450, 800),
+    }.get(difficulty, 100)
+    # множитель от звёзд машины игрока
+    return int(base * (1 + player_rating * 0.1))
+
+
+def pve_today_stats(user_id):
+    """Сколько монет и гонок уже сделано за последние 24ч."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COUNT(*), COALESCE(SUM(reward), 0)
+                 FROM pve_races
+                 WHERE user_id = %s
+                   AND created_at >= NOW() - INTERVAL '24 hours' ''', (user_id,))
+    row = c.fetchone()
+    c.close(); conn.close()
+    return (row[0] or 0), (row[1] or 0)
+  
 def delete_car_from_catalog(car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
