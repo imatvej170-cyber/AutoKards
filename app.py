@@ -3593,7 +3593,165 @@ def wheel_spin_paid():
     else: session['wheel_result'] = result
     return redirect(url_for('wheel'))
 
+# ─────────── PvE-ГОНКИ С БОТАМИ ───────────
 
+@app.route('/pve')
+@login_required
+def pve():
+    user_id = session['user_id']
+
+    if get_setting('pve_enabled') != '1':
+        flash('Режим PvE временно отключён')
+        return redirect(url_for('index'))
+
+    # машины игрока
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT c.id, c.model, c.brand, c.rating, c.horsepower,
+                        c.acceleration, c.top_speed, c.price
+                 FROM cars c
+                 JOIN user_cars uc ON uc.car_id = c.id
+                 WHERE uc.user_id = %s
+                 ORDER BY c.rating DESC, c.price DESC''', (user_id,))
+    cars = c.fetchall()
+    c.close(); conn.close()
+
+    # статистика за 24ч + лимиты
+    races_today, coins_today = pve_today_stats(user_id)
+    daily_races = get_int_setting('pve_daily_races', 40)
+    daily_coins = get_int_setting('pve_daily_limit', 15000)
+
+    # бонус гаража (для отображения игроку, что боты будут сильнее)
+    garage_mult, total_stars = garage_bonus(user_id)
+
+    return render_template('pve.html',
+        cars=cars,
+        balance=get_balance(user_id),
+        races_today=races_today, coins_today=coins_today,
+        daily_races=daily_races, daily_coins=daily_coins,
+        garage_mult=round(garage_mult, 2), total_stars=total_stars,
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
+
+
+@app.route('/pve/race', methods=['POST'])
+@login_required
+def pve_race():
+    user_id = session['user_id']
+
+    if get_setting('pve_enabled') != '1':
+        flash('Режим PvE временно отключён')
+        return redirect(url_for('index'))
+
+    # данные из формы
+    try:
+        car_id = int(request.form.get('car_id', 0))
+    except (ValueError, TypeError):
+        car_id = 0
+    difficulty = request.form.get('difficulty', 'medium')
+    if difficulty not in ('easy', 'medium', 'hard'):
+        difficulty = 'medium'
+
+    if car_id <= 0:
+        flash('Выбери машину')
+        return redirect(url_for('pve'))
+
+    # проверяем, что машина принадлежит игроку
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (user_id, car_id))
+    if not c.fetchone():
+        c.close(); conn.close()
+        flash('Этой машины нет в твоём гараже')
+        return redirect(url_for('pve'))
+    c.close(); conn.close()
+
+    # проверяем лимиты за 24ч
+    races_today, coins_today = pve_today_stats(user_id)
+    daily_races = get_int_setting('pve_daily_races', 40)
+    daily_coins = get_int_setting('pve_daily_limit', 15000)
+
+    if races_today >= daily_races:
+        flash(f'Дневной лимит гонок исчерпан ({daily_races}/день)')
+        return redirect(url_for('pve'))
+    if coins_today >= daily_coins:
+        flash(f'Дневной лимит монет исчерпан ({daily_coins}/день)')
+        return redirect(url_for('pve'))
+
+    # берём машину
+    car = get_car_full(car_id)
+    if not car:
+        flash('Машина не найдена')
+        return redirect(url_for('pve'))
+
+    # считаем силы
+    player_power = car_power(car)
+    garage_mult, _ = garage_bonus(user_id)
+    bot_base = make_bot_score(player_power, difficulty, garage_mult)
+
+    player_score = player_power * random.uniform(0.9, 1.1)
+    bot_score = bot_base * random.uniform(0.9, 1.1)
+
+    won = player_score > bot_score
+    bot_rating = power_to_stars(bot_base)
+
+    # награда с учётом лимита
+    reward = calc_pve_reward(difficulty, car.get('rating', 1), won)
+    if won and reward > 0:
+        left = max(0, daily_coins - coins_today)
+        reward = min(reward, left)
+
+    if won and reward > 0:
+        add_coins(user_id, reward)
+
+    # записываем в БД
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO pve_races
+                 (user_id, car_id, difficulty, player_score, bot_score,
+                  bot_rating, won, reward)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                 RETURNING id''',
+              (user_id, car_id, difficulty, player_score, bot_score,
+               bot_rating, won, reward))
+    race_id = c.fetchone()[0]
+    conn.commit(); c.close(); conn.close()
+
+    return redirect(url_for('pve_result', race_id=race_id))
+
+
+@app.route('/pve/result/<int:race_id>')
+@login_required
+def pve_result(race_id):
+    user_id = session['user_id']
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, user_id, car_id, difficulty, player_score,
+                        bot_score, bot_rating, won, reward, created_at
+                 FROM pve_races
+                 WHERE id = %s AND user_id = %s''', (race_id, user_id))
+    row = c.fetchone()
+    c.close(); conn.close()
+
+    if not row:
+        flash('Гонка не найдена')
+        return redirect(url_for('pve'))
+
+    race = {
+        'id': row[0], 'user_id': row[1], 'car_id': row[2],
+        'difficulty': row[3], 'player_score': row[4], 'bot_score': row[5],
+        'bot_rating': row[6], 'won': row[7], 'reward': row[8], 'created_at': row[9]
+    }
+
+    car = get_car_full(race['car_id'])
+
+    return render_template('pve_result.html',
+        race=race,
+        car=car,
+        balance=get_balance(user_id),
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
+  
 # ---------- ЖУРНАЛ ----------
 @app.route('/journal')
 @login_required
