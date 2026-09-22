@@ -152,7 +152,7 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INTEGER')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_bonus_at TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_spin_at TEXT')
-  c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_paid_spin_at TEXT')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_paid_spin_at TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_passive_income TEXT')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_streak INTEGER DEFAULT 0')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0')
