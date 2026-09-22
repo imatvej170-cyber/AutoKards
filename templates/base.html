@@ -549,7 +549,51 @@
             background: var(--card-bg) !important;
             border-color: var(--border) !important;
         }
+        /* БЕЙДЖ РЕДКОСТИ КОЛЛЕКЦИИ (подложка) */
+        [data-theme="dark"] .rarity-badge {
+            background: var(--card-bg-solid) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border) !important;
+        }
+        [data-theme="dark"] .rarity-common .rarity-badge {
+            background: rgba(189, 189, 189, 0.15) !important;
+            color: #e0e0e0 !important;
+            border-color: #bdbdbd !important;
+        }
+        [data-theme="dark"] .rarity-rare .rarity-badge {
+            background: rgba(66, 165, 245, 0.15) !important;
+            color: #64b5f6 !important;
+            border-color: #42a5f5 !important;
+        }
+        [data-theme="dark"] .rarity-legendary .rarity-badge {
+            background: rgba(255, 193, 7, 0.15) !important;
+            color: #ffd54f !important;
+            border-color: #ffc107 !important;
+        }
 
+        /* ПОЛОСКА ПРОГРЕССА КОЛЛЕКЦИИ */
+        [data-theme="dark"] .collection-progress-bar,
+        [data-theme="dark"] .progress-bar {
+            background: #0f0f1e !important;
+            border: 1px solid var(--border) !important;
+        }
+        [data-theme="dark"] .collection-progress-fill,
+        [data-theme="dark"] .progress-fill {
+            background: linear-gradient(90deg, var(--accent), #ffb347) !important;
+            box-shadow: 0 0 10px rgba(255, 140, 26, 0.8), 0 0 20px rgba(255, 140, 26, 0.5) !important;
+        }
+        [data-theme="dark"] .collection-progress-text,
+        [data-theme="dark"] .progress-text {
+            color: var(--text-secondary) !important;
+        }
+
+        /* В БЕЙДЖЕ "Собрано: X / Y" на главной коллекций */
+        [data-theme="dark"] .stats-pill {
+            background: var(--card-bg-solid) !important;
+            color: var(--text-secondary) !important;
+            border: 2px solid var(--border) !important;
+            box-shadow: 0 0 15px rgba(255, 140, 26, 0.15) !important;
+        }
         /* 10. РЕДКОСТИ КОЛЛЕКЦИЙ */
         .collection-card.rarity-common,
         .admin-row.rarity-common,
