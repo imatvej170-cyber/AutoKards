@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.res-wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 60px; }
+
+.res-banner {
+    text-align: center; padding: 28px 20px; border-radius: 20px;
+    margin-bottom: 22px; position: relative; overflow: hidden;
+}
+.res-banner.win {
+    background: linear-gradient(135deg, rgba(76,175,80,0.18), rgba(255,179,71,0.12));
+    border: 2px solid rgba(76,175,80,0.6);
+    box-shadow: 0 0 40px rgba(76,175,80,0.35), inset 0 0 30px rgba(76,175,80,0.08);
+}
+.res-banner.lose {
+    background: linear-gradient(135deg, rgba(255,77,77,0.15), rgba(120,0,0,0.1));
+    border: 2px solid rgba(255,77,77,0.5);
+    box-shadow: 0 0 40px rgba(255,77,77,0.25), inset 0 0 30px rgba(255,77,77,0.06);
+}
+.res-emoji { font-size: 60px; line-height: 1; margin-bottom: 8px; }
+.res-title {
+    font-size: 34px; font-weight: 900; letter-spacing: 2px; margin-bottom: 6px;
+}
+.res-banner.win .res-title { color: #4caf50; text-shadow: 0 0 20px rgba(76,175,80,0.6); }
+.res-banner.lose .res-title { color: #ff4d4d; text-shadow: 0 0 20px rgba(255,77,77,0.5); }
+.res-sub { color: #bbb; font-size: 14px; }
+
+.diff-tag {
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.diff-tag.easy { background: rgba(76,175,80,0.2); color: #4caf50; border: 1px solid rgba(76,175,80,0.5); }
+.diff-tag.medium { background: rgba(255,179,71,0.2); color: #ffb347; border: 1px solid rgba(255,179,71,0.5); }
+.diff-tag.hard { background: rgba(255,77,77,0.2); color: #ff4d4d; border: 1px solid rgba(255,77,77,0.5); }
+
+.reward-box {
+    text-align: center; padding: 20px; border-radius: 16px;
+    background: rgba(255,138,0,0.1);
+    border: 1px solid rgba(255,138,0,0.4);
+    margin-bottom: 22px;
+}
+.reward-label { font-size: 13px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+.reward-value {
+    font-size: 40px; font-weight: 900; color: #ff8a00;
+    text-shadow: 0 0 24px rgba(255,138,0,0.6); margin-top: 4px;
+}
+.reward-value.zero { color: #666; text-shadow: none; }
+
+.battle {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,138,0,0.2);
+    border-radius: 16px; padding: 20px; margin-bottom: 22px;
+}
+.battle-title {
+    text-align: center; font-size: 14px; color: #999; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 18px;
+}
+.battle-row { margin-bottom: 16px; }
+.battle-row:last-child { margin-bottom: 0; }
+.battle-label {
+    display: flex; justify-content: space-between;
+    font-size: 14px; margin-bottom: 6px;
+}
+.battle-label .name { font-weight: 700; }
+.battle-label .score { color: #ff8a00; font-weight: 700; }
+.bar {
+    height: 14px; border-radius: 7px; overflow: hidden;
+    background: rgba(0,0,0,0.35); position: relative;
+}
+.bar-fill {
+    height: 100%; border-radius: 7px; transition: width 0.8s ease-out;
+}
+.bar-fill.player { background: linear-gradient(90deg, #ff8a00, #ffb347); box-shadow: 0 0 12px rgba(255,138,0,0.5); }
+.bar-fill.bot { background: linear-gradient(90deg, #4a4a4a, #777); }
+
+.bot-stars { color: #ffb347; letter-spacing: 2px; font-size: 13px; }
+
+.actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px;
+}
+.btn {
+    display: block; text-align: center; padding: 16px;
+    border-radius: 14px; text-decoration: none; font-weight: 800;
+    font-size: 16px; transition: all 0.2s; border: none; cursor: pointer;
+}
+.btn-primary {
+    background: linear-gradient(135deg, #ff8a00, #ffb347);
+    color: #1a1a1a; box-shadow: 0 6px 20px rgba(255,138,0,0.5);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255,138,0,0.7); }
+.btn-secondary {
+    background: rgba(255,255,255,0.05);
+    color: #ddd; border: 1px solid rgba(255,138,0,0.3);
+}
+.btn-secondary:hover { background: rgba(255,138,0,0.15); border-color: rgba(255,138,0,0.6); }
+
+.car-info {
+    text-align: center; color: #999; font-size: 13px; margin-top: 12px;
+}
+.car-info b { color: #ff8a00; }
+
+@keyframes pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    70% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+.res-banner { animation: pop 0.5s ease-out; }
+</style>
+
+<div class="res-wrap">
+
+    {% if race.won %}
+        <div class="res-banner win">
+            <div class="res-emoji">🏆</div>
+            <div class="res-title">ПОБЕДА!</div>
+            <div class="res-sub">Ты обошёл бота. Красава!</div>
+        </div>
+    {% else %}
+        <div class="res-banner lose">
+            <div class="res-emoji">💨</div>
+            <div class="res-title">ПОРАЖЕНИЕ</div>
+            <div class="res-sub">Бот оказался быстрее. Попробуй ещё!</div>
+        </div>
+    {% endif %}
+
+    <div style="text-align:center;">
+        <span class="diff-tag {{ race.difficulty }}">
+            {% if race.difficulty == 'easy' %}🟢 Лёгкий
+            {% elif race.difficulty == 'medium' %}🟡 Средний
+            {% else %}🔴 Сложный{% endif %}
+        </span>
+    </div>
+
+    <div class="reward-box">
+        <div class="reward-label">Награда</div>
+        <div class="reward-value {% if race.reward == 0 %}zero{% endif %}">
+            {% if race.reward > 0 %}+{{ race.reward }} 💰{% else %}0 💰{% endif %}
+        </div>
+        <div class="car-info">Баланс: <b>{{ balance }}</b> монет</div>
+    </div>
+
+    <div class="battle">
+        <div class="battle-title">⚔️ Ход гонки</div>
+
+        <div class="battle-row">
+            <div class="battle-label">
+                <span class="name">🚗 Ты — {{ car.model if car else 'Машина' }}</span>
+                <span class="score">{{ race.player_score|round(0)|int }}</span>
+            </div>
+            <div class="bar"><div class="bar-fill player" style="width: {{ (race.player_score / (race.player_score + race.bot_score) * 100)|round(1) }}%;"></div></div>
+        </div>
+
+        <div class="battle-row">
+            <div class="battle-label">
+                <span class="name">🤖 Бот <span class="bot-stars">{{ '★' * race.bot_rating }}</span></span>
+                <span class="score">{{ race.bot_score|round(0)|int }}</span>
+            </div>
+            <div class="bar"><div class="bar-fill bot" style="width: {{ (race.bot_score / (race.player_score + race.bot_score) * 100)|round(1) }}%;"></div></div>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="{{ url_for('pve') }}" class="btn btn-primary">🏁 Ещё раз</a>
+        <a href="{{ url_for('garage') }}" class="btn btn-secondary">🏠 В гараж</a>
+    </div>
+
+</div>
+
+{% endblock %}
