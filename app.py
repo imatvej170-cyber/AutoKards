@@ -3562,14 +3562,14 @@ if row and row[0]:
         'car_min_rating': get_int_setting('wheel_car_min_rating', 1),
         'car_max_rating': get_int_setting('wheel_car_max_rating', 4),
     }
-    return render_template('wheel.html',
-                           ready=ready, time_left=format_time_left(secs) if not ready else '',
-                           result=result, balance=get_balance(session['user_id']),
-                           paid_enabled=paid_enabled, paid_price=paid_price,
-                           paid_info=paid_info, free_info=free_info,
-                           paid_ready=paid_ready, paid_time_left=paid_time_left,
-                           user=session.get('username'),
-                           is_admin=is_admin(session.get('username')))
+  return render_template('wheel.html',
+                         ready=ready, time_left=format_time_left(secs) if not ready else '',
+                         result=result, balance=get_balance(session['user_id']),
+                         paid_enabled=paid_enabled, paid_price=paid_price,
+                         paid_info=paid_info, free_info=free_info,
+                         paid_ready=paid_ready, paid_time_left=paid_time_left,
+                         user=session.get('username'),
+                         is_admin=is_admin(session.get('username')))
   
 
 
