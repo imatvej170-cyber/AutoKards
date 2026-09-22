@@ -3537,10 +3537,10 @@ def wheel():
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
     paid_ready = True
-paid_time_left = ''
-conn = get_db(); c = conn.cursor()
-c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (session['user_id'],))
-row = c.fetchone(); c.close(); conn.close()
+    paid_time_left = ''
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (session['user_id'],))
+    row = c.fetchone(); c.close(); conn.close()
 if row and row[0]:
     try:
         last = datetime.fromisoformat(row[0])
