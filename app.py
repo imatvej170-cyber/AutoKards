@@ -3995,6 +3995,14 @@ def pve_result(race_id):
 @app.route('/salvage')
 @login_required
 def salvage():
+    import traceback
+    try:
+        return _salvage_inner()
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /salvage:</h2><pre>' + traceback.format_exc() + '</pre>', 500
+
+
+def _salvage_inner():
     user_id = session['user_id']
 
     if get_setting('salvage_enabled') != '1':
