@@ -109,6 +109,24 @@
 <input type="number" name="paid_wheel_car_max_rating" min="1" max="8"
        value="{{ settings.paid_wheel_car_max_rating }}" class="form-input">
 
+            <h3 class="section">🏁 PvE Гонки (с ботами)</h3>
+
+            <label class="check-row">
+                <input type="checkbox" name="pve_enabled" value="1"
+                       {% if settings.pve_enabled == '1' %}checked{% endif %}>
+                Включить режим PvE
+            </label>
+
+            <label class="form-label">Макс. гонок в день</label>
+            <input type="number" name="pve_daily_races" min="1" max="9999"
+                   value="{{ settings.pve_daily_races }}" class="form-input">
+
+            <label class="form-label">Макс. монет в день</label>
+            <input type="number" name="pve_daily_limit" min="1" max="999999"
+                   value="{{ settings.pve_daily_limit }}" class="form-input">
+
+            <button type="submit" class="btn btn-primary">Сохранить настройки</button>
+
             <button type="submit" class="btn btn-primary">Сохранить настройки</button>
         </form>
 
