@@ -3995,7 +3995,7 @@ def pve_result(race_id):
 
 @app.route('/salvage')
 @login_required
-def _salvage_inner():
+def salvage():
     user_id = session['user_id']
 
     if get_setting('salvage_enabled') != '1':
