@@ -3623,6 +3623,18 @@ def pve():
     # бонус гаража (для отображения игроку, что боты будут сильнее)
     garage_mult, total_stars = garage_bonus(user_id)
 
+    # последние 10 гонок для журнала
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT pr.id, pr.difficulty, pr.won, pr.reward,
+                        pr.created_at, c.model, c.rating
+                 FROM pve_races pr
+                 JOIN cars c ON c.id = pr.car_id
+                 WHERE pr.user_id = %s
+                 ORDER BY pr.id DESC
+                 LIMIT 10''', (user_id,))
+    recent_races = c.fetchall()
+    c.close(); conn.close()
+  
     return render_template('pve.html',
         cars=cars,
         balance=get_balance(user_id),
@@ -3631,6 +3643,7 @@ def pve():
         garage_mult=round(garage_mult, 2), total_stars=total_stars,
         user=session.get('username'),
         is_admin=is_admin(session.get('username'))
+        recent_races=recent_races
     )
 
 
