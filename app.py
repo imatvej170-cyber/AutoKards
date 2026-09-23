@@ -3989,6 +3989,194 @@ def pve_result(race_id):
         user=session.get('username'),
         is_admin=is_admin(session.get('username'))
     )
+
+# ─────────── СВАЛКА: РОУТЫ ───────────
+
+@app.route('/salvage')
+@login_required
+def salvage():
+    user_id = session['user_id']
+
+    if get_setting('salvage_enabled') != '1':
+        flash('Свалка временно закрыта')
+        return redirect(url_for('index'))
+
+    # находки игрока
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT jc.id, jc.car_id, jc.condition, jc.found_at,
+                        c.model, c.brand, c.rating, c.price,
+                        c.horsepower, c.acceleration, c.top_speed
+                 FROM junk_cars jc
+                 JOIN cars c ON c.id = jc.car_id
+                 WHERE jc.user_id = %s
+                 ORDER BY jc.id DESC''', (user_id,))
+    rows = c.fetchall()
+    c.close(); conn.close()
+
+    junk_list = []
+    for r in rows:
+        item = {
+            'junk_id': r[0], 'car_id': r[1], 'condition': r[2], 'found_at': r[3],
+            'model': r[4], 'brand': r[5] or '—', 'rating': r[6], 'price': r[7] or 0,
+            'horsepower': r[8], 'acceleration': r[9], 'top_speed': r[10]
+        }
+        # цена продажи и ремонта
+        item['sell_price'] = int((item['price'] or 0) * 0.25)
+        item['restore'] = salvage_restore_cost(item, user_id)
+        junk_list.append(item)
+
+    slots_used = len(junk_list)
+    slots_max = get_int_setting('salvage_slots', 5)
+    digs_today = salvage_digs_today(user_id)
+    digs_max = get_int_setting('salvage_daily_limit', 5)
+    dig_price = get_int_setting('salvage_dig_price', 500)
+
+    return render_template('salvage.html',
+        junk_list=junk_list,
+        balance=get_balance(user_id),
+        parts=get_user_parts(user_id),
+        parts_max=get_int_setting('salvage_max_parts', 50),
+        slots_used=slots_used, slots_max=slots_max,
+        digs_today=digs_today, digs_max=digs_max,
+        dig_price=dig_price,
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
+
+
+@app.route('/salvage/dig', methods=['POST'])
+@login_required
+def salvage_dig():
+    user_id = session['user_id']
+    result = do_salvage_dig(user_id)
+
+    if 'error' in result:
+        flash(result['error'])
+        return redirect(url_for('salvage'))
+
+    # формируем текст сообщения
+    t = result['result_type']
+    if t == 'junk':
+        flash('🗑 Пусто. Только ржавые болты...')
+    elif t == 'coins':
+        flash(f'💰 Нашёл {result["coins"]} монет!')
+    elif t == 'parts':
+        flash(f'🔩 Нашёл {result["parts"]} деталей!')
+    elif t == 'car_common':
+        flash(f'🚗 Нашёл машину в плохом состоянии!')
+    elif t == 'car_rare':
+        flash(f'💎 Нашёл РЕДКУЮ машину!')
+    elif t == 'car_exclusive':
+        flash(f'🌟 ЭКСКЛЮЗИВ! Невероятная удача!')
+
+    return redirect(url_for('salvage'))
+
+
+@app.route('/salvage/restore/<int:junk_id>', methods=['POST'])
+@login_required
+def salvage_restore(junk_id):
+    user_id = session['user_id']
+
+    # берём находку
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT jc.car_id, c.price FROM junk_cars jc
+                 JOIN cars c ON c.id = jc.car_id
+                 WHERE jc.id = %s AND jc.user_id = %s''', (junk_id, user_id))
+    row = c.fetchone()
+    c.close(); conn.close()
+
+    if not row:
+        flash('Находка не найдена')
+        return redirect(url_for('salvage'))
+
+    car_id, car_price = row[0], row[1] or 0
+
+    # проверяем, что такой машины ещё нет в гараже
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (user_id, car_id))
+    already = c.fetchone()
+    c.close(); conn.close()
+
+    if already:
+        flash('Такая машина уже есть в гараже. Продай как есть или выкинь.')
+        return redirect(url_for('salvage'))
+
+    # считаем стоимость
+    car = get_car_full(car_id)
+    if not car:
+        flash('Машина не найдена в каталоге')
+        return redirect(url_for('salvage'))
+
+    cost = salvage_restore_cost(car, user_id)
+    final_price = cost['final']
+    parts_needed = cost['parts_needed']
+
+    # проверяем баланс
+    if get_balance(user_id) < final_price:
+        flash(f'Не хватает монет. Нужно {final_price} 💰')
+        return redirect(url_for('salvage'))
+
+    # списываем монеты и детали
+    add_coins(user_id, -final_price)
+    if parts_needed > 0:
+        add_parts(user_id, -parts_needed)
+
+    # добавляем в гараж
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO user_cars (user_id, car_id)
+                 VALUES (%s, %s) ON CONFLICT DO NOTHING''', (user_id, car_id))
+    # удаляем из свалки
+    c.execute('DELETE FROM junk_cars WHERE id = %s AND user_id = %s', (junk_id, user_id))
+    conn.commit(); c.close(); conn.close()
+
+    flash(f'🔧 Восстановил «{car["model"]}»! −{final_price} 💰' +
+          (f', −{parts_needed} 🔩' if parts_needed else ''))
+    return redirect(url_for('salvage'))
+
+
+@app.route('/salvage/sell/<int:junk_id>', methods=['POST'])
+@login_required
+def salvage_sell(junk_id):
+    user_id = session['user_id']
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT jc.car_id, c.price, c.model FROM junk_cars jc
+                 JOIN cars c ON c.id = jc.car_id
+                 WHERE jc.id = %s AND jc.user_id = %s''', (junk_id, user_id))
+    row = c.fetchone()
+    c.close(); conn.close()
+
+    if not row:
+        flash('Находка не найдена')
+        return redirect(url_for('salvage'))
+
+    car_id, price, model = row[0], row[1] or 0, row[2]
+    sell_price = int(price * 0.25)
+
+    add_coins(user_id, sell_price)
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM junk_cars WHERE id = %s AND user_id = %s', (junk_id, user_id))
+    conn.commit(); c.close(); conn.close()
+
+    flash(f'💰 Продал «{model}» как есть за {sell_price} монет')
+    return redirect(url_for('salvage'))
+
+
+@app.route('/salvage/throw/<int:junk_id>', methods=['POST'])
+@login_required
+def salvage_throw(junk_id):
+    user_id = session['user_id']
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM junk_cars WHERE id = %s AND user_id = %s', (junk_id, user_id))
+    deleted = c.rowcount
+    conn.commit(); c.close(); conn.close()
+
+    if deleted:
+        flash('🗑 Выкинул находку')
+    return redirect(url_for('salvage'))
   
 # ---------- ЖУРНАЛ ----------
 @app.route('/journal')
