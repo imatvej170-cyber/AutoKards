@@ -4009,15 +4009,6 @@ def _salvage_inner():
         flash('Свалка временно закрыта')
         return redirect(url_for('index'))
 
-    # находки игрока
-    conn = get_db(); c = conn.cursor()
-    c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
-                 VALUES (%s, %s, %s) ON CONFLICT DO NOTHING''',
-              (user_id, car_id, datetime.now().isoformat()))
-    # удаляем из свалки
-    c.execute('DELETE FROM junk_cars WHERE id = %s AND user_id = %s', (junk_id, user_id))
-    conn.commit(); c.close(); conn.close()
-
     junk_list = []
     for r in rows:
         item = {
