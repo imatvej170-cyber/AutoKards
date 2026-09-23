@@ -195,14 +195,13 @@ def init_db():
     created_at TIMESTAMP DEFAULT NOW()
 )''')
 
-      c.execute('''CREATE TABLE IF NOT EXISTS junk_cars (
+    c.execute('''CREATE TABLE IF NOT EXISTS junk_cars (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         car_id INTEGER NOT NULL,
         condition INTEGER NOT NULL DEFAULT 30,
         found_at TIMESTAMP DEFAULT NOW()
     )''')
-
     c.execute('''CREATE TABLE IF NOT EXISTS user_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
         opened_at TEXT NOT NULL, UNIQUE(user_id, car_id)
