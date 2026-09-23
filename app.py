@@ -4003,15 +4003,12 @@ def salvage():
 
     # находки игрока
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT jc.id, jc.car_id, jc.condition, jc.found_at,
-                        c.model, c.brand, c.rating, c.price,
-                        c.horsepower, c.acceleration, c.top_speed
-                 FROM junk_cars jc
-                 JOIN cars c ON c.id = jc.car_id
-                 WHERE jc.user_id = %s
-                 ORDER BY jc.id DESC''', (user_id,))
-    rows = c.fetchall()
-    c.close(); conn.close()
+    c.execute('''INSERT INTO user_cars (user_id, car_id, opened_at)
+                 VALUES (%s, %s, %s) ON CONFLICT DO NOTHING''',
+              (user_id, car_id, datetime.now().isoformat()))
+    # удаляем из свалки
+    c.execute('DELETE FROM junk_cars WHERE id = %s AND user_id = %s', (junk_id, user_id))
+    conn.commit(); c.close(); conn.close()
 
     junk_list = []
     for r in rows:
