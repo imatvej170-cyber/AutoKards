@@ -87,6 +87,11 @@ DEFAULT_SETTINGS = {
     'pve_daily_limit': '15000',       # макс монет в день с PvE
     'pve_daily_races': '40',          # макс гонок в день
     'pve_enabled': '1',               # вкл/выкл режим
+    'salvage_enabled': '1',           # вкл/выкл свалку
+    'salvage_dig_price': '500',       # цена одной раскопки
+    'salvage_daily_limit': '5',       # макс раскопок в день
+    'salvage_slots': '5',             # макс машин в "находках"
+    'salvage_max_parts': '50',        # макс деталей в запасе
 }
 
 # ============ ДОСТИЖЕНИЯ ============
@@ -164,6 +169,7 @@ def init_db():
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS music_enabled BOOLEAN DEFAULT FALSE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS vibration_enabled BOOLEAN DEFAULT TRUE')
     c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS dark_theme BOOLEAN DEFAULT FALSE')
+    c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS parts INTEGER DEFAULT 0')
 
     c.execute('''CREATE TABLE IF NOT EXISTS cars (
         id SERIAL PRIMARY KEY, model VARCHAR(60) NOT NULL, rating INTEGER NOT NULL,
@@ -188,6 +194,14 @@ def init_db():
     reward INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW()
 )''')
+
+      c.execute('''CREATE TABLE IF NOT EXISTS junk_cars (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        car_id INTEGER NOT NULL,
+        condition INTEGER NOT NULL DEFAULT 30,
+        found_at TIMESTAMP DEFAULT NOW()
+    )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS user_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
