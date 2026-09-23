@@ -3642,10 +3642,9 @@ def pve():
         daily_races=daily_races, daily_coins=daily_coins,
         garage_mult=round(garage_mult, 2), total_stars=total_stars,
         user=session.get('username'),
-        is_admin=is_admin(session.get(('username'))
+        is_admin=is_admin(session.get('username')),
         recent_races=recent_races
     )
-
 
 @app.route('/pve/race', methods=['POST'])
 @login_required
