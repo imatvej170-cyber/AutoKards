@@ -1952,8 +1952,9 @@ def do_salvage_dig(user_id):
     if car_id:
         conn = get_db(); c = conn.cursor()
         c.execute('''INSERT INTO junk_cars (user_id, car_id, condition)
-                     VALUES (%s, %s, %s)''', (user_id, car_id, random.randint(20, 40)))
-        junk_id = c.lastrowid
+                     VALUES (%s, %s, %s) RETURNING id''',
+                  (user_id, car_id, random.randint(20, 40)))
+        junk_id = c.fetchone()[0]
         conn.commit(); c.close(); conn.close()
     else:
         junk_id = None
@@ -4059,9 +4060,16 @@ def _salvage_inner():
 @app.route('/salvage/dig', methods=['POST'])
 @login_required
 def salvage_dig():
+    import traceback
+    try:
+        return _salvage_dig_inner()
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /salvage/dig:</h2><pre>' + traceback.format_exc() + '</pre>', 500
+
+
+def _salvage_dig_inner():
     user_id = session['user_id']
     result = do_salvage_dig(user_id)
-
     if 'error' in result:
         flash(result['error'])
         return redirect(url_for('salvage'))
