@@ -202,7 +202,7 @@ def init_db():
         condition INTEGER NOT NULL DEFAULT 30,
         found_at TIMESTAMP DEFAULT NOW()
     )''')
-      c.execute('''CREATE TABLE IF NOT EXISTS salvage_digs (
+    c.execute('''CREATE TABLE IF NOT EXISTS salvage_digs (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         result_type TEXT NOT NULL,
