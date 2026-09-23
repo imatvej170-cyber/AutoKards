@@ -3759,8 +3759,15 @@ def compare_page():
 @app.route('/wheel')
 @login_required
 def wheel():
+    import traceback
+    try:
+        return _wheel_debug()
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /wheel:</h2><pre>' + traceback.format_exc() + '</pre>', 500
+
+
+def _wheel_debug():
     flash_new_achievements(session['user_id'])
-    ready, secs = can_spin(session['user_id'])
     result = session.pop('wheel_result', None)
     paid_enabled = get_setting('paid_wheel_enabled') == '1'
     paid_ready = True
