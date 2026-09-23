@@ -82,10 +82,6 @@
 {% else %}
     <div class="cooldown-box">💎 Через <strong>{{ paid_time_left }}</strong></div>
 {% endif %}
-                <button type="submit" class="btn btn-primary btn-spin premium-btn"
-                        {% if balance < paid_price %}disabled title="Не хватает монет"{% endif %}>
-                    💎 Крутить за {{ paid_price }} 💰
-                </button>
             </form>
             <div class="wheel-warn">
                 Призы заметно лучше! Без кулдауна — можно крутить сколько хочешь.
