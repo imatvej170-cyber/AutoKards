@@ -3775,7 +3775,6 @@ def _wheel_debug():
     conn = get_db(); c = conn.cursor()
     c.execute('SELECT last_paid_spin_at FROM users WHERE id = %s', (session['user_id'],))
     row = c.fetchone(); c.close(); conn.close()
-    row = c.fetchone(); c.close(); conn.close()
     if row and row[0]:
         try:
             last = datetime.fromisoformat(row[0])
