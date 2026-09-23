@@ -202,6 +202,12 @@ def init_db():
         condition INTEGER NOT NULL DEFAULT 30,
         found_at TIMESTAMP DEFAULT NOW()
     )''')
+      c.execute('''CREATE TABLE IF NOT EXISTS salvage_digs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        result_type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )''')
     c.execute('''CREATE TABLE IF NOT EXISTS user_cars (
         id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, car_id INTEGER NOT NULL,
         opened_at TEXT NOT NULL, UNIQUE(user_id, car_id)
@@ -1768,7 +1774,214 @@ def pve_today_stats(user_id):
     row = c.fetchone()
     c.close(); conn.close()
     return (row[0] or 0), (row[1] or 0)
-  
+
+# ─────────── СВАЛКА ───────────
+
+def get_user_parts(user_id):
+    """Сколько деталей у игрока."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COALESCE(parts, 0) FROM users WHERE id = %s', (user_id,))
+    row = c.fetchone()
+    c.close(); conn.close()
+    return row[0] if row else 0
+
+
+def add_parts(user_id, amount):
+    """Изменяет количество деталей (может быть отрицательным)."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE users SET parts = GREATEST(0, COALESCE(parts, 0) + %s) WHERE id = %s',
+              (amount, user_id))
+    conn.commit(); c.close(); conn.close()
+
+
+def salvage_digs_today(user_id):
+    """Сколько копок сделано за последние 24ч."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COUNT(*) FROM salvage_digs
+                 WHERE user_id = %s
+                   AND created_at >= NOW() - INTERVAL '24 hours' ''', (user_id,))
+    row = c.fetchone()
+    c.close(); conn.close()
+    return row[0] or 0
+
+
+def salvage_slots_used(user_id):
+    """Сколько машин сейчас лежит на свалке у игрока."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM junk_cars WHERE user_id = %s', (user_id,))
+    row = c.fetchone()
+    c.close(); conn.close()
+    return row[0] or 0
+
+
+def salvage_pick_car(rating_min, rating_max, exclude_ids):
+    """Случайная машина из каталога по рейтингу.
+    Исключает уже имеющиеся id (из user_cars и junk_cars).
+    Возвращает id или None."""
+    conn = get_db(); c = conn.cursor()
+    if exclude_ids:
+        c.execute('''SELECT id FROM cars
+                     WHERE rating BETWEEN %s AND %s
+                       AND COALESCE(is_exclusive, FALSE) = FALSE
+                       AND id <> ALL(%s)
+                     ORDER BY RANDOM() LIMIT 1''',
+                  (rating_min, rating_max, list(exclude_ids)))
+    else:
+        c.execute('''SELECT id FROM cars
+                     WHERE rating BETWEEN %s AND %s
+                       AND COALESCE(is_exclusive, FALSE) = FALSE
+                     ORDER BY RANDOM() LIMIT 1''',
+                  (rating_min, rating_max))
+    row = c.fetchone()
+    c.close(); conn.close()
+    return row[0] if row else None
+
+
+def salvage_pick_exclusive(exclude_ids):
+    """Случайная эксклюзивная машина, которой у игрока ещё нет."""
+    conn = get_db(); c = conn.cursor()
+    if exclude_ids:
+        c.execute('''SELECT id FROM cars
+                     WHERE COALESCE(is_exclusive, FALSE) = TRUE
+                       AND id <> ALL(%s)
+                     ORDER BY RANDOM() LIMIT 1''', (list(exclude_ids),))
+    else:
+        c.execute('''SELECT id FROM cars
+                     WHERE COALESCE(is_exclusive, FALSE) = TRUE
+                     ORDER BY RANDOM() LIMIT 1''')
+    row = c.fetchone()
+    c.close(); conn.close()
+    return row[0] if row else None
+
+
+def do_salvage_dig(user_id):
+    """Основная функция копки. Возвращает словарь с результатом."""
+    # проверки
+    if get_setting('salvage_enabled') != '1':
+        return {'error': 'Свалка временно закрыта'}
+
+    slots_max = get_int_setting('salvage_slots', 5)
+    digs_max = get_int_setting('salvage_daily_limit', 5)
+    price = get_int_setting('salvage_dig_price', 500)
+
+    if salvage_slots_used(user_id) >= slots_max:
+        return {'error': f'Все слоты заняты ({slots_max}/{slots_max}). Разберись с находками!'}
+
+    if salvage_digs_today(user_id) >= digs_max:
+        return {'error': f'Дневной лимит раскопок исчерпан ({digs_max}/день)'}
+
+    balance = get_balance(user_id)
+    if balance < price:
+        return {'error': f'Не хватает монет. Нужно {price} 💰'}
+
+    # списываем
+    add_coins(user_id, -price)
+
+    # определяем результат
+    roll = random.randint(1, 100)
+    result_type = 'junk'
+    car_id = None
+    coins_found = 0
+    parts_found = 0
+
+    if roll <= 25:
+        result_type = 'junk'
+    elif roll <= 45:
+        result_type = 'coins'
+        coins_found = random.randint(200, 500)
+        add_coins(user_id, coins_found)
+    elif roll <= 65:
+        result_type = 'parts'
+        parts_found = random.randint(1, 3)
+        add_parts(user_id, parts_found)
+    elif roll <= 95:
+        # обычная 4-5★, исключаем уже имеющиеся
+        conn = get_db(); c = conn.cursor()
+        c.execute('SELECT car_id FROM user_cars WHERE user_id = %s', (user_id,))
+        owned = [r[0] for r in c.fetchall()]
+        c.execute('SELECT car_id FROM junk_cars WHERE user_id = %s', (user_id,))
+        junk = [r[0] for r in c.fetchall()]
+        c.close(); conn.close()
+        car_id = salvage_pick_car(4, 5, owned + junk)
+        if car_id:
+            result_type = 'car_common'
+        else:
+            # всё скупил — даём монеты
+            result_type = 'coins'
+            coins_found = random.randint(300, 600)
+            add_coins(user_id, coins_found)
+    elif roll <= 99:
+        # редкая 6-7★
+        conn = get_db(); c = conn.cursor()
+        c.execute('SELECT car_id FROM user_cars WHERE user_id = %s', (user_id,))
+        owned = [r[0] for r in c.fetchall()]
+        c.execute('SELECT car_id FROM junk_cars WHERE user_id = %s', (user_id,))
+        junk = [r[0] for r in c.fetchall()]
+        c.close(); conn.close()
+        car_id = salvage_pick_car(6, 7, owned + junk)
+        if car_id:
+            result_type = 'car_rare'
+        else:
+            result_type = 'parts'
+            parts_found = 3
+            add_parts(user_id, 3)
+    else:
+        # эксклюзив 1%
+        conn = get_db(); c = conn.cursor()
+        c.execute('SELECT car_id FROM user_cars WHERE user_id = %s', (user_id,))
+        owned = [r[0] for r in c.fetchall()]
+        c.execute('SELECT car_id FROM junk_cars WHERE user_id = %s', (user_id,))
+        junk = [r[0] for r in c.fetchall()]
+        c.close(); conn.close()
+        car_id = salvage_pick_exclusive(owned + junk)
+        if car_id:
+            result_type = 'car_exclusive'
+        else:
+            # все эксклюзивы уже есть
+            result_type = 'coins'
+            coins_found = random.randint(500, 1000)
+            add_coins(user_id, coins_found)
+
+    # записываем копку в лог
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO salvage_digs (user_id, result_type)
+                 VALUES (%s, %s)''', (user_id, result_type))
+    conn.commit(); c.close(); conn.close()
+
+    # если нашли машину — кладём в junk_cars
+    if car_id:
+        conn = get_db(); c = conn.cursor()
+        c.execute('''INSERT INTO junk_cars (user_id, car_id, condition)
+                     VALUES (%s, %s, %s)''', (user_id, car_id, random.randint(20, 40)))
+        junk_id = c.lastrowid
+        conn.commit(); c.close(); conn.close()
+    else:
+        junk_id = None
+
+    return {
+        'ok': True,
+        'result_type': result_type,
+        'car_id': car_id,
+        'junk_id': junk_id,
+        'coins': coins_found,
+        'parts': parts_found,
+        'paid': price
+    }
+
+
+def salvage_restore_cost(car, user_id):
+    """Сколько стоит восстановить машину со свалки.
+    Формула: price × 0.6, минус 15% за каждую деталь (макс 50%)."""
+    base_price = int((car.get('price') or 0) * 0.6)
+    parts_avail = get_user_parts(user_id)
+    discount = min(parts_avail * 0.15, 0.5)
+    final = int(base_price * (1 - discount))
+    return {
+        'base': base_price,
+        'discount_percent': int(discount * 100),
+        'final': max(0, final),
+        'parts_needed': min(parts_avail, 4)
+    }
 def delete_car_from_catalog(car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
