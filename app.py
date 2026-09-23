@@ -3994,14 +3994,6 @@ def pve_result(race_id):
 
 @app.route('/salvage')
 @login_required
-def salvage():
-    import traceback
-    try:
-        return _salvage_inner()
-    except Exception:
-        return '<h2 style="color:red;">Ошибка в /salvage:</h2><pre>' + traceback.format_exc() + '</pre>', 500
-
-
 def _salvage_inner():
     user_id = session['user_id']
 
@@ -4009,6 +4001,19 @@ def _salvage_inner():
         flash('Свалка временно закрыта')
         return redirect(url_for('index'))
 
+    # ─── берём находки из БД ───
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT jc.id, jc.car_id, jc.condition, jc.found_at,
+                        c.model, c.brand, c.rating, c.price,
+                        c.horsepower, c.acceleration, c.top_speed
+                 FROM junk_cars jc
+                 JOIN cars c ON c.id = jc.car_id
+                 WHERE jc.user_id = %s
+                 ORDER BY jc.id DESC''', (user_id,))
+    rows = c.fetchall()
+    c.close(); conn.close()
+
+    # ─── собираем список находок ───
     junk_list = []
     for r in rows:
         item = {
@@ -4027,6 +4032,17 @@ def _salvage_inner():
     digs_max = get_int_setting('salvage_daily_limit', 5)
     dig_price = get_int_setting('salvage_dig_price', 500)
 
+    return render_template('salvage.html',
+        junk_list=junk_list,
+        balance=get_balance(user_id),
+        parts=get_user_parts(user_id),
+        parts_max=get_int_setting('salvage_max_parts', 50),
+        slots_used=slots_used, slots_max=slots_max,
+        digs_today=digs_today, digs_max=digs_max,
+        dig_price=dig_price,
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
     return render_template('salvage.html',
         junk_list=junk_list,
         balance=get_balance(user_id),
