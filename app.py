@@ -4152,9 +4152,10 @@ def admin_settings():
         for k in ['discount_min_rating', 'discount_max_rating', 'discount_percent',
                   'wheel_coin_min', 'wheel_coin_max', 'wheel_car_chance',
                   'wheel_car_min_rating', 'wheel_car_max_rating', 'wheel_cooldown_hours',
-                  'paid_wheel_price', 'paid_wheel_car_min_rating', 'paid_wheel_car_max_rating']:
+                  'paid_wheel_price', 'paid_wheel_car_min_rating', 'paid_wheel_car_max_rating',
+                  'pve_daily_races', 'pve_daily_limit']:
             set_setting(k, request.form.get(k, get_setting(k)))
-        for k in ['discount_enabled', 'wheel_enabled', 'paid_wheel_enabled']:
+        for k in ['discount_enabled', 'wheel_enabled', 'paid_wheel_enabled', 'pve_enabled']:
             set_setting(k, '1' if request.form.get(k) else '0')
         flash('Настройки сохранены!')
         return redirect(url_for('admin_settings'))
