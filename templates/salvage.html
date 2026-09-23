@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.sv-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+.sv-title {
+    font-size: 32px; font-weight: 800; text-align: center;
+    background: linear-gradient(90deg, #ff8a00, #ffb347);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 6px;
+}
+.sv-sub { text-align: center; color: #888; margin-bottom: 22px; font-size: 14px; }
+
+.sv-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 22px;
+}
+.stat-card {
+    background: rgba(255,138,0,0.08);
+    border: 1px solid rgba(255,138,0,0.25);
+    border-radius: 14px; padding: 14px 16px; text-align: center;
+}
+.stat-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 20px; font-weight: 700; color: #ff8a00; margin-top: 4px; }
+.stat-value.warn { color: #ff4d4d; }
+
+.dig-box {
+    background: linear-gradient(135deg, rgba(255,138,0,0.12), rgba(255,179,71,0.06));
+    border: 2px solid rgba(255,138,0,0.4);
+    border-radius: 18px; padding: 26px 20px;
+    text-align: center; margin-bottom: 28px;
+    box-shadow: 0 0 30px rgba(255,138,0,0.15);
+}
+.dig-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.dig-desc { font-size: 13px; color: #aaa; margin-bottom: 18px; line-height: 1.6; }
+.dig-btn {
+    display: inline-block; padding: 16px 40px;
+    background: linear-gradient(135deg, #ff8a00, #ffb347);
+    color: #1a1a1a; font-size: 18px; font-weight: 800;
+    border: none; border-radius: 14px; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(255,138,0,0.5);
+    transition: all 0.2s; letter-spacing: 1px;
+}
+.dig-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(255,138,0,0.7); }
+.dig-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.dig-warn { color: #ff8080; font-size: 13px; margin-top: 10px; }
+
+.sv-section-title {
+    font-size: 18px; font-weight: 700; margin: 28px 0 14px;
+    display: flex; align-items: center; gap: 8px;
+}
+
+.junk-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+.junk-card {
+    background: rgba(255,255,255,0.03);
+    border: 2px solid rgba(255,138,0,0.2);
+    border-radius: 16px; padding: 16px;
+    transition: all 0.2s;
+}
+.junk-card:hover { border-color: rgba(255,138,0,0.5); }
+.junk-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.junk-name { font-weight: 700; font-size: 15px; }
+.junk-brand { font-size: 12px; color: #999; margin-top: 2px; }
+.junk-stars { color: #ffb347; font-size: 13px; letter-spacing: 1px; }
+.junk-specs {
+    font-size: 12px; color: #aaa; line-height: 1.7;
+    padding: 10px 0; border-top: 1px dashed rgba(255,138,0,0.2);
+    border-bottom: 1px dashed rgba(255,138,0,0.2);
+    margin-bottom: 12px;
+}
+.cond-bar {
+    height: 8px; border-radius: 4px; background: rgba(0,0,0,0.35);
+    overflow: hidden; margin: 6px 0 10px;
+}
+.cond-fill {
+    height: 100%; background: linear-gradient(90deg, #ff4d4d, #ffb347);
+    border-radius: 4px;
+}
+.cond-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.junk-actions { display: flex; flex-direction: column; gap: 8px; }
+.junk-btn {
+    display: block; padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; font-weight: 700; border: none; cursor: pointer;
+    transition: all 0.15s; text-align: center;
+}
+.junk-btn.restore {
+    background: linear-gradient(135deg, #4caf50, #66bb6a);
+    color: #fff; box-shadow: 0 3px 12px rgba(76,175,80,0.4);
+}
+.junk-btn.restore:hover { transform: translateY(-1px); box-shadow: 0 5px 18px rgba(76,175,80,0.6); }
+.junk-btn.restore:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.junk-btn.sell {
+    background: linear-gradient(135deg, #ff8a00, #ffb347);
+    color: #1a1a1a;
+}
+.junk-btn.sell:hover { transform: translateY(-1px); }
+.junk-btn.throw {
+    background: rgba(255,255,255,0.05);
+    color: #999; border: 1px solid rgba(255,77,77,0.3);
+}
+.junk-btn.throw:hover { color: #ff8080; border-color: rgba(255,77,77,0.7); }
+
+.empty-msg {
+    text-align: center; padding: 40px 20px; color: #888;
+    background: rgba(255,255,255,0.03); border-radius: 14px;
+    font-size: 14px; line-height: 1.6;
+}
+
+.legend {
+    display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
+    font-size: 12px; color: #999; margin-top: 14px;
+}
+.legend span { display: flex; align-items: center; gap: 5px; }
+</style>
+
+<div class="sv-wrap">
+    <div class="sv-title">🔍 Автосвалка</div>
+    <div class="sv-sub">Копайся в железе. Находи битые машины, детали и монеты. Восстанавливай — и в гараж.</div>
+
+    <div class="sv-stats">
+        <div class="stat-card">
+            <div class="stat-label">💰 Баланс</div>
+            <div class="stat-value">{{ balance }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">🔩 Детали</div>
+            <div class="stat-value">{{ parts }} / {{ parts_max }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">📦 Слоты</div>
+            <div class="stat-value {% if slots_used >= slots_max %}warn{% endif %}">
+                {{ slots_used }} / {{ slots_max }}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">⛏ Копок за 24ч</div>
+            <div class="stat-value {% if digs_today >= digs_max %}warn{% endif %}">
+                {{ digs_today }} / {{ digs_max }}
+            </div>
+        </div>
+    </div>
+
+    <div class="dig-box">
+        <div class="dig-title">⛏ Копнуть разок?</div>
+        <div class="dig-desc">
+            Стоимость: <b style="color:#ff8a00;">{{ dig_price }} 💰</b><br>
+            Шансы: хлам 25% · монеты 20% · детали 20% · машина 34% · эксклюзив 1%
+        </div>
+        <form method="POST" action="{{ url_for('salvage_dig') }}" style="display:inline;">
+            <button type="submit" class="dig-btn"
+                {% if slots_used >= slots_max or digs_today >= digs_max or balance < dig_price %}disabled{% endif %}>
+                ⛏ КОПАТЬ ({{ dig_price }} 💰)
+            </button>
+        </form>
+        {% if slots_used >= slots_max %}
+            <div class="dig-warn">⚠️ Все слоты заняты — разберись с находками</div>
+        {% elif digs_today >= digs_max %}
+            <div class="dig-warn">⚠️ Дневной лимит копок исчерпан</div>
+        {% elif balance < dig_price %}
+            <div class="dig-warn">⚠️ Не хватает монет на копку</div>
+        {% endif %}
+        <div class="legend">
+            <span>🗑 Хлам 25%</span>
+            <span>💰 Монеты 20%</span>
+            <span>🔩 Детали 20%</span>
+            <span>🚗 Машина 34%</span>
+            <span>🌟 Эксклюзив 1%</span>
+        </div>
+    </div>
+
+    {% if junk_list %}
+    <div class="sv-section-title">📦 Твои находки ({{ junk_list|length }}/{{ slots_max }})</div>
+    <div class="junk-grid">
+        {% for j in junk_list %}
+        <div class="junk-card">
+            <div class="junk-head">
+                <div>
+                    <div class="junk-name">{{ j.model }}</div>
+                    <div class="junk-brand">{{ j.brand }}</div>
+                </div>
+                <div class="junk-stars">{{ '★' * j.rating }}</div>
+            </div>
+
+            <div class="cond-label">Состояние: {{ j.condition }}%</div>
+            <div class="cond-bar"><div class="cond-fill" style="width: {{ j.condition }}%;"></div></div>
+
+            <div class="junk-specs">
+                🐎 {{ j.horsepower }} hp · ⏱ {{ j.acceleration }} с · 🏎 {{ j.top_speed }} км/ч<br>
+                💰 Рыночная цена: {{ j.price }}
+            </div>
+
+            <div class="junk-actions">
+                <form method="POST" action="{{ url_for('salvage_restore', junk_id=j.junk_id) }}">
+                    <button type="submit" class="junk-btn restore"
+                        {% if balance < j.restore.final %}disabled{% endif %}>
+                        🔧 Восстановить — {{ j.restore.final }} 💰
+                        {% if j.restore.parts_needed > 0 %}
+                            ({{ j.restore.parts_needed }} 🔩 = −{{ j.restore.discount_percent }}%)
+                        {% endif %}
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('salvage_sell', junk_id=j.junk_id) }}">
+                    <button type="submit" class="junk-btn sell">
+                        💰 Продать как есть — {{ j.sell_price }} 💰
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('salvage_throw', junk_id=j.junk_id) }}"
+                      onsubmit="return confirm('Выкинуть «{{ j.model }}»? Ничего не получишь.');">
+                    <button type="submit" class="junk-btn throw">🗑 Выкинуть</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-msg">
+        🔍 Тут пока пусто.<br>
+        Жми <b>«КОПАТЬ»</b> сверху — может, повезёт!
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
