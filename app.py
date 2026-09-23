@@ -4095,6 +4095,14 @@ def _salvage_dig_inner():
 @app.route('/salvage/restore/<int:junk_id>', methods=['POST'])
 @login_required
 def salvage_restore(junk_id):
+    import traceback
+    try:
+        return _salvage_restore_debug(junk_id)
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в restore:</h2><pre>' + traceback.format_exc() + '</pre>', 500
+
+
+def _salvage_restore_debug(junk_id):
     user_id = session['user_id']
 
     # берём находку
