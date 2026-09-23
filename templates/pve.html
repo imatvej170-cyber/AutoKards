@@ -93,6 +93,25 @@
     color: #ff8080; padding: 12px 16px; border-radius: 12px;
     text-align: center; margin-bottom: 20px; font-size: 14px;
 }
+
+/* ─── ЖУРНАЛ ГОНОК ─── */
+.journal-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.journal-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px; border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,138,0,0.15);
+    transition: all 0.2s;
+}
+.journal-item:hover { border-color: rgba(255,138,0,0.4); background: rgba(255,138,0,0.05); }
+.journal-icon { font-size: 24px; }
+.journal-info { flex: 1; }
+.journal-car { font-weight: 700; font-size: 14px; }
+.journal-stars { color: #ffb347; font-size: 12px; margin-left: 4px; }
+.journal-meta { font-size: 12px; color: #999; margin-top: 2px; }
+.journal-reward { font-weight: 800; font-size: 16px; }
+.journal-reward.positive { color: #4caf50; text-shadow: 0 0 8px rgba(76,175,80,0.4); }
+.journal-reward.zero { color: #666; }
 </style>
 
 <div class="pve-wrap">
@@ -172,6 +191,29 @@
         </button>
     </form>
     {% endif %}
+
+    {% if recent_races %}
+    <div class="pve-section-title" style="margin-top:40px;">📜 Последние гонки</div>
+    <div class="journal-list">
+        {% for r in recent_races %}
+        <div class="journal-item">
+            <div class="journal-icon">{% if r[2] %}🏆{% else %}💨{% endif %}</div>
+            <div class="journal-info">
+                <div class="journal-car">{{ r[5] }} <span class="journal-stars">{{ '★' * r[6] }}</span></div>
+                <div class="journal-meta">
+                    {% if r[1] == 'easy' %}🟢 Лёгкий
+                    {% elif r[1] == 'medium' %}🟡 Средний
+                    {% else %}🔴 Сложный{% endif %}
+                    · {{ r[4].strftime('%d.%m %H:%M') if r[4] else '' }}
+                </div>
+            </div>
+            <div class="journal-reward {% if r[3] > 0 %}positive{% else %}zero{% endif %}">
+                {% if r[3] > 0 %}+{{ r[3] }} 💰{% else %}0 💰{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 
 <script>
@@ -183,7 +225,6 @@ function selectDiff(el) {
     document.querySelectorAll('.diff-btn').forEach(x => x.classList.remove('selected'));
     el.classList.add('selected');
 }
-// выделяем первую машину сразу
 window.addEventListener('DOMContentLoaded', () => {
     const first = document.querySelector('.car-pick');
     if (first) first.classList.add('selected');
