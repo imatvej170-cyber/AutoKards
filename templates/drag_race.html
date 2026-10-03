@@ -13,62 +13,140 @@
 .race-header-right { font-size: 14px; color: #aaa; }
 .race-header-right b { color: #ff8a00; }
 
-/* трасса */
+/* ═══ ТРАССА ═══ */
 .track {
-    position: relative; height: 180px; border-radius: 16px;
-    background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
-    border: 2px solid rgba(255,138,0,0.3);
+    position: relative; height: 260px; border-radius: 16px;
     overflow: hidden; margin-bottom: 20px;
-    box-shadow: inset 0 0 40px rgba(255,138,0,0.08);
+    border: 2px solid rgba(255,138,0,0.3);
+    box-shadow: 0 0 30px rgba(255,138,0,0.15);
 }
-.track::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: 30px;
-    height: 3px;
-    background: repeating-linear-gradient(90deg, #ff8a00 0 30px, transparent 30px 60px);
-    opacity: 0.6;
+
+/* небо */
+.sky {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 55%;
+    background: linear-gradient(180deg, #4A90D9 0%, #87CEEB 60%, #B0E0E6 100%);
 }
+
+/* облака */
+.clouds-layer {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 55%; overflow: hidden;
+    pointer-events: none;
+}
+.clouds-layer::before {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+        radial-gradient(ellipse 50px 18px at 80px 30px, rgba(255,255,255,0.95) 60%, transparent 61%),
+        radial-gradient(ellipse 35px 14px at 110px 42px, rgba(255,255,255,0.85) 60%, transparent 61%),
+        radial-gradient(ellipse 60px 22px at 320px 55px, rgba(255,255,255,0.95) 60%, transparent 61%),
+        radial-gradient(ellipse 40px 16px at 360px 68px, rgba(255,255,255,0.85) 60%, transparent 61%),
+        radial-gradient(ellipse 55px 20px at 580px 25px, rgba(255,255,255,0.9) 60%, transparent 61%),
+        radial-gradient(ellipse 38px 14px at 620px 38px, rgba(255,255,255,0.8) 60%, transparent 61%);
+    background-repeat: repeat-x;
+    background-size: 800px 100%;
+    animation: cloudsMove 40s linear infinite;
+}
+@keyframes cloudsMove {
+    from { background-position-x: 0; }
+    to { background-position-x: -800px; }
+}
+
+/* трава */
+.grass {
+    position: absolute; top: 55%; left: 0; right: 0;
+    height: 15%;
+    background: linear-gradient(180deg, #6BBF59 0%, #4CAF50 50%, #2E7D32 100%);
+}
+.grass::after {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+        85deg, transparent 0 15px,
+        rgba(0,0,0,0.08) 15px 17px
+    );
+    pointer-events: none;
+}
+
+/* дорога */
+.road-layer {
+    position: absolute; top: 70%; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 40%, #2a2a2a 100%);
+    overflow: hidden;
+}
+.road-stripes {
+    position: absolute; top: 50%; left: 0; right: 0;
+    height: 5px; margin-top: -2px;
+    background-image: repeating-linear-gradient(
+        90deg,
+        #FFD700 0 50px,
+        transparent 50px 100px
+    );
+    opacity: 0.9;
+    will-change: background-position-x;
+}
+.guardrail {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 6px;
+    background: repeating-linear-gradient(
+        90deg,
+        #999 0 30px,
+        #666 30px 60px
+    );
+    border-top: 2px solid #ccc;
+    border-bottom: 2px solid #333;
+    will-change: background-position-x;
+}
+
+/* финиш */
 .finish-line {
-    position: absolute; right: 20px; top: 0; bottom: 0; width: 4px;
-    background: repeating-linear-gradient(0deg, #fff 0 10px, #000 10px 20px);
-    z-index: 3;
+    position: absolute; right: 30px; top: 70%; bottom: 0;
+    width: 6px;
+    background: repeating-linear-gradient(
+        0deg,
+        #fff 0 12px,
+        #000 12px 24px
+    );
+    z-index: 4;
+    box-shadow: 0 0 12px rgba(255,255,255,0.6);
 }
+
+/* машины */
 .car-lane {
     position: absolute; left: 0; right: 40px;
     display: flex; align-items: center;
-    transition: none;
 }
-.car-lane.player { top: 20px; }
-.car-lane.ghost  { top: 100px; opacity: 0.7; }
+.car-lane.player { top: 76%; }
+.car-lane.ghost  { top: 82%; opacity: 0.85; }
 
 .car-sprite {
-    position: absolute; left: 0;
+    position: absolute; left: 0; top: -25px;
     transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
 }
 .car-sprite img {
-    height: 60px; width: auto;
+    height: 50px; width: auto;
     transform: scaleX(-1);
-    filter: drop-shadow(0 0 8px rgba(255,138,0,0.5));
+    filter: drop-shadow(0 0 8px rgba(255,138,0,0.6));
 }
 .car-sprite.ghost-sprite img {
     filter: drop-shadow(0 0 6px rgba(120,120,120,0.5)) grayscale(0.5);
 }
 .car-label {
-    position: absolute; top: -18px; left: 0;
-    font-size: 11px; color: #ff8a00; white-space: nowrap;
-    font-weight: 700;
+    position: absolute; top: -16px; left: 0;
+    font-size: 10px; color: #ff8a00; white-space: nowrap;
+    font-weight: 700; text-shadow: 0 0 4px #000;
 }
-.car-sprite.ghost-sprite .car-label { color: #999; }
+.car-sprite.ghost-sprite .car-label { color: #ccc; }
 
 .bot-placeholder {
-    height: 40px; padding: 0 12px;
-    background: rgba(120,120,120,0.3);
-    border: 1px dashed #666; border-radius: 8px;
+    height: 32px; padding: 0 10px;
+    background: rgba(120,120,120,0.4);
+    border: 1px dashed #888; border-radius: 8px;
     display: flex; align-items: center;
-    color: #999; font-size: 12px;
+    color: #ddd; font-size: 11px;
 }
 
-/* тахометр */
+/* ═══ ТАХОМЕТР ═══ */
 .tacho-box {
     background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,138,0,0.3);
@@ -173,9 +251,9 @@
 .countdown.hidden { display: none; }
 
 @media (max-width: 600px) {
-    .car-sprite img { height: 42px; }
+    .car-sprite img { height: 38px; }
     .btn-start, .btn-shift { padding: 16px 30px; font-size: 18px; }
-    .track { height: 140px; }
+    .track { height: 220px; }
 }
 </style>
 
@@ -192,22 +270,31 @@
 
     <!-- ТРАССА -->
     <div class="track" id="track">
+        <div class="sky"></div>
+        <div class="clouds-layer"></div>
+        <div class="grass"></div>
+
+        <div class="road-layer">
+            <div class="road-stripes" id="roadStripes"></div>
+            <div class="guardrail" id="guardrail"></div>
+        </div>
+
         <div class="finish-line"></div>
 
         <div class="car-lane player">
-            <div class="car-sprite player-sprite" id="playerSprite" style="left: 0;">
+            <div class="car-sprite player-sprite" id="playerSprite">
                 <div class="car-label">Ты</div>
                 <img src="{{ url_for('car_image', car_id=car.id) }}" alt="{{ car.model }}">
             </div>
         </div>
 
         <div class="car-lane ghost">
-            <div class="car-sprite ghost-sprite" id="ghostSprite" style="left: 0;">
+            <div class="car-sprite ghost-sprite" id="ghostSprite">
                 <div class="car-label">{{ ghost.username }}</div>
                 {% if ghost.car_id %}
-                    <img src="{{ url_for('car_image', car_id=ghost.car_id) }}" alt="{{ ghost.car_model or 'ghost' }}">
+                    <img src="{{ url_for('car_image', car_id=ghost.car_id) }}" alt="ghost">
                 {% else %}
-                <div class="bot-placeholder">🤖 Бот</div>
+                    <div class="bot-placeholder">🤖 Бот</div>
                 {% endif %}
             </div>
         </div>
@@ -278,6 +365,8 @@ var raceFinished = false;
 var shiftCooldown = false;
 var tickInterval = null;
 var timerInterval = null;
+var roadOffset = 0;
+var bgSpeed = 0;
 
 // ─── ЭЛЕМЕНТЫ ───
 var btnStart = document.getElementById('btnStart');
@@ -295,14 +384,16 @@ var playerTimeEl = document.getElementById('playerTime');
 var ghostTimeEl = document.getElementById('ghostTime');
 var flashMsg = document.getElementById('flashMsg');
 var countdownEl = document.getElementById('countdown');
+var roadStripes = document.getElementById('roadStripes');
+var guardrail = document.getElementById('guardrail');
 
 // ─── ФУНКЦИЯ ДВИЖЕНИЯ МАШИНЫ ───
 function setCarPosition(spriteEl, pct) {
     var track = document.getElementById('track');
     if (!track) return;
     var trackWidth = track.clientWidth;
-    var carWidth = 60;         // ширина машины
-    var finishMargin = 40;     // отступ от линии финиша
+    var carWidth = 60;
+    var finishMargin = 40;
     var maxX = trackWidth - carWidth - finishMargin;
     var x = (pct / 100) * maxX;
     spriteEl.style.transform = 'translateX(' + x + 'px)';
@@ -341,26 +432,32 @@ function startRace() {
     startTimer();
 }
 
-// ─── ТИК ОБОРОТОВ ───
+// ─── ТИК ОБОРОТОВ + АВТО-ДВИЖЕНИЕ ───
 function startTicking() {
     tickInterval = setInterval(function() {
         if (raceFinished) return;
 
-        rpm += 2.5;
+        rpm += 2.0;
 
-        // 🏎 машина ЕДЕТ постоянно — скорость зависит от передачи
-        var autoSpeed = 0.06 * gear;
+        // машина ЕДЕТ постоянно
+        var autoSpeed = 0.12 * gear;
         playerProgressPct = Math.min(100, playerProgressPct + autoSpeed);
         playerProgressEl.style.width = playerProgressPct + '%';
         setCarPosition(playerSprite, playerProgressPct);
 
-        // финиш по позиции (если набралось раньше 5 переключений)
+        // движение фона
+        bgSpeed = 3 + gear * 2.5;
+        roadOffset -= bgSpeed;
+        roadStripes.style.backgroundPositionX = roadOffset + 'px';
+        guardrail.style.backgroundPositionX = roadOffset + 'px';
+
+        // финиш по позиции
         if (playerProgressPct >= 100) {
             finishRace();
             return;
         }
 
-        // перекрут двигателя
+        // перекрут
         if (rpm >= 100) {
             if (!shiftCooldown) {
                 shiftCooldown = true;
@@ -369,7 +466,7 @@ function startTicking() {
                 totalShifts++;
                 rpm = 15;
                 gear++;
-                playerProgressPct = Math.min(100, playerProgressPct + 8);
+                playerProgressPct = Math.min(100, playerProgressPct + 5);
                 showFlash('ПЕРЕКРУТИЛ!', 'miss');
                 updateStats();
 
@@ -385,6 +482,7 @@ function startTicking() {
         renderTacho();
     }, 50);
 }
+
 // ─── ТАЙМЕР ───
 function startTimer() {
     timerInterval = setInterval(function() {
@@ -395,7 +493,7 @@ function startTimer() {
         setCarPosition(ghostSprite, ghostProgressPct);
         ghostTimeEl.textContent = elapsed.toFixed(2);
 
-        // если призрак доехал И игрок уже финишировал — отправляем результат
+        // если призрак доехал И игрок уже финишировал — отправляем
         if (elapsed >= GHOST_TIME && raceFinished) {
             clearInterval(timerInterval);
             ghostProgressEl.style.width = '100%';
@@ -404,7 +502,7 @@ function startTimer() {
         }
     }, 50);
 }
-    
+
 // ─── ПЕРЕКЛЮЧЕНИЕ ───
 btnShift.addEventListener('click', shift);
 document.addEventListener('keydown', function(e) {
@@ -434,16 +532,16 @@ function shift() {
         perfectShifts++;
         var distFromCenter = Math.abs(rpm - center);
         var quality = 1 - (distFromCenter / halfWidth);
-        var progressBonus = 20 + quality * 5;
+        var progressBonus = 14 + quality * 6;
         playerProgressPct = Math.min(100, playerProgressPct + progressBonus);
         showFlash('PERFECT! +' + Math.round(progressBonus) + '%', 'perfect');
     } else if (rpm < ZONE_MIN) {
         misses++;
-        playerProgressPct = Math.min(100, playerProgressPct + 8);
+        playerProgressPct = Math.min(100, playerProgressPct + 5);
         showFlash('РАНО!', 'miss');
     } else {
         misses++;
-        playerProgressPct = Math.min(100, playerProgressPct + 8);
+        playerProgressPct = Math.min(100, playerProgressPct + 5);
         showFlash('ПОЗДНО!', 'miss');
     }
 
@@ -491,22 +589,20 @@ function finishRace() {
 
     clearInterval(tickInterval);
 
-    // доводим игрока до финиша
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
     setCarPosition(playerSprite, 100);
 
     if (elapsed >= GHOST_TIME) {
-        // призрак уже финишировал — отправляем сразу
         clearInterval(timerInterval);
         ghostProgressEl.style.width = '100%';
         setCarPosition(ghostSprite, 100);
         setTimeout(submitResult, 500);
     } else {
-        // ждём призрака — таймер сам его довезёт (см. startTimer)
         showFlash('🏁 Ты финишировал! Ждём призрака...', 'perfect');
     }
 }
+
 function submitResult() {
     fetch('/drag/finish', {
         method: 'POST',
@@ -537,10 +633,13 @@ function submitResult() {
         flashMsg.className = 'flash-message flash-miss';
         setTimeout(function() { window.location.href = '/drag'; }, 2000);
     });
+}
+
+// ─── RESIZE ───
 window.addEventListener('resize', function() {
     setCarPosition(playerSprite, playerProgressPct);
     setCarPosition(ghostSprite, ghostProgressPct);
 });
-}
 </script>
+
 {% endblock %}
