@@ -33,7 +33,6 @@
     100% { transform: scale(1); opacity: 1; }
 }
 
-/* тайм-панель */
 .time-panel {
     display: grid; grid-template-columns: 1fr auto 1fr;
     gap: 16px; align-items: center;
@@ -45,12 +44,12 @@
 .time-side { text-align: center; }
 .time-side.you .time-value { color: #ff8a00; text-shadow: 0 0 12px rgba(255,138,0,0.6); }
 .time-side.ghost .time-value { color: #999; }
+.time-side.ghost.win .time-value { color: #4caf50; text-shadow: 0 0 12px rgba(76,175,80,0.5); }
 .time-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .time-value { font-size: 32px; font-weight: 900; }
 .time-name { font-size: 13px; color: #aaa; margin-top: 4px; }
 .vs { font-size: 20px; font-weight: 900; color: #555; }
 
-/* доп. инфа */
 .info-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
     margin-bottom: 22px;
@@ -98,6 +97,13 @@
     color: #ddd; border: 1px solid rgba(255,138,0,0.3);
 }
 .btn-secondary:hover { background: rgba(255,138,0,0.15); border-color: rgba(255,138,0,0.6); }
+
+@media (max-width: 500px) {
+    .time-value { font-size: 24px; }
+    .res-title { font-size: 26px; }
+    .info-grid { grid-template-columns: 1fr; }
+    .actions { grid-template-columns: 1fr; }
+}
 </style>
 
 <div class="res-wrap">
@@ -116,6 +122,7 @@
         </div>
     {% endif %}
 
+    <!-- ВРЕМЯ -->
     <div class="time-panel">
         <div class="time-side you">
             <div class="time-label">Ты</div>
@@ -123,17 +130,22 @@
             <div class="time-name">{{ car.model if car else 'Машина' }}</div>
         </div>
         <div class="vs">VS</div>
-        <div class="time-side ghost">
+        <div class="time-side ghost {% if race.won %}win{% endif %}">
             <div class="time-label">Призрак</div>
-            <div class="time-value">{{ '%.2f'|format(race.elapsed_time + 0.5) if race.won else '—' }}</div>
+            <div class="time-value">
+                {% if race.ghost_time and race.ghost_time > 0 %}
+                    {{ '%.2f'|format(race.ghost_time) }}
+                {% else %}—{% endif %}
+            </div>
             <div class="time-name">
-                {% if race.distance == 'quarter' %}1/4 мили
-                {% elif race.distance == 'half' %}1/2 мили
-                {% else %}1 миля{% endif %}
+                {% if race.distance == 'quarter' %}📏 1/4 мили
+                {% elif race.distance == 'half' %}📏 1/2 мили
+                {% else %}📏 1 миля{% endif %}
             </div>
         </div>
     </div>
 
+    <!-- СТАТИСТИКА -->
     <div class="info-grid">
         <div class="info-card">
             <div class="info-label">Perfect</div>
@@ -149,6 +161,7 @@
         </div>
     </div>
 
+    <!-- НАГРАДА -->
     <div class="reward-box">
         <div class="reward-label">Награда</div>
         <div class="reward-value {% if race.reward == 0 %}zero{% endif %}">
@@ -157,6 +170,7 @@
         <div class="balance-after">Баланс: <b>{{ balance }}</b> монет</div>
     </div>
 
+    <!-- КНОПКИ -->
     <div class="actions">
         <a href="{{ url_for('drag') }}" class="btn btn-primary">🏁 Ещё раз</a>
         <a href="{{ url_for('garage') }}" class="btn btn-secondary">🏠 В гараж</a>
