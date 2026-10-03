@@ -334,7 +334,7 @@ def init_db():
     for k, v in DEFAULT_SETTINGS.items():
         c.execute('INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING', (k, v))
 
-    c.execute('''CREATE TABLE IF NOT EXISTS drag_races (
+        c.execute('''CREATE TABLE IF NOT EXISTS drag_races (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         car_id INTEGER NOT NULL,
@@ -346,8 +346,9 @@ def init_db():
         won BOOLEAN NOT NULL,
         reward INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
-        c.execute('ALTER TABLE drag_races ADD COLUMN IF NOT EXISTS ghost_time REAL')
     )''')
+
+    c.execute('ALTER TABLE drag_races ADD COLUMN IF NOT EXISTS ghost_time REAL')
     # Автосоздание стартовой скидки (один раз)
     c.execute("SELECT value FROM settings WHERE key = 'start_discount_created'")
     if not c.fetchone():
