@@ -2214,341 +2214,6 @@ def drag_do_race(user_id, car_id, distance, perfect_shifts, misses, total_shifts
         'top_speed': top_speed_achieved,
     }
 
-# ─────────── DRAG: РОУТЫ ───────────
-
-@app.route('/drag')
-@login_required
-def drag():
-    user_id = session['user_id']
-
-    if get_setting('drag_enabled') != '1':
-        flash('Драг-гонки временно отключены')
-        return redirect(url_for('index'))
-
-    # машины игрока
-    conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT c.id, c.model, c.brand, c.rating,
-                        c.horsepower, c.acceleration, c.top_speed, c.price
-                 FROM cars c
-                 JOIN user_cars uc ON uc.car_id = c.id
-                 WHERE uc.user_id = %s
-                 ORDER BY c.rating DESC, c.price DESC''', (user_id,))
-    cars = c.fetchall()
-    c.close(); conn.close()
-
-    # лимиты
-    races_today, coins_today = drag_today_stats(user_id)
-    daily_races = get_int_setting('drag_daily_races', 30)
-    daily_reward = get_int_setting('drag_daily_reward', 10000)
-
-    # последние 10 заездов
-    conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT dr.id, dr.distance, dr.elapsed_time, dr.won, dr.reward,
-                        dr.created_at, c.model, c.rating
-                 FROM drag_races dr
-                 JOIN cars c ON c.id = dr.car_id
-                 WHERE dr.user_id = %s
-                 ORDER BY dr.id DESC
-                 LIMIT 10''', (user_id,))
-    recent = c.fetchall()
-    c.close(); conn.close()
-
-    return render_template('drag.html',
-        cars=cars,
-        distances=DRAG_DISTANCES,
-        balance=get_balance(user_id),
-        races_today=races_today, coins_today=coins_today,
-        daily_races=daily_races, daily_reward=daily_reward,
-        recent=recent,
-        user=session.get('username'),
-        is_admin=is_admin(session.get('username'))
-    )
-
-
-@app.route('/drag/race')
-@login_required
-def drag_race():
-    user_id = session['user_id']
-
-    if get_setting('drag_enabled') != '1':
-        flash('Драг-гонки временно отключены')
-        return redirect(url_for('index'))
-
-    try:
-        car_id = int(request.args.get('car_id', 0))
-    except (ValueError, TypeError):
-        car_id = 0
-    distance = request.args.get('distance', 'quarter')
-
-    if distance not in DRAG_DISTANCES:
-        distance = 'quarter'
-
-    if car_id <= 0:
-        flash('Выбери машину')
-        return redirect(url_for('drag'))
-
-    # проверка владения
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s',
-              (user_id, car_id))
-    if not c.fetchone():
-        c.close(); conn.close()
-        flash('Этой машины нет в гараже')
-        return redirect(url_for('drag'))
-    c.close(); conn.close()
-
-    # лимиты
-    races_today, coins_today = drag_today_stats(user_id)
-    daily_races = get_int_setting('drag_daily_races', 30)
-    daily_reward = get_int_setting('drag_daily_reward', 10000)
-
-    if races_today >= daily_races:
-        flash(f'Дневной лимит гонок ({daily_races})')
-        return redirect(url_for('drag'))
-    if coins_today >= daily_reward:
-        flash(f'Дневной лимит монет ({daily_reward})')
-        return redirect(url_for('drag'))
-
-    car = get_car_full(car_id)
-    if not car:
-        flash('Машина не найдена')
-        return redirect(url_for('drag'))
-
-    # призрак
-    ghost = drag_find_friend_ghost(user_id, car, distance)
-    if not ghost:
-        ghost = drag_generate_bot_ghost(user_id, car, distance)
-
-    # идеальная зона
-    zone_min, zone_max = drag_ideal_zone(car)
-
-    return render_template('drag_race.html',
-        car=car,
-        distance=distance,
-        distance_info=DRAG_DISTANCES[distance],
-        ghost=ghost,
-        zone_min=zone_min,
-        zone_max=zone_max,
-        user=session.get('username'),
-    )
-
-
-@app.route('/drag/finish', methods=['POST'])
-@login_required
-def drag_finish():
-    user_id = session['user_id']
-
-    if get_setting('drag_enabled') != '1':
-        return jsonify({'error': 'Режим отключён'}), 400
-
-    data = request.get_json() or {}
-    try:
-        car_id = int(data.get('car_id', 0))
-        perfect_shifts = int(data.get('perfect_shifts', 0))
-        misses = int(data.get('misses', 0))
-        total_shifts = int(data.get('total_shifts', 0))
-        ghost_time = float(data.get('ghost_time', 0))
-        distance = str(data.get('distance', 'quarter'))
-    except (ValueError, TypeError):
-        return jsonify({'error': 'Некорректные данные'}), 400
-
-    if distance not in DRAG_DISTANCES:
-        return jsonify({'error': 'Неизвестная дистанция'}), 400
-
-    if perfect_shifts < 0 or misses < 0 or total_shifts < 1:
-        return jsonify({'error': 'Некорректные данные'}), 400
-
-    if ghost_time <= 0:
-        return jsonify({'error': 'Некорректное время призрака'}), 400
-
-    result = drag_do_race(user_id, car_id, distance,
-                         perfect_shifts, misses, total_shifts,
-                         ghost_time=ghost_time)
-
-    if 'error' in result:
-        return jsonify(result), 400
-
-    return jsonify(result)
-
-
-@app.route('/drag/result/<int:race_id>')
-@login_required
-def drag_result(race_id):
-    user_id = session['user_id']
-
-    conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT id, user_id, car_id, distance, elapsed_time, top_speed,
-                        perfect_shifts, misses, won, reward, created_at
-                 FROM drag_races
-                 WHERE id = %s AND user_id = %s''', (race_id, user_id))
-    row = c.fetchone()
-    c.close(); conn.close()
-
-    if not row:
-        flash('Гонка не найдена')
-        return redirect(url_for('drag'))
-
-    race = {
-        'id': row[0], 'user_id': row[1], 'car_id': row[2],
-        'distance': row[3], 'elapsed_time': row[4], 'top_speed': row[5],
-        'perfect_shifts': row[6], 'misses': row[7],
-        'won': row[8], 'reward': row[9], 'created_at': row[10]
-    }
-
-    car = get_car_full(race['car_id'])
-
-    return render_template('drag_result.html',
-        race=race,
-        car=car,
-        distance_info=DRAG_DISTANCES.get(race['distance'], DRAG_DISTANCES['quarter']),
-        balance=get_balance(user_id),
-        user=session.get('username'),
-        is_admin=is_admin(session.get('username'))
-    )
-# ---------- ЛИЧНЫЙ ГАРАЖ ----------
-def get_user_cars(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT c.id, c.model, c.rating, c.price FROM cars c
-                 JOIN user_cars uc ON uc.car_id = c.id WHERE uc.user_id = %s ORDER BY uc.id DESC''',
-              (user_id,))
-    rows = c.fetchall(); c.close(); conn.close()
-    return rows
-
-
-def count_user_cars(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM user_cars WHERE user_id = %s', (user_id,))
-    r = c.fetchone(); c.close(); conn.close()
-    return r[0] if r else 0
-
-
-def has_car(user_id, car_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    r = c.fetchone(); c.close(); conn.close()
-    return r is not None
-
-
-def buy_car(user_id, car_id):
-    if has_car(user_id, car_id): return False, 'Эта машина уже в твоём гараже'
-    car = get_car_full(car_id)
-    if not car: return False, 'Машина не найдена'
-    if car['is_exclusive']:
-        return False, 'Эксклюзивные машины нельзя купить — только получить за коллекцию'
-    req_level = get_level_required_for_stars(car['rating'])
-    user_level = get_user_level_info(user_id)['level']
-    if user_level < req_level:
-        return False, f'Нужен {req_level} уровень для покупки {car["rating"]}★ машины'
-
-    # Скидка дня
-    discount = get_active_discount()
-    final_price = car['price']
-    was_disc = False
-    discount_label = ''
-    if discount and discount['car_id'] == car_id:
-        final_price = int(final_price * (100 - discount['discount_percent']) / 100)
-        was_disc = True
-        discount_label = f'скидка дня −{discount["discount_percent"]}%'
-
-    # Постоянные скидки
-    pct, dname = get_discount_for_car(car_id, car['rating'])
-    if pct > 0:
-        alt_price = int(car['price'] * (100 - pct) / 100)
-        if alt_price < final_price:
-            final_price = alt_price
-            was_disc = True
-            discount_label = f'{dname} −{pct}%'
-
-    balance = get_balance(user_id)
-    if balance < final_price:
-        return False, f'Не хватает монет. Нужно {final_price}, у тебя {balance}'
-    conn = get_db(); c = conn.cursor()
-    c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s', (final_price, user_id))
-    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
-              (user_id, car_id, datetime.now().isoformat()))
-    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    conn.commit(); c.close(); conn.close()
-    desc = f'Покупка: {car["model"]}'
-    if discount_label:
-        desc += f' ({discount_label})'
-    log_transaction(user_id, 'buy', -final_price, car_id, desc)
-    add_xp(user_id, XP_REWARDS.get('buy', 30))
-    progress_quest(user_id, 'buy_car_1', 1)
-    return True, f'Куплена «{car["model"]}» за {final_price} монет!'
-
-
-def sell_car(user_id, car_id):
-    if not has_car(user_id, car_id): return False, 'У тебя нет этой машины', 0
-    car = get_car_full(car_id)
-    if not car: return False, 'Машина не найдена', 0
-    refund = int(car['price'] * SELL_RATE)
-    conn = get_db(); c = conn.cursor()
-    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
-              (user_id, car_id))
-    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (refund, user_id))
-    conn.commit(); c.close(); conn.close()
-    log_transaction(user_id, 'sell', refund, car_id, f'Продажа: {car["model"]}')
-    add_xp(user_id, XP_REWARDS.get('sell', 10))
-    progress_quest(user_id, 'sell_car_1', 1)
-    return True, f'«{car["model"]}» продана за {refund} монет', refund
-
-
-# ---------- ИЗБРАННОЕ / ВИШЛИСТ ----------
-def toggle_favorite(user_id, car_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT 1 FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    exists = c.fetchone()
-    if exists:
-        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-        result = False
-    else:
-        c.execute('INSERT INTO favorite_cars (user_id, car_id, created_at) VALUES (%s, %s, %s)',
-                  (user_id, car_id, datetime.now().isoformat()))
-        result = True
-    conn.commit(); c.close(); conn.close()
-    return result
-
-
-def get_favorite_ids(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT car_id FROM favorite_cars WHERE user_id = %s', (user_id,))
-    rows = c.fetchall(); c.close(); conn.close()
-    return {r[0] for r in rows}
-
-
-def toggle_wishlist(user_id, car_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT 1 FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-    exists = c.fetchone()
-    if exists:
-        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
-        result = False
-    else:
-        c.execute('INSERT INTO wishlist (user_id, car_id, created_at) VALUES (%s, %s, %s)',
-                  (user_id, car_id, datetime.now().isoformat()))
-        result = True
-    conn.commit(); c.close(); conn.close()
-    return result
-
-
-def get_wishlist_ids(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('SELECT car_id FROM wishlist WHERE user_id = %s', (user_id,))
-    rows = c.fetchall(); c.close(); conn.close()
-    return {r[0] for r in rows}
-
-
-def get_wishlist_cars(user_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT c.id, c.model, c.rating, c.price, w.created_at
-                 FROM cars c JOIN wishlist w ON w.car_id = c.id
-                 WHERE w.user_id = %s ORDER BY w.id DESC''', (user_id,))
-    rows = c.fetchall(); c.close(); conn.close()
-    return [{'id': r[0], 'model': r[1], 'rating': r[2], 'price': r[3] or 0} for r in rows]
-
 
 # ---------- СКИДКА ДНЯ ----------
 def get_active_discount():
@@ -5037,6 +4702,341 @@ def admin_reroll_discount():
         return redirect(url_for('admin_settings'))
     except Exception:
         return '<h2 style="color:red;">Ошибка:</h2><pre>' + traceback.format_exc() + '</pre>', 500
+
+# ─────────── DRAG: РОУТЫ ───────────
+
+@app.route('/drag')
+@login_required
+def drag():
+    user_id = session['user_id']
+
+    if get_setting('drag_enabled') != '1':
+        flash('Драг-гонки временно отключены')
+        return redirect(url_for('index'))
+
+    # машины игрока
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT c.id, c.model, c.brand, c.rating,
+                        c.horsepower, c.acceleration, c.top_speed, c.price
+                 FROM cars c
+                 JOIN user_cars uc ON uc.car_id = c.id
+                 WHERE uc.user_id = %s
+                 ORDER BY c.rating DESC, c.price DESC''', (user_id,))
+    cars = c.fetchall()
+    c.close(); conn.close()
+
+    # лимиты
+    races_today, coins_today = drag_today_stats(user_id)
+    daily_races = get_int_setting('drag_daily_races', 30)
+    daily_reward = get_int_setting('drag_daily_reward', 10000)
+
+    # последние 10 заездов
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT dr.id, dr.distance, dr.elapsed_time, dr.won, dr.reward,
+                        dr.created_at, c.model, c.rating
+                 FROM drag_races dr
+                 JOIN cars c ON c.id = dr.car_id
+                 WHERE dr.user_id = %s
+                 ORDER BY dr.id DESC
+                 LIMIT 10''', (user_id,))
+    recent = c.fetchall()
+    c.close(); conn.close()
+
+    return render_template('drag.html',
+        cars=cars,
+        distances=DRAG_DISTANCES,
+        balance=get_balance(user_id),
+        races_today=races_today, coins_today=coins_today,
+        daily_races=daily_races, daily_reward=daily_reward,
+        recent=recent,
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
+
+
+@app.route('/drag/race')
+@login_required
+def drag_race():
+    user_id = session['user_id']
+
+    if get_setting('drag_enabled') != '1':
+        flash('Драг-гонки временно отключены')
+        return redirect(url_for('index'))
+
+    try:
+        car_id = int(request.args.get('car_id', 0))
+    except (ValueError, TypeError):
+        car_id = 0
+    distance = request.args.get('distance', 'quarter')
+
+    if distance not in DRAG_DISTANCES:
+        distance = 'quarter'
+
+    if car_id <= 0:
+        flash('Выбери машину')
+        return redirect(url_for('drag'))
+
+    # проверка владения
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (user_id, car_id))
+    if not c.fetchone():
+        c.close(); conn.close()
+        flash('Этой машины нет в гараже')
+        return redirect(url_for('drag'))
+    c.close(); conn.close()
+
+    # лимиты
+    races_today, coins_today = drag_today_stats(user_id)
+    daily_races = get_int_setting('drag_daily_races', 30)
+    daily_reward = get_int_setting('drag_daily_reward', 10000)
+
+    if races_today >= daily_races:
+        flash(f'Дневной лимит гонок ({daily_races})')
+        return redirect(url_for('drag'))
+    if coins_today >= daily_reward:
+        flash(f'Дневной лимит монет ({daily_reward})')
+        return redirect(url_for('drag'))
+
+    car = get_car_full(car_id)
+    if not car:
+        flash('Машина не найдена')
+        return redirect(url_for('drag'))
+
+    # призрак
+    ghost = drag_find_friend_ghost(user_id, car, distance)
+    if not ghost:
+        ghost = drag_generate_bot_ghost(user_id, car, distance)
+
+    # идеальная зона
+    zone_min, zone_max = drag_ideal_zone(car)
+
+    return render_template('drag_race.html',
+        car=car,
+        distance=distance,
+        distance_info=DRAG_DISTANCES[distance],
+        ghost=ghost,
+        zone_min=zone_min,
+        zone_max=zone_max,
+        user=session.get('username'),
+    )
+
+
+@app.route('/drag/finish', methods=['POST'])
+@login_required
+def drag_finish():
+    user_id = session['user_id']
+
+    if get_setting('drag_enabled') != '1':
+        return jsonify({'error': 'Режим отключён'}), 400
+
+    data = request.get_json() or {}
+    try:
+        car_id = int(data.get('car_id', 0))
+        perfect_shifts = int(data.get('perfect_shifts', 0))
+        misses = int(data.get('misses', 0))
+        total_shifts = int(data.get('total_shifts', 0))
+        ghost_time = float(data.get('ghost_time', 0))
+        distance = str(data.get('distance', 'quarter'))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Некорректные данные'}), 400
+
+    if distance not in DRAG_DISTANCES:
+        return jsonify({'error': 'Неизвестная дистанция'}), 400
+
+    if perfect_shifts < 0 or misses < 0 or total_shifts < 1:
+        return jsonify({'error': 'Некорректные данные'}), 400
+
+    if ghost_time <= 0:
+        return jsonify({'error': 'Некорректное время призрака'}), 400
+
+    result = drag_do_race(user_id, car_id, distance,
+                         perfect_shifts, misses, total_shifts,
+                         ghost_time=ghost_time)
+
+    if 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify(result)
+
+
+@app.route('/drag/result/<int:race_id>')
+@login_required
+def drag_result(race_id):
+    user_id = session['user_id']
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, user_id, car_id, distance, elapsed_time, top_speed,
+                        perfect_shifts, misses, won, reward, created_at
+                 FROM drag_races
+                 WHERE id = %s AND user_id = %s''', (race_id, user_id))
+    row = c.fetchone()
+    c.close(); conn.close()
+
+    if not row:
+        flash('Гонка не найдена')
+        return redirect(url_for('drag'))
+
+    race = {
+        'id': row[0], 'user_id': row[1], 'car_id': row[2],
+        'distance': row[3], 'elapsed_time': row[4], 'top_speed': row[5],
+        'perfect_shifts': row[6], 'misses': row[7],
+        'won': row[8], 'reward': row[9], 'created_at': row[10]
+    }
+
+    car = get_car_full(race['car_id'])
+
+    return render_template('drag_result.html',
+        race=race,
+        car=car,
+        distance_info=DRAG_DISTANCES.get(race['distance'], DRAG_DISTANCES['quarter']),
+        balance=get_balance(user_id),
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
+# ---------- ЛИЧНЫЙ ГАРАЖ ----------
+def get_user_cars(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT c.id, c.model, c.rating, c.price FROM cars c
+                 JOIN user_cars uc ON uc.car_id = c.id WHERE uc.user_id = %s ORDER BY uc.id DESC''',
+              (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return rows
+
+
+def count_user_cars(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM user_cars WHERE user_id = %s', (user_id,))
+    r = c.fetchone(); c.close(); conn.close()
+    return r[0] if r else 0
+
+
+def has_car(user_id, car_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    r = c.fetchone(); c.close(); conn.close()
+    return r is not None
+
+
+def buy_car(user_id, car_id):
+    if has_car(user_id, car_id): return False, 'Эта машина уже в твоём гараже'
+    car = get_car_full(car_id)
+    if not car: return False, 'Машина не найдена'
+    if car['is_exclusive']:
+        return False, 'Эксклюзивные машины нельзя купить — только получить за коллекцию'
+    req_level = get_level_required_for_stars(car['rating'])
+    user_level = get_user_level_info(user_id)['level']
+    if user_level < req_level:
+        return False, f'Нужен {req_level} уровень для покупки {car["rating"]}★ машины'
+
+    # Скидка дня
+    discount = get_active_discount()
+    final_price = car['price']
+    was_disc = False
+    discount_label = ''
+    if discount and discount['car_id'] == car_id:
+        final_price = int(final_price * (100 - discount['discount_percent']) / 100)
+        was_disc = True
+        discount_label = f'скидка дня −{discount["discount_percent"]}%'
+
+    # Постоянные скидки
+    pct, dname = get_discount_for_car(car_id, car['rating'])
+    if pct > 0:
+        alt_price = int(car['price'] * (100 - pct) / 100)
+        if alt_price < final_price:
+            final_price = alt_price
+            was_disc = True
+            discount_label = f'{dname} −{pct}%'
+
+    balance = get_balance(user_id)
+    if balance < final_price:
+        return False, f'Не хватает монет. Нужно {final_price}, у тебя {balance}'
+    conn = get_db(); c = conn.cursor()
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) - %s WHERE id = %s', (final_price, user_id))
+    c.execute('INSERT INTO user_cars (user_id, car_id, opened_at) VALUES (%s, %s, %s)',
+              (user_id, car_id, datetime.now().isoformat()))
+    c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    conn.commit(); c.close(); conn.close()
+    desc = f'Покупка: {car["model"]}'
+    if discount_label:
+        desc += f' ({discount_label})'
+    log_transaction(user_id, 'buy', -final_price, car_id, desc)
+    add_xp(user_id, XP_REWARDS.get('buy', 30))
+    progress_quest(user_id, 'buy_car_1', 1)
+    return True, f'Куплена «{car["model"]}» за {final_price} монет!'
+
+
+def sell_car(user_id, car_id):
+    if not has_car(user_id, car_id): return False, 'У тебя нет этой машины', 0
+    car = get_car_full(car_id)
+    if not car: return False, 'Машина не найдена', 0
+    refund = int(car['price'] * SELL_RATE)
+    conn = get_db(); c = conn.cursor()
+    c.execute('DELETE FROM user_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('DELETE FROM public_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    c.execute('UPDATE users SET favorite_car_id = NULL WHERE id = %s AND favorite_car_id = %s',
+              (user_id, car_id))
+    c.execute('UPDATE users SET balance = COALESCE(balance, 0) + %s WHERE id = %s', (refund, user_id))
+    conn.commit(); c.close(); conn.close()
+    log_transaction(user_id, 'sell', refund, car_id, f'Продажа: {car["model"]}')
+    add_xp(user_id, XP_REWARDS.get('sell', 10))
+    progress_quest(user_id, 'sell_car_1', 1)
+    return True, f'«{car["model"]}» продана за {refund} монет', refund
+
+
+# ---------- ИЗБРАННОЕ / ВИШЛИСТ ----------
+def toggle_favorite(user_id, car_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    exists = c.fetchone()
+    if exists:
+        c.execute('DELETE FROM favorite_cars WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+        result = False
+    else:
+        c.execute('INSERT INTO favorite_cars (user_id, car_id, created_at) VALUES (%s, %s, %s)',
+                  (user_id, car_id, datetime.now().isoformat()))
+        result = True
+    conn.commit(); c.close(); conn.close()
+    return result
+
+
+def get_favorite_ids(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT car_id FROM favorite_cars WHERE user_id = %s', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return {r[0] for r in rows}
+
+
+def toggle_wishlist(user_id, car_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+    exists = c.fetchone()
+    if exists:
+        c.execute('DELETE FROM wishlist WHERE user_id = %s AND car_id = %s', (user_id, car_id))
+        result = False
+    else:
+        c.execute('INSERT INTO wishlist (user_id, car_id, created_at) VALUES (%s, %s, %s)',
+                  (user_id, car_id, datetime.now().isoformat()))
+        result = True
+    conn.commit(); c.close(); conn.close()
+    return result
+
+
+def get_wishlist_ids(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT car_id FROM wishlist WHERE user_id = %s', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return {r[0] for r in rows}
+
+
+def get_wishlist_cars(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT c.id, c.model, c.rating, c.price, w.created_at
+                 FROM cars c JOIN wishlist w ON w.car_id = c.id
+                 WHERE w.user_id = %s ORDER BY w.id DESC''', (user_id,))
+    rows = c.fetchall(); c.close(); conn.close()
+    return [{'id': r[0], 'model': r[1], 'rating': r[2], 'price': r[3] or 0} for r in rows]
 
 
 # ---------- КАРТИНКИ ----------
