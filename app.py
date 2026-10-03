@@ -2064,7 +2064,7 @@ def drag_calc_reward(won, distance, car_rating):
 
 
 def drag_generate_bot_ghost(user_id, car, distance):
-    """Бот-призрак: считается от силы машины + бонус гаража (защита от фарма)."""
+    """Бот-призрак: считается от силы машины + бонус гаража."""
     power = drag_calc_power(car)
     _, total_stars = garage_bonus(user_id)
     stars_bonus = 1 + min(total_stars / 800, 0.4)
@@ -2075,13 +2075,23 @@ def drag_generate_bot_ghost(user_id, car, distance):
     raw = base * (300 / (bot_power + 100)) ** 0.7
     ghost_time = round(raw * random.uniform(0.92, 0.98), 2)
 
+    # ищем похожую машину для картинки (по рейтингу игрока)
+    car_rating = car.get('rating') or 3
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT id, model FROM cars
+                 WHERE rating BETWEEN %s AND %s
+                 ORDER BY RANDOM() LIMIT 1''',
+              (max(1, car_rating - 1), min(8, car_rating + 1)))
+    row = c.fetchone()
+    c.close(); conn.close()
+
     return {
         'username': '🤖 Бот',
         'time': ghost_time,
         'is_bot': True,
-        'car_model': 'Соперник',
+        'car_id': row[0] if row else None,
+        'car_model': row[1] if row else 'Соперник',
     }
-
 
 def drag_find_friend_ghost(user_id, car, distance):
     """Лучший заезд друга на похожей машине (±1★)."""
