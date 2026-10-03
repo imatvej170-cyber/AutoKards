@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.race-wrap { max-width: 1000px; margin: 0 auto; padding: 16px 12px 40px; }
+
+.race-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+}
+.race-header-left { font-size: 14px; color: #aaa; }
+.race-header-left b { color: #ff8a00; }
+.race-header-right { font-size: 14px; color: #aaa; }
+.race-header-right b { color: #ff8a00; }
+
+/* трасса */
+.track {
+    position: relative; height: 180px; border-radius: 16px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+    border: 2px solid rgba(255,138,0,0.3);
+    overflow: hidden; margin-bottom: 20px;
+    box-shadow: inset 0 0 40px rgba(255,138,0,0.08);
+}
+.track::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 30px;
+    height: 3px;
+    background: repeating-linear-gradient(90deg, #ff8a00 0 30px, transparent 30px 60px);
+    opacity: 0.6;
+}
+.finish-line {
+    position: absolute; right: 20px; top: 0; bottom: 0; width: 4px;
+    background: repeating-linear-gradient(0deg, #fff 0 10px, #000 10px 20px);
+    z-index: 3;
+}
+.car-lane {
+    position: absolute; left: 0; right: 40px;
+    display: flex; align-items: center;
+    transition: none;
+}
+.car-lane.player { top: 20px; }
+.car-lane.ghost  { top: 100px; opacity: 0.7; }
+
+.car-sprite {
+    position: absolute; left: 0;
+    transition: left 0.15s ease-out;
+    will-change: left;
+}
+.car-sprite img {
+    height: 60px; width: auto;
+    transform: scaleX(-1);
+    filter: drop-shadow(0 0 8px rgba(255,138,0,0.5));
+}
+.car-sprite.ghost-sprite img {
+    filter: drop-shadow(0 0 6px rgba(120,120,120,0.5)) grayscale(0.5);
+}
+.car-label {
+    position: absolute; top: -18px; left: 0;
+    font-size: 11px; color: #ff8a00; white-space: nowrap;
+    font-weight: 700;
+}
+.car-sprite.ghost-sprite .car-label { color: #999; }
+
+.bot-placeholder {
+    height: 40px; padding: 0 12px;
+    background: rgba(120,120,120,0.3);
+    border: 1px dashed #666; border-radius: 8px;
+    display: flex; align-items: center;
+    color: #999; font-size: 12px;
+}
+
+/* тахометр */
+.tacho-box {
+    background: rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,138,0,0.3);
+    border-radius: 16px; padding: 16px 20px;
+    margin-bottom: 20px;
+}
+.tacho-label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: #999; margin-bottom: 6px;
+}
+.tacho-bar {
+    position: relative; height: 40px; border-radius: 10px;
+    background: rgba(0,0,0,0.6); overflow: hidden;
+}
+.tacho-zone {
+    position: absolute; top: 0; bottom: 0;
+    background: linear-gradient(180deg, rgba(76,175,80,0.35), rgba(76,175,80,0.15));
+    border-left: 2px solid #4caf50; border-right: 2px solid #4caf50;
+}
+.tacho-fill {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    background: linear-gradient(90deg, #ff4d4d, #ffb347, #ff8a00);
+    width: 0%; transition: width 0.05s linear;
+    opacity: 0.7;
+}
+.tacho-rpm {
+    position: absolute; right: 8px; top: 50%;
+    transform: translateY(-50%);
+    font-weight: 800; font-size: 16px; color: #fff;
+    text-shadow: 0 0 6px rgba(0,0,0,0.8);
+    z-index: 2;
+}
+.gear-box {
+    display: flex; justify-content: space-between;
+    margin-top: 10px; font-size: 13px; color: #999;
+}
+.gear-box b { color: #ff8a00; }
+
+/* прогресс */
+.progress-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-bottom: 20px;
+}
+.progress-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,138,0,0.15);
+    border-radius: 12px; padding: 12px 14px;
+}
+.progress-label { font-size: 12px; color: #999; margin-bottom: 6px; }
+.progress-bar {
+    height: 10px; background: rgba(0,0,0,0.4);
+    border-radius: 5px; overflow: hidden;
+}
+.progress-fill {
+    height: 100%; transition: width 0.2s ease-out;
+    border-radius: 5px;
+}
+.progress-fill.player { background: linear-gradient(90deg, #ff8a00, #ffb347); }
+.progress-fill.ghost { background: linear-gradient(90deg, #666, #999); }
+
+/* кнопки */
+.controls {
+    display: flex; gap: 12px; justify-content: center;
+    margin-top: 20px; flex-wrap: wrap;
+}
+.btn-start {
+    padding: 20px 50px; font-size: 22px; font-weight: 900;
+    background: linear-gradient(135deg, #ff8a00, #ffb347);
+    color: #1a1a1a; border: none; border-radius: 16px;
+    cursor: pointer; letter-spacing: 2px;
+    box-shadow: 0 6px 28px rgba(255,138,0,0.6);
+    transition: all 0.2s;
+}
+.btn-start:hover { transform: translateY(-3px); box-shadow: 0 10px 36px rgba(255,138,0,0.8); }
+.btn-shift {
+    padding: 20px 50px; font-size: 22px; font-weight: 900;
+    background: linear-gradient(135deg, #4caf50, #66bb6a);
+    color: #fff; border: none; border-radius: 16px;
+    cursor: pointer; letter-spacing: 2px;
+    box-shadow: 0 6px 28px rgba(76,175,80,0.6);
+    transition: all 0.15s;
+}
+.btn-shift:hover { transform: translateY(-3px); }
+.btn-shift:active { transform: translateY(0) scale(0.97); }
+.btn-shift:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.flash-message {
+    text-align: center; font-size: 20px; font-weight: 800;
+    min-height: 30px; margin-top: 14px;
+    transition: opacity 0.3s;
+}
+.flash-perfect { color: #4caf50; text-shadow: 0 0 12px rgba(76,175,80,0.7); }
+.flash-miss { color: #ff4d4d; text-shadow: 0 0 12px rgba(255,77,77,0.7); }
+
+.countdown {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 140px; font-weight: 900; color: #ff8a00;
+    text-shadow: 0 0 40px rgba(255,138,0,0.9);
+    background: rgba(0,0,0,0.7); z-index: 100;
+}
+.countdown.hidden { display: none; }
+
+@media (max-width: 600px) {
+    .car-sprite img { height: 42px; }
+    .btn-start, .btn-shift { padding: 16px 30px; font-size: 18px; }
+    .track { height: 140px; }
+}
+</style>
+
+<div class="race-wrap">
+
+    <div class="race-header">
+        <div class="race-header-left">
+            🚗 <b>{{ car.model }}</b> · {{ car.rating }}★
+        </div>
+        <div class="race-header-right">
+            📏 <b>{{ distance_info.label }}</b> · Призрак: <b id="ghostName">{{ ghost.username }}</b>
+        </div>
+    </div>
+
+    <!-- ТРАССА -->
+    <div class="track" id="track">
+        <div class="finish-line"></div>
+
+        <div class="car-lane player">
+            <div class="car-sprite player-sprite" id="playerSprite" style="left: 0;">
+                <div class="car-label">Ты</div>
+                <img src="{{ url_for('car_image', car_id=car.id) }}" alt="{{ car.model }}">
+            </div>
+        </div>
+
+        <div class="car-lane ghost">
+            <div class="car-sprite ghost-sprite" id="ghostSprite" style="left: 0;">
+                <div class="car-label">{{ ghost.username }}</div>
+                {% if ghost.is_bot %}
+                    <div class="bot-placeholder">🤖 Бот</div>
+                {% else %}
+                    <img src="{{ url_for('car_image', car_id=ghost.car_id) }}" alt="ghost">
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ТАХОМЕТР -->
+    <div class="tacho-box">
+        <div class="tacho-label">
+            <span>Обороты</span>
+            <span>Идеальная зона: {{ zone_min }}–{{ zone_max }}</span>
+        </div>
+        <div class="tacho-bar">
+            <div class="tacho-zone" id="tachoZone"
+                 style="left: {{ zone_min }}%; width: {{ zone_max - zone_min }}%;"></div>
+            <div class="tacho-fill" id="tachoFill"></div>
+            <div class="tacho-rpm" id="tachoRpm">0</div>
+        </div>
+        <div class="gear-box">
+            <span>Передача: <b id="gearNum">1</b> / 5</span>
+            <span>Perfect: <b id="perfectCount">0</b> · Miss: <b id="missCount">0</b></span>
+        </div>
+    </div>
+
+    <!-- ПРОГРЕСС -->
+    <div class="progress-row">
+        <div class="progress-item">
+            <div class="progress-label">Ты · <span id="playerTime">0.00</span>с</div>
+            <div class="progress-bar"><div class="progress-fill player" id="playerProgress" style="width:0%;"></div></div>
+        </div>
+        <div class="progress-item">
+            <div class="progress-label">{{ ghost.username }} · <span id="ghostTime">0.00</span>с</div>
+            <div class="progress-bar"><div class="progress-fill ghost" id="ghostProgress" style="width:0%;"></div></div>
+        </div>
+    </div>
+
+    <!-- КНОПКИ -->
+    <div class="controls">
+        <button type="button" class="btn-start" id="btnStart">🏁 ПОЕХАЛИ!</button>
+        <button type="button" class="btn-shift" id="btnShift" disabled>⚙️ ПЕРЕКЛЮЧИТЬ (Space)</button>
+    </div>
+
+    <div class="flash-message" id="flashMsg"></div>
+
+</div>
+
+<div class="countdown hidden" id="countdown">3</div>
+
+<script>
+// ─── ДАННЫЕ С СЕРВЕРА ───
+const CAR_ID = {{ car.id }};
+const DISTANCE = "{{ distance }}";
+const GHOST_TIME = {{ '%.2f'|format(ghost.time) }};
+const ZONE_MIN = {{ zone_min }};
+const ZONE_MAX = {{ zone_max }};
+const MAX_GEARS = 5;
+
+// ─── СОСТОЯНИЕ ───
+let rpm = 0;
+let gear = 1;
+let perfectShifts = 0;
+let misses = 0;
+let totalShifts = 0;
+let elapsed = 0;
+let playerProgressPct = 0;
+let ghostProgressPct = 0;
+let raceStarted = false;
+let raceFinished = false;
+let tickInterval = null;
+let timerInterval = null;
+
+// ─── ЭЛЕМЕНТЫ ───
+const btnStart = document.getElementById('btnStart');
+const btnShift = document.getElementById('btnShift');
+const tachoFill = document.getElementById('tachoFill');
+const tachoRpm = document.getElementById('tachoRpm');
+const gearNum = document.getElementById('gearNum');
+const perfectEl = document.getElementById('perfectCount');
+const missEl = document.getElementById('missCount');
+const playerSprite = document.getElementById('playerSprite');
+const ghostSprite = document.getElementById('ghostSprite');
+const playerProgressEl = document.getElementById('playerProgress');
+const ghostProgressEl = document.getElementById('ghostProgress');
+const playerTimeEl = document.getElementById('playerTime');
+const ghostTimeEl = document.getElementById('ghostTime');
+const flashMsg = document.getElementById('flashMsg');
+const countdownEl = document.getElementById('countdown');
+
+// ─── СТАРТ ───
+btnStart.addEventListener('click', () => {
+    btnStart.disabled = true;
+    runCountdown();
+});
+
+function runCountdown() {
+    let n = 3;
+    countdownEl.textContent = n;
+    countdownEl.classList.remove('hidden');
+
+    const cd = setInterval(() => {
+        n--;
+        if (n > 0) {
+            countdownEl.textContent = n;
+        } else if (n === 0) {
+            countdownEl.textContent = 'GO!';
+        } else {
+            clearInterval(cd);
+            countdownEl.classList.add('hidden');
+            startRace();
+        }
+    }, 700);
+}
+
+function startRace() {
+    raceStarted = true;
+    btnShift.disabled = false;
+    rpm = 10;
+    startTicking();
+    startTimer();
+}
+
+// ─── ТИК ОБОРОТОВ ───
+function startTicking() {
+    tickInterval = setInterval(() => {
+        if (raceFinished) return;
+
+        rpm += 2.5;   // скорость роста оборотов
+
+        // перекрутил двигатель — авто-miss
+        if (rpm >= 100) {
+            misses++;
+            totalShifts++;
+            rpm = 15;
+            gear++;
+            showFlash('ПЕРЕКРУТИЛ!', 'miss');
+            updateStats();
+
+            if (gear > MAX_GEARS) {
+                finishRace();
+                return;
+            }
+        }
+
+        renderTacho();
+    }, 50);
+}
+
+// ─── ТАЙМЕР ЗАЕЗДА ───
+function startTimer() {
+    timerInterval = setInterval(() => {
+        if (raceFinished) return;
+        elapsed += 0.05;
+
+        // прогресс призрака
+        ghostProgressPct = Math.min(100, (elapsed / GHOST_TIME) * 100);
+        ghostProgressEl.style.width = ghostProgressPct + '%';
+        ghostSprite.style.left = `calc(${ghostProgressPct}% - ${ghostProgressPct * 0.6}px)`;
+        ghostTimeEl.textContent = elapsed.toFixed(2);
+
+        // если призрак уже финишировал — и мы ещё нет — не даём ему ехать дальше
+        if (ghostProgressPct >= 100 && playerProgressPct < 100) {
+            ghostProgressEl.style.width = '100%';
+        }
+    }, 50);
+}
+
+// ─── КНОПКА ПЕРЕКЛЮЧЕНИЯ ───
+btnShift.addEventListener('click', shift);
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && raceStarted && !raceFinished && !btnShift.disabled) {
+        e.preventDefault();
+        shift();
+    }
+});
+
+function shift() {
+    if (!raceStarted || raceFinished || gear > MAX_GEARS) return;
+
+    totalShifts++;
+    const center = (ZONE_MIN + ZONE_MAX) / 2;
+    const halfWidth = (ZONE_MAX - ZONE_MIN) / 2;
+
+    if (rpm >= ZONE_MIN && rpm <= ZONE_MAX) {
+        // PERFECT
+        perfectShifts++;
+        // чем ближе к центру зоны — тем больше прогресс
+        const distFromCenter = Math.abs(rpm - center);
+        const quality = 1 - (distFromCenter / halfWidth);  // 0..1
+        const progressBonus = 18 + quality * 6;  // 18..24%
+        playerProgressPct = Math.min(100, playerProgressPct + progressBonus);
+        showFlash('PERFECT! +' + Math.round(progressBonus) + '%', 'perfect');
+    } else if (rpm < ZONE_MIN) {
+        misses++;
+        playerProgressPct = Math.min(100, playerProgressPct + 6);
+        showFlash('РАНО!', 'miss');
+    } else {
+        misses++;
+        playerProgressPct = Math.min(100, playerProgressPct + 6);
+        showFlash('ПОЗДНО!', 'miss');
+    }
+
+    rpm = 15;
+    gear++;
+    updateStats();
+
+    if (gear > MAX_GEARS || playerProgressPct >= 100) {
+        finishRace();
+        return;
+    }
+
+    renderTacho();
+}
+
+// ─── ОТРИСОВКА ───
+function renderTacho() {
+    const pct = Math.min(100, rpm);
+    tachoFill.style.width = pct + '%';
+    tachoRpm.textContent = Math.round(rpm);
+}
+
+function updateStats() {
+    gearNum.textContent = Math.min(gear, MAX_GEARS);
+    perfectEl.textContent = perfectShifts;
+    missEl.textContent = misses;
+    playerProgressEl.style.width = playerProgressPct + '%';
+    playerSprite.style.left = `calc(${playerProgressPct}% - ${playerProgressPct * 0.6}px)`;
+}
+
+function showFlash(text, type) {
+    flashMsg.textContent = text;
+    flashMsg.className = 'flash-message flash-' + type;
+    setTimeout(() => {
+        flashMsg.textContent = '';
+        flashMsg.className = 'flash-message';
+    }, 700);
+}
+
+// ─── ФИНИШ ───
+function finishRace() {
+    if (raceFinished) return;
+    raceFinished = true;
+    btnShift.disabled = true;
+
+    clearInterval(tickInterval);
+    clearInterval(timerInterval);
+
+    // доводим прогресс игрока до 100
+    playerProgressPct = 100;
+    playerProgressEl.style.width = '100%';
+    playerSprite.style.left = 'calc(100% - 60px)';
+
+    // отправляем на сервер
+    fetch('/drag/finish', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            car_id: CAR_ID,
+            distance: DISTANCE,
+            perfect_shifts: perfectShifts,
+            misses: misses,
+            total_shifts: totalShifts,
+            ghost_time: GHOST_TIME
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            flashMsg.textContent = 'Ошибка: ' + data.error;
+            flashMsg.className = 'flash-message flash-miss';
+            setTimeout(() => window.location.href = '/drag', 2000);
+            return;
+        }
+        setTimeout(() => {
+            window.location.href = '/drag/result/' + data.race_id;
+        }, 900);
+    })
+    .catch(err => {
+        flashMsg.textContent = 'Ошибка соединения';
+        flashMsg.className = 'flash-message flash-miss';
+        setTimeout(() => window.location.href = '/drag', 2000);
+    });
+}
+</script>
+
+{% endblock %}
