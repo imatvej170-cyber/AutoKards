@@ -263,51 +263,57 @@ const GHOST_TIME = {{ '%.2f'|format(ghost.time) }};
 const ZONE_MIN = {{ zone_min }};
 const ZONE_MAX = {{ zone_max }};
 const MAX_GEARS = 5;
-let shiftCooldown = false;
 
 // ─── СОСТОЯНИЕ ───
-let rpm = 0;
-let gear = 1;
-let perfectShifts = 0;
-let misses = 0;
-let totalShifts = 0;
-let elapsed = 0;
-let playerProgressPct = 0;
-let ghostProgressPct = 0;
-let raceStarted = false;
-let raceFinished = false;
-let tickInterval = null;
-let timerInterval = null;
+var rpm = 0;
+var gear = 1;
+var perfectShifts = 0;
+var misses = 0;
+var totalShifts = 0;
+var elapsed = 0;
+var playerProgressPct = 0;
+var ghostProgressPct = 0;
+var raceStarted = false;
+var raceFinished = false;
+var shiftCooldown = false;
+var tickInterval = null;
+var timerInterval = null;
 
 // ─── ЭЛЕМЕНТЫ ───
-const btnStart = document.getElementById('btnStart');
-const btnShift = document.getElementById('btnShift');
-const tachoFill = document.getElementById('tachoFill');
-const tachoRpm = document.getElementById('tachoRpm');
-const gearNum = document.getElementById('gearNum');
-const perfectEl = document.getElementById('perfectCount');
-const missEl = document.getElementById('missCount');
-const playerSprite = document.getElementById('playerSprite');
-const ghostSprite = document.getElementById('ghostSprite');
-const playerProgressEl = document.getElementById('playerProgress');
-const ghostProgressEl = document.getElementById('ghostProgress');
-const playerTimeEl = document.getElementById('playerTime');
-const ghostTimeEl = document.getElementById('ghostTime');
-const flashMsg = document.getElementById('flashMsg');
-const countdownEl = document.getElementById('countdown');
+var btnStart = document.getElementById('btnStart');
+var btnShift = document.getElementById('btnShift');
+var tachoFill = document.getElementById('tachoFill');
+var tachoRpm = document.getElementById('tachoRpm');
+var gearNum = document.getElementById('gearNum');
+var perfectEl = document.getElementById('perfectCount');
+var missEl = document.getElementById('missCount');
+var playerSprite = document.getElementById('playerSprite');
+var ghostSprite = document.getElementById('ghostSprite');
+var playerProgressEl = document.getElementById('playerProgress');
+var ghostProgressEl = document.getElementById('ghostProgress');
+var playerTimeEl = document.getElementById('playerTime');
+var ghostTimeEl = document.getElementById('ghostTime');
+var flashMsg = document.getElementById('flashMsg');
+var countdownEl = document.getElementById('countdown');
+
+// ─── ФУНКЦИЯ ДВИЖЕНИЯ МАШИНЫ ───
+function setCarPosition(spriteEl, pct) {
+    var offset = pct * 0.6;
+    spriteEl.style.left = 'calc(' + pct + '% - ' + offset + 'px)';
+}
 
 // ─── СТАРТ ───
-btnStart.addEventListener('click', () => {
+btnStart.addEventListener('click', function() {
     btnStart.disabled = true;
     runCountdown();
 });
 
 function runCountdown() {
-    let n = 3;
+    var n = 3;
     countdownEl.textContent = n;
     countdownEl.classList.remove('hidden');
 
-    const cd = setInterval(() => {
+    var cd = setInterval(function() {
         n--;
         if (n > 0) {
             countdownEl.textContent = n;
@@ -331,54 +337,52 @@ function startRace() {
 
 // ─── ТИК ОБОРОТОВ ───
 function startTicking() {
-    tickInterval = setInterval(() => {
+    tickInterval = setInterval(function() {
         if (raceFinished) return;
 
-        rpm += 2.5;   // скорость роста оборотов
+        rpm += 2.5;
 
-if (rpm >= 100) {
-    if (!shiftCooldown) {
-        shiftCooldown = true;
-        setTimeout(() => { shiftCooldown = false; }, 500);
-        misses++;
-        totalShifts++;
-        rpm = 15;
-        gear++;
-        playerProgressPct = Math.min(100, playerProgressPct + 8);
-        showFlash('ПЕРЕКРУТИЛ!', 'miss');
-        updateStats();
+        if (rpm >= 100) {
+            if (!shiftCooldown) {
+                shiftCooldown = true;
+                setTimeout(function() { shiftCooldown = false; }, 500);
+                misses++;
+                totalShifts++;
+                rpm = 15;
+                gear++;
+                playerProgressPct = Math.min(100, playerProgressPct + 8);
+                showFlash('ПЕРЕКРУТИЛ!', 'miss');
+                updateStats();
 
-        if (gear > MAX_GEARS) {
-            finishRace();
-            return;
+                if (gear > MAX_GEARS) {
+                    finishRace();
+                    return;
+                }
+            } else {
+                rpm = 90;
+            }
         }
-    } else {
-        rpm = 90;  // откат, если в кулдауне
-    }
-}
 
-// ─── ТАЙМЕР ЗАЕЗДА ───
-function startTimer() {
-    timerInterval = setInterval(() => {
-        if (raceFinished) return;
-        elapsed += 0.05;
-
-        // прогресс призрака
-        ghostProgressPct = Math.min(100, (elapsed / GHOST_TIME) * 100);
-        ghostProgressEl.style.width = ghostProgressPct + '%';
-        ghostSprite.style.left = `calc(${ghostProgressPct}% - ${ghostProgressPct * 0.6}px)`;
-        ghostTimeEl.textContent = elapsed.toFixed(2);
-
-        // если призрак уже финишировал — и мы ещё нет — не даём ему ехать дальше
-        if (ghostProgressPct >= 100 && playerProgressPct < 100) {
-            ghostProgressEl.style.width = '100%';
-        }
+        renderTacho();
     }, 50);
 }
 
-// ─── КНОПКА ПЕРЕКЛЮЧЕНИЯ ───
+// ─── ТАЙМЕР ───
+function startTimer() {
+    timerInterval = setInterval(function() {
+        if (raceFinished) return;
+        elapsed += 0.05;
+
+        ghostProgressPct = Math.min(100, (elapsed / GHOST_TIME) * 100);
+        ghostProgressEl.style.width = ghostProgressPct + '%';
+        setCarPosition(ghostSprite, ghostProgressPct);
+        ghostTimeEl.textContent = elapsed.toFixed(2);
+    }, 50);
+}
+
+// ─── ПЕРЕКЛЮЧЕНИЕ ───
 btnShift.addEventListener('click', shift);
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', function(e) {
     if (e.code === 'Space' && raceStarted && !raceFinished && !btnShift.disabled) {
         e.preventDefault();
         shift();
@@ -388,27 +392,24 @@ document.addEventListener('keydown', (e) => {
 function shift() {
     if (!raceStarted || raceFinished || gear > MAX_GEARS) return;
 
-    // защита от спама: 500мс между переключениями
     if (shiftCooldown) return;
     shiftCooldown = true;
-    setTimeout(() => { shiftCooldown = false; }, 500);
+    setTimeout(function() { shiftCooldown = false; }, 500);
 
-    // слишком низкие обороты = не считаем за попытку
     if (rpm < 25) {
         showFlash('Слишком рано!', 'miss');
         return;
     }
 
     totalShifts++;
-    const center = (ZONE_MIN + ZONE_MAX) / 2;
-    const halfWidth = (ZONE_MAX - ZONE_MIN) / 2;
+    var center = (ZONE_MIN + ZONE_MAX) / 2;
+    var halfWidth = (ZONE_MAX - ZONE_MIN) / 2;
 
     if (rpm >= ZONE_MIN && rpm <= ZONE_MAX) {
-        // PERFECT
         perfectShifts++;
-        const distFromCenter = Math.abs(rpm - center);
-        const quality = 1 - (distFromCenter / halfWidth);
-        const progressBonus = 20 + quality * 5;   // 20..25%
+        var distFromCenter = Math.abs(rpm - center);
+        var quality = 1 - (distFromCenter / halfWidth);
+        var progressBonus = 20 + quality * 5;
         playerProgressPct = Math.min(100, playerProgressPct + progressBonus);
         showFlash('PERFECT! +' + Math.round(progressBonus) + '%', 'perfect');
     } else if (rpm < ZONE_MIN) {
@@ -425,7 +426,6 @@ function shift() {
     gear++;
     updateStats();
 
-    // финиш ТОЛЬКО по количеству передач, не по прогрессу
     if (gear > MAX_GEARS) {
         finishRace();
         return;
@@ -436,7 +436,7 @@ function shift() {
 
 // ─── ОТРИСОВКА ───
 function renderTacho() {
-    const pct = Math.min(100, rpm);
+    var pct = Math.min(100, rpm);
     tachoFill.style.width = pct + '%';
     tachoRpm.textContent = Math.round(rpm);
 }
@@ -446,13 +446,13 @@ function updateStats() {
     perfectEl.textContent = perfectShifts;
     missEl.textContent = misses;
     playerProgressEl.style.width = playerProgressPct + '%';
-    playerSprite.style.left = `calc(${playerProgressPct}% - ${playerProgressPct * 0.6}px)`;
+    setCarPosition(playerSprite, playerProgressPct);
 }
 
 function showFlash(text, type) {
     flashMsg.textContent = text;
     flashMsg.className = 'flash-message flash-' + type;
-    setTimeout(() => {
+    setTimeout(function() {
         flashMsg.textContent = '';
         flashMsg.className = 'flash-message';
     }, 700);
@@ -467,12 +467,10 @@ function finishRace() {
     clearInterval(tickInterval);
     clearInterval(timerInterval);
 
-    // доводим прогресс игрока до 100
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
     playerSprite.style.left = 'calc(100% - 60px)';
 
-    // отправляем на сервер
     fetch('/drag/finish', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -485,24 +483,23 @@ function finishRace() {
             ghost_time: GHOST_TIME
         })
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.error) {
             flashMsg.textContent = 'Ошибка: ' + data.error;
             flashMsg.className = 'flash-message flash-miss';
-            setTimeout(() => window.location.href = '/drag', 2000);
+            setTimeout(function() { window.location.href = '/drag'; }, 2000);
             return;
         }
-        setTimeout(() => {
+        setTimeout(function() {
             window.location.href = '/drag/result/' + data.race_id;
         }, 900);
     })
-    .catch(err => {
+    .catch(function(err) {
         flashMsg.textContent = 'Ошибка соединения';
         flashMsg.className = 'flash-message flash-miss';
-        setTimeout(() => window.location.href = '/drag', 2000);
+        setTimeout(function() { window.location.href = '/drag'; }, 2000);
     });
 }
 </script>
-
 {% endblock %}
