@@ -2138,7 +2138,7 @@ def drag_find_friend_ghost(user_id, car, distance):
     }
 
 
-def drag_do_race(user_id, car_id, distance, perfect_shifts, misses, total_shifts, ghost_time=None):
+def drag_do_race(user_id, car_id, distance, perfect_shifts, misses, total_shifts, ghost_time=None, elapsed_time=None):
     """Основная функция заезда. Возвращает словарь."""
     if get_setting('drag_enabled') != '1':
         return {'error': 'Режим драга временно отключён'}
@@ -2175,9 +2175,11 @@ def drag_do_race(user_id, car_id, distance, perfect_shifts, misses, total_shifts
     performance = 100.0 * (perfect_shifts - misses) / total_shifts
     performance = max(0, min(100, performance))
 
-    # время игрока
-    player_time = drag_calc_time(car, distance, performance)
-
+    # время игрока: если клиент прислал — используем реальное
+    if elapsed_time and elapsed_time > 0:
+        player_time = round(float(elapsed_time), 2)
+    else:
+        player_time = drag_calc_time(car, distance, performance)
     # призрак: если передан ghost_time — используем его
     if ghost_time and ghost_time > 0:
         ghost = {'time': float(ghost_time), 'username': 'Призрак', 'is_bot': False}
@@ -4849,6 +4851,7 @@ def drag_finish():
         misses = int(data.get('misses', 0))
         total_shifts = int(data.get('total_shifts', 0))
         ghost_time = float(data.get('ghost_time', 0))
+        elapsed_time = float(data.get('elapsed_time', 0))
         distance = str(data.get('distance', 'quarter'))
     except (ValueError, TypeError):
         return jsonify({'error': 'Некорректные данные'}), 400
@@ -4862,16 +4865,17 @@ def drag_finish():
     if ghost_time <= 0:
         return jsonify({'error': 'Некорректное время призрака'}), 400
 
+    if elapsed_time <= 0 or elapsed_time > 120:
+        return jsonify({'error': 'Некорректное время заезда'}), 400
+
     result = drag_do_race(user_id, car_id, distance,
                          perfect_shifts, misses, total_shifts,
-                         ghost_time=ghost_time)
+                         ghost_time=ghost_time, elapsed_time=elapsed_time)
 
     if 'error' in result:
         return jsonify(result), 400
 
     return jsonify(result)
-
-
 @app.route('/drag/result/<int:race_id>')
 @login_required
 def drag_result(race_id):
