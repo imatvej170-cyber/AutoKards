@@ -581,7 +581,7 @@ function submitResult() {
             misses: misses,
             total_shifts: totalShifts,
             ghost_time: GHOST_TIME,
-            elapsed_time: elapsed
+            elapsed_time: Math.max(0.1, Math.round(elapsed * 100) / 100)
         })
     })
     .then(function(r) { return r.json(); })
