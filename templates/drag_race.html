@@ -13,7 +13,6 @@
 .race-header-right { font-size: 14px; color: #aaa; }
 .race-header-right b { color: #ff8a00; }
 
-/* ═══ ТРАССА — ВЫСОКАЯ И ЗУМИРОВАННАЯ ═══ */
 .track-bleed {
     width: 100vw;
     margin-left: calc(50% - 50vw);
@@ -27,7 +26,6 @@
     box-shadow: 0 0 40px rgba(255,138,0,0.2);
 }
 
-/* ФОН */
 .bg-image {
     position: absolute; inset: 0;
     background-image: url('{{ url_for("static", filename="drag/bg.jpg") }}');
@@ -37,7 +35,6 @@
     z-index: 1;
 }
 
-/* ОБЛАКА — узкая полоса сверху */
 .clouds-layer {
     position: absolute; top: 0; left: 0; right: 0;
     height: 35%; overflow: hidden;
@@ -57,7 +54,6 @@
     to { transform: translateX(-50%); }
 }
 
-/* ДОРОГА — большая часть трассы */
 .road {
     position: absolute; bottom: 0; left: 0; right: 0;
     height: 220px;
@@ -81,7 +77,6 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
-/* разметка — по центру дороги */
 .road-stripes {
     position: absolute; bottom: 105px; left: 0; right: 0;
     height: 8px;
@@ -93,7 +88,6 @@
     box-shadow: 0 0 12px rgba(255,215,0,0.6);
 }
 
-/* финиш */
 .finish-line {
     position: absolute; bottom: 0; left: 0;
     width: 12px; height: 220px;
@@ -106,7 +100,6 @@
     will-change: transform;
 }
 
-/* ═══ МАШИНЫ — КРУПНЫЕ ═══ */
 .car-lane {
     position: absolute; left: 0; right: 0;
     z-index: 5;
@@ -156,7 +149,6 @@
     font-weight: 700;
 }
 
-/* ═══ ТАХОМЕТР ═══ */
 .tacho-box {
     background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,138,0,0.3);
@@ -195,7 +187,6 @@
 }
 .gear-box b { color: #ff8a00; }
 
-/* прогресс */
 .progress-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     margin-bottom: 20px;
@@ -217,7 +208,6 @@
 .progress-fill.player { background: linear-gradient(90deg, #ff8a00, #ffb347); }
 .progress-fill.ghost { background: linear-gradient(90deg, #666, #999); }
 
-/* кнопки */
 .controls {
     display: flex; gap: 12px; justify-content: center;
     margin-top: 20px; flex-wrap: wrap; padding-bottom: 40px;
@@ -286,7 +276,6 @@
     </div>
 </div>
 
-<!-- ТРАССА -->
 <div class="track-bleed">
     <div class="track" id="track">
         <div class="bg-image"></div>
@@ -401,13 +390,13 @@ function updateWorld() {
     var W = track.clientWidth;
     var playerX = W * 0.15;
 
-    // призрак — относительно игрока, сжимаем, чтобы не улетал
+    // призрак — относительно игрока
     var ghostOffset = ((ghostProgressPct - playerProgressPct) / 100) * (W * 0.45);
     ghostOffset = Math.max(-playerX + 10, Math.min(W - playerX - 100, ghostOffset));
     ghostSprite.style.transform = 'translateX(' + ghostOffset + 'px)';
 
-    // финиш — относительно игрока
-    var finishOffset = ((100 - playerProgressPct) / 100) * (W * 0.85);
+    // ФИНИШ: держим далеко за экраном до 70% прогресса
+    var finishOffset = playerX + ((100 - playerProgressPct) / 100) * (W * 2.2 - playerX);
     finishLine.style.transform = 'translateX(' + finishOffset + 'px)';
 
     // разметка едет
@@ -452,6 +441,7 @@ function startTicking() {
         var autoSpeed = 0.12 * gear;
         playerProgressPct = Math.min(100, playerProgressPct + autoSpeed);
         playerProgressEl.style.width = playerProgressPct + '%';
+        playerTimeEl.textContent = elapsed.toFixed(2);
 
         if (playerProgressPct >= 100) { finishRace(); return; }
 
@@ -568,6 +558,7 @@ function finishRace() {
 
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
+    playerTimeEl.textContent = elapsed.toFixed(2);
     updateWorld();
 
     if (elapsed >= GHOST_TIME) {
@@ -584,9 +575,13 @@ function submitResult() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            car_id: CAR_ID, distance: DISTANCE,
-            perfect_shifts: perfectShifts, misses: misses,
-            total_shifts: totalShifts, ghost_time: GHOST_TIME
+            car_id: CAR_ID,
+            distance: DISTANCE,
+            perfect_shifts: perfectShifts,
+            misses: misses,
+            total_shifts: totalShifts,
+            ghost_time: GHOST_TIME,
+            elapsed_time: elapsed
         })
     })
     .then(function(r) { return r.json(); })
