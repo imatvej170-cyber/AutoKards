@@ -348,6 +348,19 @@ function startTicking() {
 
         rpm += 2.5;
 
+        // 🏎 машина ЕДЕТ постоянно — скорость зависит от передачи
+        var autoSpeed = 0.06 * gear;
+        playerProgressPct = Math.min(100, playerProgressPct + autoSpeed);
+        playerProgressEl.style.width = playerProgressPct + '%';
+        setCarPosition(playerSprite, playerProgressPct);
+
+        // финиш по позиции (если набралось раньше 5 переключений)
+        if (playerProgressPct >= 100) {
+            finishRace();
+            return;
+        }
+
+        // перекрут двигателя
         if (rpm >= 100) {
             if (!shiftCooldown) {
                 shiftCooldown = true;
@@ -372,7 +385,6 @@ function startTicking() {
         renderTacho();
     }, 50);
 }
-
 // ─── ТАЙМЕР ───
 function startTimer() {
     timerInterval = setInterval(function() {
