@@ -346,6 +346,7 @@ def init_db():
         won BOOLEAN NOT NULL,
         reward INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
+        c.execute('ALTER TABLE drag_races ADD COLUMN IF NOT EXISTS ghost_time REAL')
     )''')
     # Автосоздание стартовой скидки (один раз)
     c.execute("SELECT value FROM settings WHERE key = 'start_discount_created'")
@@ -2201,15 +2202,15 @@ def drag_do_race(user_id, car_id, distance, perfect_shifts, misses, total_shifts
     top_speed_achieved = round((meters / player_time) * 3.6 * 1.1, 1)
     top_speed_achieved = min(top_speed_achieved, top)
 
-    # запись
+       # запись
     conn = get_db(); c = conn.cursor()
     c.execute('''INSERT INTO drag_races
                  (user_id, car_id, distance, elapsed_time, top_speed,
-                  perfect_shifts, misses, won, reward)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                  perfect_shifts, misses, won, reward, ghost_time)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                  RETURNING id''',
               (user_id, car_id, distance, player_time, top_speed_achieved,
-               perfect_shifts, misses, won, reward))
+               perfect_shifts, misses, won, reward, final_ghost_time))
     race_id = c.fetchone()[0]
     conn.commit(); c.close(); conn.close()
 
@@ -4877,7 +4878,7 @@ def drag_result(race_id):
 
     conn = get_db(); c = conn.cursor()
     c.execute('''SELECT id, user_id, car_id, distance, elapsed_time, top_speed,
-                        perfect_shifts, misses, won, reward, created_at
+                        perfect_shifts, misses, won, reward, created_at, ghost_time
                  FROM drag_races
                  WHERE id = %s AND user_id = %s''', (race_id, user_id))
     row = c.fetchone()
@@ -4891,9 +4892,9 @@ def drag_result(race_id):
         'id': row[0], 'user_id': row[1], 'car_id': row[2],
         'distance': row[3], 'elapsed_time': row[4], 'top_speed': row[5],
         'perfect_shifts': row[6], 'misses': row[7],
-        'won': row[8], 'reward': row[9], 'created_at': row[10]
+        'won': row[8], 'reward': row[9], 'created_at': row[10],
+        'ghost_time': row[11] if row[11] else 0
     }
-
     car = get_car_full(race['car_id'])
 
     return render_template('drag_result.html',
