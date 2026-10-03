@@ -4865,8 +4865,9 @@ def drag_finish():
     if ghost_time <= 0:
         return jsonify({'error': 'Некорректное время призрака'}), 400
 
-    if elapsed_time <= 0 or elapsed_time > 120:
-        return jsonify({'error': 'Некорректное время заезда'}), 400
+    # если время не пришло или подозрительное — используем формулу
+    if elapsed_time <= 0 or elapsed_time > 200:
+        elapsed_time = 0
 
     result = drag_do_race(user_id, car_id, distance,
                          perfect_shifts, misses, total_shifts,
