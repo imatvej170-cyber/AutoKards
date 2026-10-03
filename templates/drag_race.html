@@ -263,6 +263,7 @@ const GHOST_TIME = {{ '%.2f'|format(ghost.time) }};
 const ZONE_MIN = {{ zone_min }};
 const ZONE_MAX = {{ zone_max }};
 const MAX_GEARS = 5;
+let shiftCooldown = false;
 
 // ─── СОСТОЯНИЕ ───
 let rpm = 0;
@@ -335,23 +336,25 @@ function startTicking() {
 
         rpm += 2.5;   // скорость роста оборотов
 
-        // перекрутил двигатель — авто-miss
-        if (rpm >= 100) {
-            misses++;
-            totalShifts++;
-            rpm = 15;
-            gear++;
-            showFlash('ПЕРЕКРУТИЛ!', 'miss');
-            updateStats();
+if (rpm >= 100) {
+    if (!shiftCooldown) {
+        shiftCooldown = true;
+        setTimeout(() => { shiftCooldown = false; }, 500);
+        misses++;
+        totalShifts++;
+        rpm = 15;
+        gear++;
+        playerProgressPct = Math.min(100, playerProgressPct + 8);
+        showFlash('ПЕРЕКРУТИЛ!', 'miss');
+        updateStats();
 
-            if (gear > MAX_GEARS) {
-                finishRace();
-                return;
-            }
+        if (gear > MAX_GEARS) {
+            finishRace();
+            return;
         }
-
-        renderTacho();
-    }, 50);
+    } else {
+        rpm = 90;  // откат, если в кулдауне
+    }
 }
 
 // ─── ТАЙМЕР ЗАЕЗДА ───
@@ -385,6 +388,17 @@ document.addEventListener('keydown', (e) => {
 function shift() {
     if (!raceStarted || raceFinished || gear > MAX_GEARS) return;
 
+    // защита от спама: 500мс между переключениями
+    if (shiftCooldown) return;
+    shiftCooldown = true;
+    setTimeout(() => { shiftCooldown = false; }, 500);
+
+    // слишком низкие обороты = не считаем за попытку
+    if (rpm < 25) {
+        showFlash('Слишком рано!', 'miss');
+        return;
+    }
+
     totalShifts++;
     const center = (ZONE_MIN + ZONE_MAX) / 2;
     const halfWidth = (ZONE_MAX - ZONE_MIN) / 2;
@@ -392,19 +406,18 @@ function shift() {
     if (rpm >= ZONE_MIN && rpm <= ZONE_MAX) {
         // PERFECT
         perfectShifts++;
-        // чем ближе к центру зоны — тем больше прогресс
         const distFromCenter = Math.abs(rpm - center);
-        const quality = 1 - (distFromCenter / halfWidth);  // 0..1
-        const progressBonus = 18 + quality * 6;  // 18..24%
+        const quality = 1 - (distFromCenter / halfWidth);
+        const progressBonus = 20 + quality * 5;   // 20..25%
         playerProgressPct = Math.min(100, playerProgressPct + progressBonus);
         showFlash('PERFECT! +' + Math.round(progressBonus) + '%', 'perfect');
     } else if (rpm < ZONE_MIN) {
         misses++;
-        playerProgressPct = Math.min(100, playerProgressPct + 6);
+        playerProgressPct = Math.min(100, playerProgressPct + 8);
         showFlash('РАНО!', 'miss');
     } else {
         misses++;
-        playerProgressPct = Math.min(100, playerProgressPct + 6);
+        playerProgressPct = Math.min(100, playerProgressPct + 8);
         showFlash('ПОЗДНО!', 'miss');
     }
 
@@ -412,7 +425,8 @@ function shift() {
     gear++;
     updateStats();
 
-    if (gear > MAX_GEARS || playerProgressPct >= 100) {
+    // финиш ТОЛЬКО по количеству передач, не по прогрессу
+    if (gear > MAX_GEARS) {
         finishRace();
         return;
     }
