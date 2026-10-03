@@ -42,8 +42,8 @@
 
 .car-sprite {
     position: absolute; left: 0;
-    transition: left 0.15s ease-out;
-    will-change: left;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
 }
 .car-sprite img {
     height: 60px; width: auto;
@@ -298,8 +298,14 @@ var countdownEl = document.getElementById('countdown');
 
 // ─── ФУНКЦИЯ ДВИЖЕНИЯ МАШИНЫ ───
 function setCarPosition(spriteEl, pct) {
-    var offset = pct * 0.6;
-    spriteEl.style.left = 'calc(' + pct + '% - ' + offset + 'px)';
+    var track = document.getElementById('track');
+    if (!track) return;
+    var trackWidth = track.clientWidth;
+    var carWidth = 60;         // ширина машины
+    var finishMargin = 40;     // отступ от линии финиша
+    var maxX = trackWidth - carWidth - finishMargin;
+    var x = (pct / 100) * maxX;
+    spriteEl.style.transform = 'translateX(' + x + 'px)';
 }
 
 // ─── СТАРТ ───
@@ -476,7 +482,7 @@ function finishRace() {
     // доводим игрока до финиша
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
-    playerSprite.style.left = 'calc(100% - 60px)';
+    setCarPosition(playerSprite, 100);
 
     if (elapsed >= GHOST_TIME) {
         // призрак уже финишировал — отправляем сразу
@@ -519,6 +525,10 @@ function submitResult() {
         flashMsg.className = 'flash-message flash-miss';
         setTimeout(function() { window.location.href = '/drag'; }, 2000);
     });
+window.addEventListener('resize', function() {
+    setCarPosition(playerSprite, playerProgressPct);
+    setCarPosition(ghostSprite, ghostProgressPct);
+});
 }
 </script>
 {% endblock %}
