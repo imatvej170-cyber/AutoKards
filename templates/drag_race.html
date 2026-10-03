@@ -370,16 +370,23 @@ function startTicking() {
 // ─── ТАЙМЕР ───
 function startTimer() {
     timerInterval = setInterval(function() {
-        if (raceFinished) return;
         elapsed += 0.05;
 
         ghostProgressPct = Math.min(100, (elapsed / GHOST_TIME) * 100);
         ghostProgressEl.style.width = ghostProgressPct + '%';
         setCarPosition(ghostSprite, ghostProgressPct);
         ghostTimeEl.textContent = elapsed.toFixed(2);
+
+        // если призрак доехал И игрок уже финишировал — отправляем результат
+        if (elapsed >= GHOST_TIME && raceFinished) {
+            clearInterval(timerInterval);
+            ghostProgressEl.style.width = '100%';
+            setCarPosition(ghostSprite, 100);
+            setTimeout(submitResult, 500);
+        }
     }, 50);
 }
-
+    
 // ─── ПЕРЕКЛЮЧЕНИЕ ───
 btnShift.addEventListener('click', shift);
 document.addEventListener('keydown', function(e) {
@@ -471,25 +478,17 @@ function finishRace() {
     playerProgressEl.style.width = '100%';
     playerSprite.style.left = 'calc(100% - 60px)';
 
-    // если призрак ещё не доехал — ждём его
-    if (elapsed < GHOST_TIME) {
-        showFlash('🏁 Ты финишировал! Ждём призрака...', 'perfect');
-
-        var waitInterval = setInterval(function() {
-            if (elapsed >= GHOST_TIME) {
-                clearInterval(waitInterval);
-                clearInterval(timerInterval);
-                ghostProgressEl.style.width = '100%';
-                setCarPosition(ghostSprite, 100);
-                setTimeout(submitResult, 500);
-            }
-        }, 100);
-    } else {
+    if (elapsed >= GHOST_TIME) {
+        // призрак уже финишировал — отправляем сразу
         clearInterval(timerInterval);
-        submitResult();
+        ghostProgressEl.style.width = '100%';
+        setCarPosition(ghostSprite, 100);
+        setTimeout(submitResult, 500);
+    } else {
+        // ждём призрака — таймер сам его довезёт (см. startTimer)
+        showFlash('🏁 Ты финишировал! Ждём призрака...', 'perfect');
     }
 }
-
 function submitResult() {
     fetch('/drag/finish', {
         method: 'POST',
