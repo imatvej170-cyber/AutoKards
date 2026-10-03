@@ -92,6 +92,10 @@ DEFAULT_SETTINGS = {
     'salvage_daily_limit': '5',       # макс раскопок в день
     'salvage_slots': '5',             # макс машин в "находках"
     'salvage_max_parts': '50',        # макс деталей в запасе
+    'drag_enabled': '1',              # вкл/выкл драг-гонки
+    'drag_daily_races': '30',         # макс гонок в день
+    'drag_daily_reward': '10000',     # макс монет в день
+    'drag_reward_win': '300',         # базовая награда за победу
 }
 
 # ============ ДОСТИЖЕНИЯ ============
@@ -330,6 +334,19 @@ def init_db():
     for k, v in DEFAULT_SETTINGS.items():
         c.execute('INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING', (k, v))
 
+    c.execute('''CREATE TABLE IF NOT EXISTS drag_races (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        car_id INTEGER NOT NULL,
+        distance TEXT NOT NULL,
+        elapsed_time REAL NOT NULL,
+        top_speed REAL NOT NULL,
+        perfect_shifts INTEGER DEFAULT 0,
+        misses INTEGER DEFAULT 0,
+        won BOOLEAN NOT NULL,
+        reward INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+    )''')
     # Автосоздание стартовой скидки (один раз)
     c.execute("SELECT value FROM settings WHERE key = 'start_discount_created'")
     if not c.fetchone():
@@ -1983,6 +2000,219 @@ def salvage_restore_cost(car, user_id):
         'final': max(0, final),
         'parts_needed': min(parts_avail, 4)
     }
+
+# ─────────── DRAG RACES ───────────
+
+DRAG_DISTANCES = {
+    'quarter': {'label': '1/4 мили', 'meters': 402, 'base': 14},
+    'half':    {'label': '1/2 мили', 'meters': 805, 'base': 22},
+    'mile':    {'label': '1 миля',   'meters': 1609, 'base': 32},
+}
+
+
+def drag_calc_power(car):
+    """Оценка мощи машины для драга (больше = быстрее)."""
+    hp = float(car.get('horsepower') or 100)
+    acc = float(car.get('acceleration') or 15)
+    top = float(car.get('top_speed') or 150)
+    return hp / 20 + (20 - acc) * 20 + top / 10
+
+
+def drag_calc_time(car, distance, performance_score=50):
+    """Время заезда в секундах.
+    performance_score: 0-100 (100 = идеальный тайминг).
+    """
+    power = drag_calc_power(car)
+    base = DRAG_DISTANCES.get(distance, DRAG_DISTANCES['quarter'])['base']
+    raw = base * (300 / (power + 100)) ** 0.7
+    # множитель за тайминг: 100 → ×0.90, 50 → ×1.025, 0 → ×1.15
+    perf_mult = 1.15 - (performance_score / 100) * 0.25
+    return round(raw * perf_mult, 2)
+
+
+def drag_ideal_zone(car):
+    """Возвращает (rpm_min, rpm_max) — идеальную зону переключения.
+    Быстрые машины: зона выше и уже. Медленные: ниже и шире."""
+    acc = float(car.get('acceleration') or 15)
+    acc = max(2, min(20, acc))
+    t = (acc - 2) / 18  # 0 = fastest, 1 = slowest
+    center = 88 - t * 18   # 88 → 70
+    width = 8 + t * 12     # 8 → 20
+    return (round(center - width / 2, 1), round(center + width / 2, 1))
+
+
+def drag_today_stats(user_id):
+    """Сколько гонок и монет за 24ч."""
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT COUNT(*), COALESCE(SUM(reward), 0)
+                 FROM drag_races
+                 WHERE user_id = %s
+                   AND created_at >= NOW() - INTERVAL '24 hours' ''', (user_id,))
+    row = c.fetchone()
+    c.close(); conn.close()
+    return (row[0] or 0), (row[1] or 0)
+
+
+def drag_calc_reward(won, distance, car_rating):
+    """Награда за победу. Проигрыш = 0."""
+    if not won:
+        return 0
+    base = get_int_setting('drag_reward_win', 300)
+    dist_mult = {'quarter': 1.0, 'half': 1.3, 'mile': 1.6}.get(distance, 1.0)
+    rating_mult = 1 + (car_rating or 1) * 0.05
+    return int(base * dist_mult * rating_mult)
+
+
+def drag_generate_bot_ghost(user_id, car, distance):
+    """Бот-призрак: считается от силы машины + бонус гаража (защита от фарма)."""
+    power = drag_calc_power(car)
+    _, total_stars = garage_bonus(user_id)
+    stars_bonus = 1 + min(total_stars / 800, 0.4)
+
+    bot_power = power * stars_bonus * random.uniform(0.92, 1.05)
+
+    base = DRAG_DISTANCES.get(distance, DRAG_DISTANCES['quarter'])['base']
+    raw = base * (300 / (bot_power + 100)) ** 0.7
+    ghost_time = round(raw * random.uniform(0.92, 0.98), 2)
+
+    return {
+        'username': '🤖 Бот',
+        'time': ghost_time,
+        'is_bot': True,
+        'car_model': 'Соперник',
+    }
+
+
+def drag_find_friend_ghost(user_id, car, distance):
+    """Лучший заезд друга на похожей машине (±1★).
+    ВНИМАНИЕ: предполагает таблицу friends (user_id, friend_id, status).
+    Если структура другая — нужно поправить."""
+    car_rating = car.get('rating') or 3
+
+    conn = get_db(); c = conn.cursor()
+    c.execute('''SELECT CASE WHEN user_id = %s THEN friend_id ELSE user_id END
+                 FROM friends
+                 WHERE (user_id = %s OR friend_id = %s)
+                   AND status = 'accepted' ''',
+              (user_id, user_id, user_id))
+    friend_ids = [r[0] for r in c.fetchall()]
+
+    if not friend_ids:
+        c.close(); conn.close()
+        return None
+
+    c.execute('''SELECT dr.id, dr.user_id, u.username, dr.car_id, c.model,
+                        dr.elapsed_time, c.rating
+                 FROM drag_races dr
+                 JOIN users u ON u.id = dr.user_id
+                 JOIN cars c ON c.id = dr.car_id
+                 WHERE dr.user_id = ANY(%s)
+                   AND dr.distance = %s
+                   AND c.rating BETWEEN %s AND %s
+                   AND dr.won = TRUE
+                 ORDER BY dr.elapsed_time ASC
+                 LIMIT 1''',
+              (friend_ids, distance,
+               max(1, car_rating - 1), min(8, car_rating + 1)))
+    row = c.fetchone()
+    c.close(); conn.close()
+
+    if not row:
+        return None
+
+    return {
+        'race_id': row[0], 'user_id': row[1], 'username': row[2],
+        'car_id': row[3], 'car_model': row[4], 'time': row[5],
+        'rating': row[6], 'is_bot': False,
+    }
+
+
+def drag_do_race(user_id, car_id, distance, perfect_shifts, misses, total_shifts):
+    """Основная функция заезда. Возвращает словарь."""
+    if get_setting('drag_enabled') != '1':
+        return {'error': 'Режим драга временно отключён'}
+
+    if distance not in DRAG_DISTANCES:
+        return {'error': 'Неизвестная дистанция'}
+
+    # проверка владения
+    conn = get_db(); c = conn.cursor()
+    c.execute('SELECT 1 FROM user_cars WHERE user_id = %s AND car_id = %s',
+              (user_id, car_id))
+    if not c.fetchone():
+        c.close(); conn.close()
+        return {'error': 'Этой машины нет в гараже'}
+    c.close(); conn.close()
+
+    # лимиты
+    races_today, coins_today = drag_today_stats(user_id)
+    daily_races = get_int_setting('drag_daily_races', 30)
+    daily_reward = get_int_setting('drag_daily_reward', 10000)
+
+    if races_today >= daily_races:
+        return {'error': f'Дневной лимит гонок ({daily_races})'}
+    if coins_today >= daily_reward:
+        return {'error': f'Дневной лимит монет ({daily_reward})'}
+
+    car = get_car_full(car_id)
+    if not car:
+        return {'error': 'Машина не найдена'}
+
+    # производительность
+    if total_shifts <= 0:
+        total_shifts = 1
+    performance = 100.0 * (perfect_shifts - misses) / total_shifts
+    performance = max(0, min(100, performance))
+
+    # время игрока
+    player_time = drag_calc_time(car, distance, performance)
+
+    # призрак
+    ghost = drag_find_friend_ghost(user_id, car, distance)
+    if not ghost:
+        ghost = drag_generate_bot_ghost(user_id, car, distance)
+
+    ghost_time = ghost['time']
+    won = player_time < ghost_time
+
+    # награда с лимитом
+    reward = drag_calc_reward(won, distance, car.get('rating', 1))
+    if won and reward > 0:
+        left = max(0, daily_reward - coins_today)
+        reward = min(reward, left)
+        if reward > 0:
+            add_coins(user_id, reward)
+
+    # максималка (для будущего рекорда скорости)
+    top = float(car.get('top_speed') or 150)
+    meters = DRAG_DISTANCES[distance]['meters']
+    top_speed_achieved = round((meters / player_time) * 3.6 * 1.1, 1)
+    top_speed_achieved = min(top_speed_achieved, top)
+
+    # запись
+    conn = get_db(); c = conn.cursor()
+    c.execute('''INSERT INTO drag_races
+                 (user_id, car_id, distance, elapsed_time, top_speed,
+                  perfect_shifts, misses, won, reward)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 RETURNING id''',
+              (user_id, car_id, distance, player_time, top_speed_achieved,
+               perfect_shifts, misses, won, reward))
+    race_id = c.fetchone()[0]
+    conn.commit(); c.close(); conn.close()
+
+    return {
+        'ok': True,
+        'race_id': race_id,
+        'player_time': player_time,
+        'ghost_time': ghost_time,
+        'ghost': ghost,
+        'won': won,
+        'reward': reward,
+        'performance': round(performance, 1),
+        'top_speed': top_speed_achieved,
+    }
+  
 def delete_car_from_catalog(car_id):
     conn = get_db(); c = conn.cursor()
     c.execute('DELETE FROM user_cars WHERE car_id = %s', (car_id,))
