@@ -2084,15 +2084,14 @@ def drag_generate_bot_ghost(user_id, car, distance):
 
 
 def drag_find_friend_ghost(user_id, car, distance):
-    """Лучший заезд друга на похожей машине (±1★).
-    ВНИМАНИЕ: предполагает таблицу friends (user_id, friend_id, status).
-    Если структура другая — нужно поправить."""
+    """Лучший заезд друга на похожей машине (±1★)."""
     car_rating = car.get('rating') or 3
 
     conn = get_db(); c = conn.cursor()
-    c.execute('''SELECT CASE WHEN user_id = %s THEN friend_id ELSE user_id END
-                 FROM friends
-                 WHERE (user_id = %s OR friend_id = %s)
+    # находим id всех друзей (принятые заявки в любую сторону)
+    c.execute('''SELECT CASE WHEN from_user_id = %s THEN to_user_id ELSE from_user_id END
+                 FROM friendships
+                 WHERE (from_user_id = %s OR to_user_id = %s)
                    AND status = 'accepted' ''',
               (user_id, user_id, user_id))
     friend_ids = [r[0] for r in c.fetchall()]
