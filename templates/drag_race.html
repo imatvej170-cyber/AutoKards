@@ -204,10 +204,10 @@
         <div class="car-lane ghost">
             <div class="car-sprite ghost-sprite" id="ghostSprite" style="left: 0;">
                 <div class="car-label">{{ ghost.username }}</div>
-                {% if ghost.is_bot %}
-                    <div class="bot-placeholder">🤖 Бот</div>
+                {% if ghost.car_id %}
+                    <img src="{{ url_for('car_image', car_id=ghost.car_id) }}" alt="{{ ghost.car_model or 'ghost' }}">
                 {% else %}
-                    <img src="{{ url_for('car_image', car_id=ghost.car_id) }}" alt="ghost">
+                <div class="bot-placeholder">🤖 Бот</div>
                 {% endif %}
             </div>
         </div>
