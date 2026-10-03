@@ -465,12 +465,32 @@ function finishRace() {
     btnShift.disabled = true;
 
     clearInterval(tickInterval);
-    clearInterval(timerInterval);
 
+    // доводим игрока до финиша
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
     playerSprite.style.left = 'calc(100% - 60px)';
 
+    // если призрак ещё не доехал — ждём его
+    if (elapsed < GHOST_TIME) {
+        showFlash('🏁 Ты финишировал! Ждём призрака...', 'perfect');
+
+        var waitInterval = setInterval(function() {
+            if (elapsed >= GHOST_TIME) {
+                clearInterval(waitInterval);
+                clearInterval(timerInterval);
+                ghostProgressEl.style.width = '100%';
+                setCarPosition(ghostSprite, 100);
+                setTimeout(submitResult, 500);
+            }
+        }, 100);
+    } else {
+        clearInterval(timerInterval);
+        submitResult();
+    }
+}
+
+function submitResult() {
     fetch('/drag/finish', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -493,7 +513,7 @@ function finishRace() {
         }
         setTimeout(function() {
             window.location.href = '/drag/result/' + data.race_id;
-        }, 900);
+        }, 300);
     })
     .catch(function(err) {
         flashMsg.textContent = 'Ошибка соединения';
