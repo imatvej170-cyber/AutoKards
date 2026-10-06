@@ -365,6 +365,7 @@ var raceFinished = false;
 var shiftCooldown = false;
 var tickInterval = null;
 var timerInterval = null;
+var playerFinishTime = 0;
 
 var btnStart = document.getElementById('btnStart');
 var btnShift = document.getElementById('btnShift');
@@ -556,8 +557,12 @@ function finishRace() {
     btnShift.disabled = true;
     clearInterval(tickInterval);
 
+    // ⏱ ЗАПОМИНАЕМ время финиша игрока — пока elapsed ещё наш
+    playerFinishTime = elapsed;
+
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
+    setCarPosition(playerSprite, 100);
     playerTimeEl.textContent = elapsed.toFixed(2);
     updateWorld();
 
@@ -581,7 +586,7 @@ function submitResult() {
             misses: misses,
             total_shifts: totalShifts,
             ghost_time: GHOST_TIME,
-            elapsed_time: Math.max(0.1, Math.round(elapsed * 100) / 100)
+            elapsed_time: Math.max(0.1, Math.round(playerFinishTime * 100) / 100)
         })
     })
     .then(function(r) { return r.json(); })
