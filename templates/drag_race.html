@@ -358,6 +358,7 @@ var perfectShifts = 0;
 var misses = 0;
 var totalShifts = 0;
 var elapsed = 0;
+var playerFinishTime = 0;
 var playerProgressPct = 0;
 var ghostProgressPct = 0;
 var raceStarted = false;
@@ -365,7 +366,6 @@ var raceFinished = false;
 var shiftCooldown = false;
 var tickInterval = null;
 var timerInterval = null;
-var playerFinishTime = 0;
 
 var btnStart = document.getElementById('btnStart');
 var btnShift = document.getElementById('btnShift');
@@ -396,7 +396,7 @@ function updateWorld() {
     ghostOffset = Math.max(-playerX + 10, Math.min(W - playerX - 100, ghostOffset));
     ghostSprite.style.transform = 'translateX(' + ghostOffset + 'px)';
 
-    // ФИНИШ: держим далеко за экраном до 70% прогресса
+    // финиш держим за экраном почти до конца
     var finishOffset = playerX + ((100 - playerProgressPct) / 100) * (W * 2.2 - playerX);
     finishLine.style.transform = 'translateX(' + finishOffset + 'px)';
 
@@ -439,7 +439,7 @@ function startTicking() {
         if (raceFinished) return;
         rpm += 2.0;
 
-        var autoSpeed = 0.12 * gear;
+        var autoSpeed = 0.06 * gear;
         playerProgressPct = Math.min(100, playerProgressPct + autoSpeed);
         playerProgressEl.style.width = playerProgressPct + '%';
         playerTimeEl.textContent = elapsed.toFixed(2);
@@ -453,11 +453,9 @@ function startTicking() {
                 misses++;
                 totalShifts++;
                 rpm = 15;
-                gear++;
-                playerProgressPct = Math.min(100, playerProgressPct + 5);
+                // gear++ УБРАНО — перекрут не переключает передачу
                 showFlash('ПЕРЕКРУТИЛ!', 'miss');
                 updateStats();
-                if (gear > MAX_GEARS) { finishRace(); return; }
             } else {
                 rpm = 90;
             }
@@ -498,30 +496,36 @@ function shift() {
     shiftCooldown = true;
     setTimeout(function() { shiftCooldown = false; }, 500);
 
-    if (rpm < 25) { showFlash('Слишком рано!', 'miss'); return; }
+    if (rpm < 25) {
+        showFlash('Слишком рано!', 'miss');
+        return;
+    }
 
     totalShifts++;
     var center = (ZONE_MIN + ZONE_MAX) / 2;
     var halfWidth = (ZONE_MAX - ZONE_MIN) / 2;
 
     if (rpm >= ZONE_MIN && rpm <= ZONE_MAX) {
+        // ✅ PERFECT — единственный способ поднять передачу
         perfectShifts++;
         var quality = 1 - (Math.abs(rpm - center) / halfWidth);
-        var progressBonus = 14 + quality * 6;
+        var progressBonus = 18 + quality * 7;
         playerProgressPct = Math.min(100, playerProgressPct + progressBonus);
+        rpm = 15;
+        gear++;
         showFlash('PERFECT! +' + Math.round(progressBonus) + '%', 'perfect');
     } else if (rpm < ZONE_MIN) {
+        // ❌ РАНО — без прогресса, без передачи
         misses++;
-        playerProgressPct = Math.min(100, playerProgressPct + 5);
+        rpm = 15;
         showFlash('РАНО!', 'miss');
     } else {
+        // ❌ ПОЗДНО — без прогресса, без передачи
         misses++;
-        playerProgressPct = Math.min(100, playerProgressPct + 5);
+        rpm = 15;
         showFlash('ПОЗДНО!', 'miss');
     }
 
-    rpm = 15;
-    gear++;
     updateStats();
     updateWorld();
 
@@ -557,13 +561,12 @@ function finishRace() {
     btnShift.disabled = true;
     clearInterval(tickInterval);
 
-    // ⏱ ЗАПОМИНАЕМ время финиша игрока — пока elapsed ещё наш
+    // ⏱ ЗАПОМИНАЕМ время финиша игрока — до того, как таймер догонит призрака
     playerFinishTime = elapsed;
 
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
-    setCarPosition(playerSprite, 100);
-    playerTimeEl.textContent = elapsed.toFixed(2);
+    playerTimeEl.textContent = playerFinishTime.toFixed(2);
     updateWorld();
 
     if (elapsed >= GHOST_TIME) {
