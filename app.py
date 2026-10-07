@@ -93,7 +93,7 @@ DEFAULT_SETTINGS = {
     'salvage_slots': '5',             # макс машин в "находках"
     'salvage_max_parts': '50',        # макс деталей в запасе
     'drag_enabled': '1',              # вкл/выкл драг-гонки
-    'drag_daily_races': '30',         # макс гонок в день
+    'drag_daily_races': '100',         # макс гонок в день
     'drag_daily_reward': '10000',     # макс монет в день
     'drag_reward_win': '300',         # базовая награда за победу
 }
