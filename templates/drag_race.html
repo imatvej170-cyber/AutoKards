@@ -22,38 +22,22 @@
 .track {
     position: relative; height: 380px;
     overflow: hidden;
-    background: #2a2a2a;
+    background: #1a1a1a;
     box-shadow: 0 0 40px rgba(255,138,0,0.2);
 }
 
+/* ФОН — двигается вбок (бесшовный) */
 .bg-image {
     position: absolute; inset: 0;
     background-image: url('{{ url_for("static", filename="drag/bg.jpg") }}');
-    background-size: cover;
-    background-position: center top;
-    background-repeat: no-repeat;
-    z-index: 1;
-}
-
-.clouds-layer {
-    position: absolute; top: 0; left: 0; right: 0;
-    height: 35%; overflow: hidden;
-    pointer-events: none; z-index: 2;
-}
-.clouds-strip {
-    position: absolute; top: 0; left: 0;
-    height: 100%; width: 200%;
-    background-image: url('{{ url_for("static", filename="drag/clouds.png") }}');
-    background-repeat: repeat-x;
     background-size: auto 100%;
-    animation: cloudsMove 60s linear infinite;
-    opacity: 0.9;
-}
-@keyframes cloudsMove {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
+    background-repeat: repeat-x;
+    background-position: 0 center;
+    z-index: 1;
+    will-change: background-position-x;
 }
 
+/* ДОРОГА */
 .road {
     position: absolute; bottom: 0; left: 0; right: 0;
     height: 220px;
@@ -77,6 +61,7 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
+/* Разметка дороги — едет */
 .road-stripes {
     position: absolute; bottom: 105px; left: 0; right: 0;
     height: 8px;
@@ -88,6 +73,114 @@
     box-shadow: 0 0 12px rgba(255,215,0,0.6);
 }
 
+/* ═══ СТАРТОВАЯ ЛИНИЯ ═══ */
+.start-line {
+    position: absolute; bottom: 0; left: 0;
+    width: 20px; height: 220px;
+    z-index: 6;
+    /* двойная белая полоса */
+    background:
+        linear-gradient(90deg,
+            #fff 0 6px,
+            transparent 6px 14px,
+            #fff 14px 20px);
+    box-shadow: 0 0 20px rgba(255,255,255,0.7);
+    transition: transform 0.1s linear;
+    will-change: transform;
+}
+
+/* ═══ СВЕТОФОР ═══ */
+.traffic-light {
+    position: absolute;
+    right: 40px; bottom: 60px;
+    z-index: 8;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+    padding: 10px 8px;
+    background: #1a1a1a;
+    border: 3px solid #333;
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+}
+.tl-light {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: #222;
+    border: 2px solid #111;
+    transition: all 0.2s;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+}
+.tl-light.red.on {
+    background: #ff2222;
+    box-shadow: 0 0 18px #ff2222, inset 0 0 8px rgba(255,255,255,0.5);
+}
+.tl-light.yellow.on {
+    background: #ffcc00;
+    box-shadow: 0 0 18px #ffcc00, inset 0 0 8px rgba(255,255,255,0.5);
+}
+.tl-light.green.on {
+    background: #22dd22;
+    box-shadow: 0 0 22px #22dd22, inset 0 0 8px rgba(255,255,255,0.5);
+    transform: scale(1.15);
+}
+/* столб */
+.traffic-light::after {
+    content: '';
+    position: absolute;
+    bottom: -30px; left: 50%;
+    transform: translateX(-50%);
+    width: 6px; height: 30px;
+    background: #333;
+    border-radius: 0 0 3px 3px;
+}
+
+/* ═══ СПИДОМЕТР ═══ */
+.speedometer {
+    position: absolute;
+    top: 16px; right: 16px;
+    z-index: 8;
+    background: rgba(0,0,0,0.75);
+    border: 2px solid rgba(255,138,0,0.5);
+    border-radius: 14px;
+    padding: 8px 16px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+}
+.speed-value {
+    font-size: 34px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 12px rgba(255,138,0,0.8);
+    font-family: 'Courier New', monospace;
+}
+.speed-unit {
+    font-size: 11px;
+    color: #ff8a00;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 2px;
+    font-weight: 700;
+}
+
+/* ═══ СЧЁТЧИК ПОСЕРЕДИНЕ (для ясности) ═══ */
+.countdown-overlay {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9;
+    font-size: 100px;
+    font-weight: 900;
+    color: #ff8a00;
+    text-shadow: 0 0 30px rgba(255,138,0,0.9), 0 0 60px rgba(255,138,0,0.5);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.countdown-overlay.show { opacity: 1; }
+
+/* ═══ ФИНИШ ═══ */
 .finish-line {
     position: absolute; bottom: 0; left: 0;
     width: 12px; height: 220px;
@@ -100,6 +193,7 @@
     will-change: transform;
 }
 
+/* ═══ МАШИНЫ ═══ */
 .car-lane {
     position: absolute; left: 0; right: 0;
     z-index: 5;
@@ -136,7 +230,6 @@
     position: absolute; top: -18px; left: 0;
     font-size: 12px; color: #ff8a00; white-space: nowrap;
     font-weight: 800; text-shadow: 0 0 6px #000, 0 0 3px #000;
-    letter-spacing: 0.5px;
 }
 .car-sprite.ghost-sprite .car-label { color: #ccc; }
 
@@ -149,6 +242,7 @@
     font-weight: 700;
 }
 
+/* ═══ ТАХОМЕТР ═══ */
 .tacho-box {
     background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,138,0,0.3);
@@ -241,19 +335,11 @@
 .flash-perfect { color: #4caf50; text-shadow: 0 0 12px rgba(76,175,80,0.7); }
 .flash-miss { color: #ff4d4d; text-shadow: 0 0 12px rgba(255,77,77,0.7); }
 
-.countdown {
-    position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 140px; font-weight: 900; color: #ff8a00;
-    text-shadow: 0 0 40px rgba(255,138,0,0.9);
-    background: rgba(0,0,0,0.7); z-index: 100;
-}
-.countdown.hidden { display: none; }
-
 @media (max-width: 600px) {
     .track { height: 300px; }
     .road { height: 170px; }
     .finish-line { height: 170px; }
+    .start-line { height: 170px; }
     .road-stripes { bottom: 80px; height: 6px; }
     .car-sprite img { height: 75px; }
     .car-sprite.ghost-sprite img { height: 68px; }
@@ -262,6 +348,12 @@
     .car-lane.ghost  { bottom: 8px; }
     .bot-placeholder { height: 50px; font-size: 14px; }
     .btn-start, .btn-shift { padding: 16px 30px; font-size: 18px; }
+    .traffic-light { right: 16px; bottom: 50px; padding: 6px; }
+    .tl-light { width: 20px; height: 20px; }
+    .speedometer { top: 8px; right: 8px; padding: 6px 12px; }
+    .speed-value { font-size: 24px; }
+    .speed-unit { font-size: 9px; }
+    .countdown-overlay { font-size: 70px; }
 }
 </style>
 
@@ -278,14 +370,34 @@
 
 <div class="track-bleed">
     <div class="track" id="track">
-        <div class="bg-image"></div>
-        <div class="clouds-layer">
-            <div class="clouds-strip"></div>
-        </div>
+        <div class="bg-image" id="bgImage"></div>
+
         <div class="road"></div>
         <div class="road-stripes" id="roadStripes"></div>
+
+        <!-- СТАРТ -->
+        <div class="start-line" id="startLine"></div>
+
+        <!-- ФИНИШ -->
         <div class="finish-line" id="finishLine"></div>
 
+        <!-- СВЕТОФОР -->
+        <div class="traffic-light" id="trafficLight">
+            <div class="tl-light red" id="tlRed"></div>
+            <div class="tl-light yellow" id="tlYellow"></div>
+            <div class="tl-light green" id="tlGreen"></div>
+        </div>
+
+        <!-- СПИДОМЕТР -->
+        <div class="speedometer">
+            <div class="speed-value" id="speedValue">0</div>
+            <div class="speed-unit">км/ч</div>
+        </div>
+
+        <!-- СЧЁТЧИК ПОСЕРЕДИНЕ -->
+        <div class="countdown-overlay" id="countdownOverlay">3</div>
+
+        <!-- МАШИНЫ -->
         <div class="car-lane player">
             <div class="car-sprite player-sprite" id="playerSprite">
                 <div class="car-label">Ты</div>
@@ -342,8 +454,6 @@
     <div class="flash-message" id="flashMsg"></div>
 </div>
 
-<div class="countdown hidden" id="countdown">3</div>
-
 <script>
 const CAR_ID = {{ car.id }};
 const DISTANCE = "{{ distance }}";
@@ -367,6 +477,9 @@ var shiftCooldown = false;
 var tickInterval = null;
 var timerInterval = null;
 
+// смещение фона (в пикселях, растёт = мир едет влево)
+var bgOffset = 0;
+
 var btnStart = document.getElementById('btnStart');
 var btnShift = document.getElementById('btnShift');
 var tachoFill = document.getElementById('tachoFill');
@@ -377,12 +490,18 @@ var missEl = document.getElementById('missCount');
 var playerSprite = document.getElementById('playerSprite');
 var ghostSprite = document.getElementById('ghostSprite');
 var finishLine = document.getElementById('finishLine');
+var startLine = document.getElementById('startLine');
+var bgImage = document.getElementById('bgImage');
+var speedValue = document.getElementById('speedValue');
+var tlRed = document.getElementById('tlRed');
+var tlYellow = document.getElementById('tlYellow');
+var tlGreen = document.getElementById('tlGreen');
+var countdownOverlay = document.getElementById('countdownOverlay');
 var playerProgressEl = document.getElementById('playerProgress');
 var ghostProgressEl = document.getElementById('ghostProgress');
 var playerTimeEl = document.getElementById('playerTime');
 var ghostTimeEl = document.getElementById('ghostTime');
 var flashMsg = document.getElementById('flashMsg');
-var countdownEl = document.getElementById('countdown');
 var roadStripes = document.getElementById('roadStripes');
 
 function updateWorld() {
@@ -391,18 +510,37 @@ function updateWorld() {
     var W = track.clientWidth;
     var playerX = W * 0.15;
 
-    // призрак — относительно игрока
+    // Призрак — относительно игрока
     var ghostOffset = ((ghostProgressPct - playerProgressPct) / 100) * (W * 0.45);
     ghostOffset = Math.max(-playerX + 10, Math.min(W - playerX - 100, ghostOffset));
     ghostSprite.style.transform = 'translateX(' + ghostOffset + 'px)';
 
-    // финиш держим за экраном почти до конца
+    // Финиш держим за экраном почти до конца
     var finishOffset = playerX + ((100 - playerProgressPct) / 100) * (W * 2.2 - playerX);
     finishLine.style.transform = 'translateX(' + finishOffset + 'px)';
 
-    // разметка едет
+    // Стартовая линия — уезжает влево по мере движения
+    var startOffset = -((playerProgressPct / 100) * W * 2.2);
+    startLine.style.transform = 'translateX(' + startOffset + 'px)';
+
+    // Разметка дороги едет
     var roadScroll = -(playerProgressPct / 100) * W * 2;
     roadStripes.style.backgroundPositionX = roadScroll + 'px';
+
+    // ФОН едет влево
+    bgOffset = -(playerProgressPct / 100) * (W * 3);
+    bgImage.style.backgroundPositionX = bgOffset + 'px';
+}
+
+// спидометр — цифры скорости
+function updateSpeedometer() {
+    // speed 0..250 в зависимости от gear и rpm
+    var speed = Math.round(rpm * 1.2 + (gear - 1) * 30);
+    if (!raceStarted) speed = 0;
+    if (raceFinished) {
+        // на финише показываем пиковую
+    }
+    speedValue.textContent = speed;
 }
 
 btnStart.addEventListener('click', function() {
@@ -411,16 +549,39 @@ btnStart.addEventListener('click', function() {
 });
 
 function runCountdown() {
-    var n = 3;
-    countdownEl.textContent = n;
-    countdownEl.classList.remove('hidden');
+    // сбрасываем светофор
+    tlRed.classList.remove('on');
+    tlYellow.classList.remove('on');
+    tlGreen.classList.remove('on');
+
+    var step = 0;
+    countdownOverlay.classList.add('show');
+
+    // Шаг 0: красный (3)
+    tlRed.classList.add('on');
+    countdownOverlay.textContent = '3';
+
     var cd = setInterval(function() {
-        n--;
-        if (n > 0) countdownEl.textContent = n;
-        else if (n === 0) countdownEl.textContent = 'GO!';
-        else {
+        step++;
+        if (step === 1) {
+            // жёлтый (2)
+            tlRed.classList.remove('on');
+            tlYellow.classList.add('on');
+            countdownOverlay.textContent = '2';
+        } else if (step === 2) {
+            // опять красный+жёлтый (1) — как на реальных светофорах
+            tlRed.classList.add('on');
+            countdownOverlay.textContent = '1';
+        } else if (step === 3) {
+            // ЗЕЛЁНЫЙ — GO
+            tlRed.classList.remove('on');
+            tlYellow.classList.remove('on');
+            tlGreen.classList.add('on');
+            countdownOverlay.textContent = 'GO!';
+            setTimeout(function() {
+                countdownOverlay.classList.remove('show');
+            }, 400);
             clearInterval(cd);
-            countdownEl.classList.add('hidden');
             startRace();
         }
     }, 700);
@@ -453,7 +614,6 @@ function startTicking() {
                 misses++;
                 totalShifts++;
                 rpm = 15;
-                // gear++ УБРАНО — перекрут не переключает передачу
                 showFlash('ПЕРЕКРУТИЛ!', 'miss');
                 updateStats();
             } else {
@@ -462,6 +622,7 @@ function startTicking() {
         }
 
         updateWorld();
+        updateSpeedometer();
         renderTacho();
     }, 50);
 }
@@ -506,7 +667,6 @@ function shift() {
     var halfWidth = (ZONE_MAX - ZONE_MIN) / 2;
 
     if (rpm >= ZONE_MIN && rpm <= ZONE_MAX) {
-        // ✅ PERFECT — единственный способ поднять передачу
         perfectShifts++;
         var quality = 1 - (Math.abs(rpm - center) / halfWidth);
         var progressBonus = 18 + quality * 7;
@@ -515,12 +675,10 @@ function shift() {
         gear++;
         showFlash('PERFECT! +' + Math.round(progressBonus) + '%', 'perfect');
     } else if (rpm < ZONE_MIN) {
-        // ❌ РАНО — без прогресса, без передачи
         misses++;
         rpm = 15;
         showFlash('РАНО!', 'miss');
     } else {
-        // ❌ ПОЗДНО — без прогресса, без передачи
         misses++;
         rpm = 15;
         showFlash('ПОЗДНО!', 'miss');
@@ -528,6 +686,7 @@ function shift() {
 
     updateStats();
     updateWorld();
+    updateSpeedometer();
 
     if (gear > MAX_GEARS) { finishRace(); return; }
     renderTacho();
@@ -561,13 +720,16 @@ function finishRace() {
     btnShift.disabled = true;
     clearInterval(tickInterval);
 
-    // ⏱ ЗАПОМИНАЕМ время финиша игрока — до того, как таймер догонит призрака
     playerFinishTime = elapsed;
 
     playerProgressPct = 100;
     playerProgressEl.style.width = '100%';
     playerTimeEl.textContent = playerFinishTime.toFixed(2);
     updateWorld();
+    updateSpeedometer();
+
+    // гасим светофор
+    tlGreen.classList.remove('on');
 
     if (elapsed >= GHOST_TIME) {
         clearInterval(timerInterval);
