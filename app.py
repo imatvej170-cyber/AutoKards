@@ -4913,14 +4913,17 @@ def drag_result(race_id):
         is_admin=is_admin(session.get('username'))
     )
   # ─────────── ХАБ ГОНОК ───────────
-
 @app.route('/racing')
 @login_required
 def racing():
-    return render_template('racing.html',
-        user=session.get('username'),
-        is_admin=is_admin(session.get('username'))
-    )
+    import traceback
+    try:
+        return render_template('racing.html',
+            user=session.get('username'),
+            is_admin=is_admin(session.get('username'))
+        )
+    except Exception:
+        return '<h2 style="color:red;">Ошибка в /racing:</h2><pre>' + traceback.format_exc() + '</pre>', 500
 # ---------- ЛИЧНЫЙ ГАРАЖ ----------
 def get_user_cars(user_id):
     conn = get_db(); c = conn.cursor()
