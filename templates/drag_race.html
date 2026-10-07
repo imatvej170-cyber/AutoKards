@@ -4,7 +4,6 @@
 <style>
 .race-container { max-width: 1100px; margin: 0 auto; padding: 0 12px 40px; }
 
-/* ═══ ШАПКА ═══ */
 .race-top {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 10px; flex-wrap: wrap; gap: 10px;
@@ -23,63 +22,49 @@
     position: relative;
     height: 400px;
     overflow: hidden;
-    background: #B3DCFD;
 }
 
-/* НЕБО */
 .sky {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 40%;
-    background: linear-gradient(180deg, #A9D4FA 0%, #B3DCFD 60%, #C9E5FE 100%);
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 42%;
+    background: linear-gradient(180deg, #A9D4FA 0%, #B3DCFD 100%);
 }
-/* солнце */
 .sky::after {
     content: '';
     position: absolute;
-    top: 30px; right: 15%;
-    width: 60px; height: 60px;
+    top: 24px; right: 12%;
+    width: 55px; height: 55px;
     border-radius: 50%;
-    background: radial-gradient(circle, #FFF7D6 0%, #FFE680 40%, transparent 70%);
-    opacity: 0.7;
+    background: radial-gradient(circle, #FFF7D6 0%, #FFE680 45%, transparent 72%);
+    opacity: 0.75;
 }
 
-/* ТРАВА */
 .grass {
-    position: absolute;
-    top: 40%; left: 0; right: 0;
-    height: 12%;
+    position: absolute; top: 42%; left: 0; right: 0;
+    height: 10%;
     background: linear-gradient(180deg, #6b9463 0%, #587d52 100%);
 }
 .grass::after {
     content: '';
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-        90deg,
-        transparent 0 40px,
-        rgba(0,0,0,0.06) 40px 42px
-    );
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg,
+        transparent 0 40px, rgba(0,0,0,0.06) 40px 42px);
 }
 
-/* ДОРОГА */
 .road {
-    position: absolute;
-    top: 52%; left: 0; right: 0; bottom: 0;
+    position: absolute; top: 52%; left: 0; right: 0; bottom: 0;
     background: linear-gradient(180deg, #3e3e3e 0%, #2e2e2e 40%, #1a1a1a 100%);
     overflow: hidden;
 }
 .road::before {
     content: '';
-    position: absolute;
-    inset: 0;
+    position: absolute; inset: 0;
     background-image:
         radial-gradient(circle at 30% 20%, rgba(255,255,255,0.04) 1px, transparent 2px),
         radial-gradient(circle at 70% 60%, rgba(255,255,255,0.03) 1px, transparent 2px);
     background-size: 40px 40px, 60px 60px;
 }
 
-/* Разметка дороги (движется) */
 .road-line {
     position: absolute;
     top: 50%; left: 0; right: 0;
@@ -92,68 +77,82 @@
     box-shadow: 0 0 10px rgba(255,215,0,0.4);
 }
 
-/* СТАРТОВАЯ ЛИНИЯ */
+/* Стартовая линия — чуть позади машины */
 .start-line {
     position: absolute;
     top: 52%; bottom: 0; left: 0;
-    width: 24px;
+    width: 26px;
     background:
         linear-gradient(90deg,
-            #fff 0 8px,
-            transparent 8px 16px,
-            #fff 16px 24px);
-    z-index: 6;
-    box-shadow: 0 0 16px rgba(255,255,255,0.7);
-    will-change: transform;
+            #fff 0 9px,
+            transparent 9px 17px,
+            #fff 17px 26px);
+    z-index: 3;
+    box-shadow: 0 0 16px rgba(255,255,255,0.6);
+    will-change: left;
 }
 
-/* СВЕТОФОР */
+/* ═══ СВЕТОФОР (реалистичный, с козырьками) ═══ */
 .traffic-light {
     position: absolute;
-    top: 55%;
+    top: 18%;
     left: 0;
-    z-index: 10;
-    transform: translateX(-50%);
-    will-change: transform;
-}
-.tl-pole {
-    width: 8px;
-    height: 90px;
-    background: #2a2a2a;
-    margin: 0 auto;
-    border-radius: 4px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-}
-.tl-box {
-    background: #1a1a1a;
-    border: 3px solid #333;
-    border-radius: 12px;
-    padding: 8px 6px;
+    z-index: 8;
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+    align-items: center;
+    will-change: left;
+}
+.tl-box {
+    background: linear-gradient(180deg, #3a3a3a 0%, #1c1c1c 50%, #0a0a0a 100%);
+    border: 3px solid #555;
+    border-radius: 14px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow:
+        0 8px 24px rgba(0,0,0,0.75),
+        inset 0 0 12px rgba(0,0,0,0.9),
+        inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .tl-light {
-    width: 28px; height: 28px;
+    width: 32px; height: 32px;
     border-radius: 50%;
-    background: #1a1a1a;
+    position: relative;
+    background: radial-gradient(circle at 35% 30%, #2a2a2a, #080808 70%);
     border: 2px solid #000;
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
-    transition: all 0.15s;
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.95);
+    overflow: hidden;
 }
-.tl-light.red.on {
-    background: #ff2222;
-    box-shadow: 0 0 20px #ff2222, inset 0 0 8px rgba(255,255,255,0.6);
+.tl-light::before {
+    content: '';
+    position: absolute;
+    top: -3px; left: -5px; right: -5px;
+    height: 14px;
+    background: linear-gradient(180deg, #3a3a3a 0%, #0a0a0a 100%);
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
-.tl-light.yellow.on {
-    background: #ffcc00;
-    box-shadow: 0 0 20px #ffcc00, inset 0 0 8px rgba(255,255,255,0.6);
+.tl-light.on.red {
+    background: radial-gradient(circle at 35% 30%, #ff8888, #dd0000 55%, #660000 100%);
+    box-shadow: 0 0 28px #ff2020, inset 0 0 10px rgba(255,255,255,0.6);
 }
-.tl-light.green.on {
-    background: #22dd22;
-    box-shadow: 0 0 26px #22dd22, inset 0 0 10px rgba(255,255,255,0.7);
-    transform: scale(1.1);
+.tl-light.on.yellow {
+    background: radial-gradient(circle at 35% 30%, #fff0a0, #ffcc00 55%, #997700 100%);
+    box-shadow: 0 0 28px #ffcc00, inset 0 0 10px rgba(255,255,255,0.7);
+}
+.tl-light.on.green {
+    background: radial-gradient(circle at 35% 30%, #aaffaa, #22dd22 55%, #006600 100%);
+    box-shadow: 0 0 34px #22dd22, inset 0 0 12px rgba(255,255,255,0.7);
+}
+.tl-pole {
+    width: 10px;
+    height: 70px;
+    background: linear-gradient(90deg, #666 0%, #333 50%, #666 100%);
+    box-shadow: 2px 0 6px rgba(0,0,0,0.6);
+    border-radius: 0 0 4px 4px;
 }
 
 /* ФИНИШ */
@@ -162,9 +161,9 @@
     top: 52%; bottom: 0; left: 0;
     width: 16px;
     background: repeating-linear-gradient(0deg, #fff 0 18px, #000 18px 36px);
-    z-index: 6;
-    box-shadow: 0 0 20px rgba(255,255,255,0.9);
-    will-change: transform;
+    z-index: 4;
+    box-shadow: 0 0 20px rgba(255,255,255,0.85);
+    will-change: left;
 }
 
 /* МАШИНЫ */
@@ -172,32 +171,31 @@
     position: absolute;
     left: 0; right: 0;
     z-index: 5;
+    height: 100px;
 }
-.car-lane.player { bottom: 110px; }
+.car-lane.player { bottom: 130px; }
 .car-lane.ghost  { bottom: 18px; }
 
 .car-sprite {
     position: absolute;
-    left: 0; bottom: 0;
-    will-change: transform;
-}
-#playerSprite {
-    transform: translateX(15vw);
+    left: 0;
+    bottom: 0;
+    will-change: left;
 }
 .car-sprite img {
-    height: 100px; width: auto; display: block;
+    height: 95px; width: auto; display: block;
     transform: scaleX(-1);
-    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.8)) drop-shadow(0 0 12px rgba(255,138,0,0.4));
+    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.85)) drop-shadow(0 0 10px rgba(255,138,0,0.35));
 }
 .car-sprite.ghost-sprite img {
-    height: 88px;
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.7)) grayscale(0.55) brightness(0.85);
+    height: 82px;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.75)) grayscale(0.5) brightness(0.85);
 }
 .car-sprite::after {
     content: '';
     position: absolute;
-    bottom: -6px; left: 8%; right: 8%; height: 10px;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, transparent 70%);
+    bottom: -5px; left: 8%; right: 8%; height: 9px;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.75) 0%, transparent 70%);
     z-index: -1;
 }
 .car-label {
@@ -215,31 +213,29 @@
     background: rgba(0,0,0,0.6);
     border: 2px dashed #888; border-radius: 12px;
     display: flex; align-items: center;
-    color: #ddd; font-size: 16px;
-    font-weight: 700;
+    color: #ddd; font-size: 16px; font-weight: 700;
 }
 
-/* ═══ СПИДОМЕТР (в углу трассы) ═══ */
+/* СПИДОМЕТР */
 .speed-panel {
     position: absolute;
     top: 20px; right: 20px;
     z-index: 9;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.82);
     border: 2px solid rgba(255,138,0,0.6);
     border-radius: 12px;
     padding: 10px 18px;
     text-align: center;
-    backdrop-filter: blur(6px);
-    min-width: 100px;
+    min-width: 108px;
 }
 .speed-value {
-    font-size: 42px;
+    font-size: 44px;
     font-weight: 900;
     color: #fff;
     line-height: 1;
     font-family: 'Courier New', monospace;
     text-shadow: 0 0 14px rgba(255,138,0,0.9);
-    letter-spacing: -1px;
+    letter-spacing: -2px;
 }
 .speed-unit {
     font-size: 11px;
@@ -250,7 +246,7 @@
     font-weight: 700;
 }
 
-/* ═══ СЧЁТЧИК ПОСЕРЕДИНЕ ЭКРАНА ═══ */
+/* СЧЁТЧИК */
 .countdown-center {
     position: absolute;
     top: 50%; left: 50%;
@@ -266,21 +262,19 @@
 }
 .countdown-center.show { opacity: 1; }
 
-/* ═══ ТАХОМЕТР ═══ */
+/* ТАХОМЕТР */
 .tacho-wrap {
     margin-top: 18px;
     margin-bottom: 16px;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.45);
     border: 2px solid rgba(255,138,0,0.3);
     border-radius: 18px;
     padding: 18px 24px 14px;
 }
 .tacho-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #999;
-    margin-bottom: 8px;
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: #999;
+    margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -290,27 +284,34 @@
 
 .tacho-bar {
     position: relative;
-    height: 54px;
+    height: 56px;
     border-radius: 10px;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     overflow: hidden;
     border: 1px solid rgba(255,255,255,0.08);
+}
+.tacho-redzone {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 92%;
+    right: 0;
+    background: rgba(255,20,20,0.18);
+    border-left: 2px dashed rgba(255,60,60,0.5);
 }
 .tacho-zone {
     position: absolute;
     top: 0; bottom: 0;
-    background: linear-gradient(180deg, rgba(76,175,80,0.4), rgba(76,175,80,0.15));
+    background: linear-gradient(180deg, rgba(76,175,80,0.4), rgba(76,175,80,0.12));
     border-left: 3px solid #4caf50;
     border-right: 3px solid #4caf50;
-    box-shadow: inset 0 0 20px rgba(76,175,80,0.2);
+    box-shadow: inset 0 0 20px rgba(76,175,80,0.18);
 }
 .tacho-fill {
     position: absolute;
     top: 0; bottom: 0; left: 0;
-    background: linear-gradient(90deg, #ff4d4d 0%, #ffb347 50%, #ff8a00 100%);
+    background: linear-gradient(90deg, #ff4d4d 0%, #ffb347 45%, #ff8a00 100%);
     width: 0%;
-    transition: width 0.05s linear;
-    opacity: 0.75;
+    opacity: 0.72;
 }
 .tacho-needle {
     position: absolute;
@@ -318,8 +319,7 @@
     left: 0;
     width: 4px;
     background: #fff;
-    box-shadow: 0 0 10px #fff, 0 0 4px #ff8a00;
-    transition: left 0.05s linear;
+    box-shadow: 0 0 12px #fff, 0 0 5px #ff8a00;
     z-index: 2;
 }
 .tacho-rpm-value {
@@ -334,7 +334,6 @@
     font-family: 'Courier New', monospace;
     z-index: 3;
 }
-
 .tacho-numbers {
     display: flex;
     justify-content: space-between;
@@ -345,14 +344,13 @@
     padding: 0 2px;
 }
 
-/* ═══ УПРАВЛЕНИЕ ═══ */
+/* УПРАВЛЕНИЕ */
 .controls {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     margin-top: 16px;
 }
-
 .btn-control {
     padding: 22px 20px;
     font-size: 18px;
@@ -361,10 +359,11 @@
     border-radius: 16px;
     cursor: pointer;
     letter-spacing: 2px;
-    transition: all 0.1s;
+    transition: transform 0.1s;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    font-family: inherit;
 }
 .btn-shift-c {
     background: linear-gradient(135deg, #4caf50, #66bb6a);
@@ -372,7 +371,7 @@
     box-shadow: 0 6px 22px rgba(76,175,80,0.5);
 }
 .btn-shift-c:active { transform: scale(0.97); }
-.btn-shift-c:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-shift-c:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .btn-gas-c {
     background: linear-gradient(135deg, #ff8a00, #ffb347);
@@ -381,7 +380,7 @@
 }
 .btn-gas-c.active {
     transform: scale(0.97);
-    box-shadow: 0 2px 10px rgba(255,138,0,0.8), inset 0 0 20px rgba(255,255,255,0.2);
+    box-shadow: 0 2px 10px rgba(255,138,0,0.9), inset 0 0 24px rgba(255,255,255,0.25);
 }
 
 .btn-start-center {
@@ -397,10 +396,10 @@
     letter-spacing: 3px;
     box-shadow: 0 6px 28px rgba(255,138,0,0.6);
     transition: all 0.2s;
+    font-family: inherit;
 }
 .btn-start-center:hover { transform: translateY(-3px); box-shadow: 0 10px 36px rgba(255,138,0,0.8); }
 
-/* ═══ СООБЩЕНИЕ ═══ */
 .flash-msg {
     text-align: center;
     font-size: 22px;
@@ -408,12 +407,10 @@
     min-height: 32px;
     margin-top: 14px;
     letter-spacing: 1px;
-    transition: opacity 0.2s;
 }
 .flash-perfect { color: #4caf50; text-shadow: 0 0 14px rgba(76,175,80,0.8); }
 .flash-miss { color: #ff4d4d; text-shadow: 0 0 14px rgba(255,77,77,0.8); }
 
-/* ═══ ПОДСКАЗКА ДЛЯ МОБИЛЬНЫХ ═══ */
 .mobile-hint {
     text-align: center;
     color: #666;
@@ -425,17 +422,15 @@
 @media (max-width: 800px) {
     .track { height: 320px; }
     .car-sprite img { height: 78px; }
-    .car-sprite.ghost-sprite img { height: 70px; }
-    .car-lane.player { bottom: 90px; }
-    .car-lane.ghost  { bottom: 12px; }
+    .car-sprite.ghost-sprite img { height: 68px; }
+    .car-lane.player { bottom: 105px; }
+    .car-lane.ghost  { bottom: 14px; }
     .speed-panel { padding: 8px 14px; top: 12px; right: 12px; }
     .speed-value { font-size: 32px; }
     .countdown-center { font-size: 100px; }
-    .tl-light { width: 22px; height: 22px; }
-    .tl-pole { height: 70px; }
-    
-    .btn-control, .btn-start-center { padding: 26px 12px; font-size: 20px; }
-    
+    .tl-light { width: 24px; height: 24px; }
+    .tl-pole { height: 50px; }
+    .btn-control, .btn-start-center { padding: 26px 12px; font-size: 18px; }
     .mobile-hint { display: block; }
 }
 </style>
@@ -507,6 +502,7 @@
             </span>
         </div>
         <div class="tacho-bar">
+            <div class="tacho-redzone"></div>
             <div class="tacho-zone" style="left: {{ zone_min }}%; width: {{ zone_max - zone_min }}%;"></div>
             <div class="tacho-fill" id="tachoFill"></div>
             <div class="tacho-needle" id="tachoNeedle"></div>
@@ -530,16 +526,14 @@
     </div>
 
     <div class="mobile-hint">
-        📱 Держи справа — газ. Тапай слева — переключение.
+        📱 Справа — держи газ. Слева — тапай для переключения.
     </div>
 
     <div class="flash-msg" id="flashMsg"></div>
 </div>
 
 <script>
-// ══════════════════════════════════════
-// ДАННЫЕ С СЕРВЕРА
-// ══════════════════════════════════════
+// ═══ ДАННЫЕ С СЕРВЕРА ═══
 const CAR_ID = {{ car.id }};
 const DISTANCE = "{{ distance }}";
 const GHOST_TIME = {{ '%.2f'|format(ghost.time) }};
@@ -547,30 +541,36 @@ const ZONE_MIN = {{ zone_min }};
 const ZONE_MAX = {{ zone_max }};
 const MAX_GEARS = 5;
 
-// ══════════════════════════════════════
-// СОСТОЯНИЕ
-// ══════════════════════════════════════
-var rpm = 0;
+// ═══ ФИЗИКА ═══
+const MAX_SPEEDS = [55, 95, 145, 205, 280];  // км/ч потолок на каждой передаче
+const ACCEL = 2.4;     // +км/ч за тик (50мс) при газе
+const DECEL = 1.8;     // -км/ч за тик без газа
+
+// Коэффициент прогресса: за ~12-15 сек при средней 150 км/ч = 100%
+// K = 0.045 для 1/4 мили, делится на 2 и 4 для 1/2 и 1 мили
+const PROGRESS_K = { quarter: 0.045, half: 0.0225, mile: 0.01125 };
+const K = PROGRESS_K[DISTANCE] || 0.045;
+
+// ═══ СОСТОЯНИЕ ═══
+var speed = 0;              // текущая скорость км/ч
+var rpm = 0;                // вычисляется из speed/maxSpeed
 var gear = 1;
-var speed = 0;
+var progress = 0;           // 0..100
+var elapsed = 0;
+var playerFinishTime = 0;
+var ghostProgressPct = 0;
 var perfectShifts = 0;
 var misses = 0;
 var totalShifts = 0;
-var elapsed = 0;
-var playerFinishTime = 0;
-var playerProgressPct = 0;
-var ghostProgressPct = 0;
 var raceStarted = false;
 var raceFinished = false;
 var gasPressed = false;
 var shiftCooldown = false;
+var roadOffset = 0;
 var tickInterval = null;
 var timerInterval = null;
-var roadOffset = 0;
 
-// ══════════════════════════════════════
-// ЭЛЕМЕНТЫ
-// ══════════════════════════════════════
+// ═══ ЭЛЕМЕНТЫ ═══
 var track = document.getElementById('track');
 var btnStart = document.getElementById('btnStart');
 var btnShift = document.getElementById('btnShift');
@@ -593,64 +593,59 @@ var tlYellow = document.getElementById('tlYellow');
 var tlGreen = document.getElementById('tlGreen');
 var countdownCenter = document.getElementById('countdownCenter');
 var flashMsg = document.getElementById('flashMsg');
-var playerTimeEl = document.getElementById('playerTime');
 
-// ══════════════════════════════════════
-// ОБНОВЛЕНИЕ МИРА
-// ══════════════════════════════════════
+// ═══ ПОЗИЦИИ НА ТРАССЕ ═══
+// Игрок всегда на 18% от левой границы (визуально «за рулём»)
+const PLAYER_X_RATIO = 0.18;
+
 function updateWorld() {
-    if (!track) return;
     var W = track.clientWidth;
-    var worldScroll = (playerProgressPct / 100) * W * 2.5;
+    var playerX = W * PLAYER_X_RATIO;
 
-    // стартовая линия — уезжает влево
-    startLine.style.transform = 'translateX(' + (W * 0.18 - worldScroll) + 'px)';
+    // Игрок — фиксирован
+    playerSprite.style.left = playerX + 'px';
 
-    // светофор — уезжает влево
-    trafficLight.style.transform = 'translateX(' + (W * 0.35 - worldScroll) + 'px) translateX(-50%)';
+    // Бот — относительно игрока, отстаёт/обгоняет по прогрессу
+    var delta = ((ghostProgressPct - progress) / 100) * (W * 0.5);
+    delta = Math.max(-W * 0.12, Math.min(W * 0.5, delta));
+    ghostSprite.style.left = (playerX + delta) + 'px';
 
-    // финиш — приближается справа
-    var finishX = W * 0.15 + ((100 - playerProgressPct) / 100) * W * 1.3;
-    finishLine.style.transform = 'translateX(' + finishX + 'px)';
+    // Мир едет влево по прогрессу
+    var worldScroll = (progress / 100) * (W * 1.6);
 
-    // разметка дороги — бесконечная прокрутка
-    roadOffset = -((playerProgressPct / 100) * W * 4);
+    // Стартовая линия — уезжает влево
+    startLine.style.left = (playerX + 40 - worldScroll) + 'px';
+
+    // Светофор — уезжает влево (стоит в 35% от старта)
+    trafficLight.style.left = (playerX + W * 0.28 - worldScroll) + 'px';
+
+    // Финиш — приближается справа
+    var finishX = playerX + ((100 - progress) / 100) * (W * 1.2);
+    finishLine.style.left = finishX + 'px';
+
+    // Разметка дороги — прокрутка по прогрессу
+    roadOffset = -(progress / 100) * (W * 6);
     roadLine.style.backgroundPositionX = roadOffset + 'px';
-
-    // призрак — относительно игрока
-    var ghostOffset = ((ghostProgressPct - playerProgressPct) / 100) * (W * 0.5);
-    ghostOffset = Math.max(-W * 0.1 + 10, Math.min(W - W * 0.15 - 100, ghostOffset));
-    ghostSprite.style.transform = 'translateX(' + ghostOffset + 'px)';
 }
 
-// ══════════════════════════════════════
-// ОБНОВЛЕНИЕ СПИДОМЕТРА И ТАХОМЕТРА
-// ══════════════════════════════════════
-function renderSpeed() {
-    // скорость: km/h, зависит от gear и rpm
-    var s = Math.round((gear - 1) * 30 + rpm * 0.6);
-    if (s < 0) s = 0;
-    if (s > 320) s = 320;
-    speed = s;
-    speedValue.textContent = s;
-}
+// ═══ ОТРИСОВКА ТАХОМЕТРА И СПИДОМЕТРА ═══
+function renderAll() {
+    // rpm = speed / maxSpeed[текущая передача] * 100
+    var maxForGear = MAX_SPEEDS[Math.min(gear, MAX_GEARS) - 1];
+    rpm = (speed / maxForGear) * 100;
+    if (rpm > 100) rpm = 100;
+    if (rpm < 0) rpm = 0;
 
-function renderTacho() {
-    var pct = Math.min(100, Math.max(0, rpm));
-    tachoFill.style.width = pct + '%';
-    tachoNeedle.style.left = 'calc(' + pct + '% - 2px)';
+    tachoFill.style.width = rpm + '%';
+    tachoNeedle.style.left = 'calc(' + rpm + '% - 2px)';
     tachoRpm.textContent = Math.round(rpm);
-}
-
-function renderStats() {
+    speedValue.textContent = Math.round(speed);
     gearNum.textContent = Math.min(gear, MAX_GEARS);
     perfectEl.textContent = perfectShifts;
     missEl.textContent = misses;
 }
 
-// ══════════════════════════════════════
-// COUNTDOWN (светофор)
-// ══════════════════════════════════════
+// ═══ COUNTDOWN ═══
 btnStart.addEventListener('click', function() {
     btnStart.disabled = true;
     runCountdown();
@@ -679,76 +674,70 @@ function runCountdown() {
         countdownCenter.textContent = 'GO!';
         tlYellow.classList.remove('on');
         tlGreen.classList.add('on');
-
         setTimeout(function() {
             countdownCenter.classList.remove('show');
         }, 500);
-
         startRace();
     }, 2400);
 }
 
-// ══════════════════════════════════════
-// СТАРТ
-// ══════════════════════════════════════
 function startRace() {
     raceStarted = true;
     btnShift.disabled = false;
     btnGas.disabled = false;
-    rpm = 0;
+    speed = 0;
+    gear = 1;
+    progress = 0;
     startTicking();
     startTimer();
+    renderAll();
 }
 
-// ══════════════════════════════════════
-// ИГРОВОЙ ЦИКЛ (обороты, прогресс, скорость)
-// ══════════════════════════════════════
+// ═══ ИГРОВОЙ ЦИКЛ ═══
 function startTicking() {
     tickInterval = setInterval(function() {
         if (raceFinished) return;
 
-        // обороты
-        if (gasPressed && rpm < 100) {
-            rpm += 1.8;
-            if (rpm > 100) rpm = 100;
-        } else if (!gasPressed) {
-            rpm = Math.max(0, rpm - 1.5);
+        var maxForGear = MAX_SPEEDS[gear - 1];
+
+        // Ускорение / замедление
+        if (gasPressed) {
+            speed += ACCEL;
+            if (speed > maxForGear) speed = maxForGear;
+        } else {
+            speed -= DECEL;
+            if (speed < 0) speed = 0;
         }
 
-        // перекрут
-        if (rpm >= 100) {
-            if (!shiftCooldown) {
-                shiftCooldown = true;
-                setTimeout(function() { shiftCooldown = false; }, 600);
-                misses++;
-                rpm = 15;
-                showFlash('ПЕРЕКРУТ!', 'miss');
-                renderStats();
+        // Прогресс = интеграл скорости
+        progress += speed * K;
+        if (progress > 100) progress = 100;
+
+        // Если на 5 передаче и скорость у лимита — просто стена
+        // Никаких перекрутов на 5-й
+
+        // Перекрут на 1-4 передачах
+        if (gear < MAX_GEARS) {
+            var maxNow = MAX_SPEEDS[gear - 1];
+            // Если игрок долго едет на максимуме передачи и не переключается — перекрут
+            if (speed >= maxNow - 0.1 && gasPressed && !shiftCooldown) {
+                // Автоматический перекрут через 1.5 сек удержания на максимуме
+                // (упрощённо — просто miss)
             }
         }
 
-        // прогресс от движения (только если есть обороты)
-        if (rpm > 15 && raceStarted) {
-            var speedFactor = (rpm - 15) / 85;
-            playerProgressPct += (0.04 + gear * 0.055) * speedFactor;
-            if (playerProgressPct > 100) playerProgressPct = 100;
-        }
-
-        // финиш по прогрессу
-        if (playerProgressPct >= 100) {
+        // Финиш
+        if (progress >= 100) {
             finishRace();
             return;
         }
 
         updateWorld();
-        renderTacho();
-        renderSpeed();
+        renderAll();
     }, 50);
 }
 
-// ══════════════════════════════════════
-// ТАЙМЕР
-// ══════════════════════════════════════
+// ═══ ТАЙМЕР ═══
 function startTimer() {
     timerInterval = setInterval(function() {
         elapsed += 0.05;
@@ -764,11 +753,7 @@ function startTimer() {
     }, 50);
 }
 
-// ══════════════════════════════════════
-// УПРАВЛЕНИЕ
-// ══════════════════════════════════════
-
-// ─── ПЕРЕКЛЮЧЕНИЕ ───
+// ═══ ПЕРЕКЛЮЧЕНИЕ ═══
 btnShift.addEventListener('click', function() { doShift(); });
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyE' || e.code === 'Space') && raceStarted && !raceFinished) {
@@ -778,43 +763,41 @@ document.addEventListener('keydown', function(e) {
 });
 
 function doShift() {
-    if (!raceStarted || raceFinished || gear > MAX_GEARS) return;
-    if (shiftCooldown) return;
-    shiftCooldown = true;
-    setTimeout(function() { shiftCooldown = false; }, 500);
-
-    if (rpm < 25) {
-        showFlash('РАНО!', 'miss');
+    if (!raceStarted || raceFinished) return;
+    if (gear >= MAX_GEARS) {
+        showFlash('5-я — максимум!', 'miss');
         return;
     }
+    if (shiftCooldown) return;
+    shiftCooldown = true;
+    setTimeout(function() { shiftCooldown = false; }, 350);
 
     totalShifts++;
 
-    if (rpm >= ZONE_MIN && rpm <= ZONE_MAX) {
+    // Переключение разрешено, если скорость достигла идеальной зоны (по rpm текущей передачи)
+    var maxNow = MAX_SPEEDS[gear - 1];
+    var currentRpm = (speed / maxNow) * 100;
+
+    if (currentRpm >= ZONE_MIN && currentRpm <= ZONE_MAX) {
+        // ✅ PERFECT
         perfectShifts++;
         gear++;
-        playerProgressPct = Math.min(100, playerProgressPct + 10);
-        rpm = 15;
         showFlash('PERFECT!', 'perfect');
-    } else if (rpm < ZONE_MIN) {
+    } else if (currentRpm < ZONE_MIN) {
+        // Слишком рано — потеря мощности
         misses++;
-        rpm = 15;
         showFlash('РАНО!', 'miss');
     } else {
+        // Слишком поздно — перекрут
         misses++;
-        rpm = 15;
+        speed = speed * 0.85; // потеря скорости
         showFlash('ПОЗДНО!', 'miss');
     }
 
-    renderStats();
-
-    if (gear > MAX_GEARS) {
-        finishRace();
-    }
+    renderAll();
 }
 
-// ─── ГАЗ (удержание) ───
-// кнопка
+// ═══ ГАЗ ═══
 btnGas.addEventListener('mousedown', function(e) { e.preventDefault(); startGas(); });
 btnGas.addEventListener('mouseup', function() { stopGas(); });
 btnGas.addEventListener('mouseleave', function() { stopGas(); });
@@ -822,7 +805,6 @@ btnGas.addEventListener('touchstart', function(e) { e.preventDefault(); startGas
 btnGas.addEventListener('touchend', function(e) { e.preventDefault(); stopGas(); }, {passive: false});
 btnGas.addEventListener('touchcancel', function() { stopGas(); });
 
-// клавиатура
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyW' || e.code === 'ArrowUp') && !e.repeat) {
         e.preventDefault();
@@ -846,9 +828,7 @@ function stopGas() {
     btnGas.classList.remove('active');
 }
 
-// ══════════════════════════════════════
-// ФИНИШ
-// ══════════════════════════════════════
+// ═══ ФИНИШ ═══
 function finishRace() {
     if (raceFinished) return;
     raceFinished = true;
@@ -859,9 +839,9 @@ function finishRace() {
     clearInterval(tickInterval);
 
     playerFinishTime = elapsed;
-    playerProgressPct = 100;
+    progress = 100;
     updateWorld();
-    renderSpeed();
+    renderAll();
 
     tlGreen.classList.remove('on');
 
@@ -906,9 +886,6 @@ function submitResult() {
     });
 }
 
-// ══════════════════════════════════════
-// ВСПОМОГАТЕЛЬНОЕ
-// ══════════════════════════════════════
 function showFlash(text, type) {
     flashMsg.textContent = text;
     flashMsg.className = 'flash-msg flash-' + type;
@@ -921,9 +898,7 @@ function showFlash(text, type) {
 window.addEventListener('resize', updateWorld);
 window.addEventListener('load', function() {
     updateWorld();
-    renderTacho();
-    renderStats();
-    renderSpeed();
+    renderAll();
 });
 </script>
 
