@@ -19,27 +19,27 @@
 }
 .track {
     position: relative;
-    height: 400px;
+    height: 380px;
     overflow: hidden;
 }
 
 .sky {
     position: absolute; top: 0; left: 0; right: 0;
-    height: 42%;
+    height: 38%;
     background: linear-gradient(180deg, #A9D4FA 0%, #B3DCFD 100%);
 }
 .sky::after {
     content: '';
     position: absolute;
-    top: 24px; right: 12%;
-    width: 55px; height: 55px;
+    top: 20px; right: 10%;
+    width: 70px; height: 70px;
     border-radius: 50%;
     background: radial-gradient(circle, #FFF7D6 0%, #FFE680 45%, transparent 72%);
     opacity: 0.75;
 }
 
 .grass {
-    position: absolute; top: 42%; left: 0; right: 0;
+    position: absolute; top: 38%; left: 0; right: 0;
     height: 10%;
     background: linear-gradient(180deg, #6b9463 0%, #587d52 100%);
 }
@@ -47,11 +47,11 @@
     content: '';
     position: absolute; inset: 0;
     background: repeating-linear-gradient(90deg,
-        transparent 0 40px, rgba(0,0,0,0.06) 40px 42px);
+        transparent 0 50px, rgba(0,0,0,0.06) 50px 52px);
 }
 
 .road {
-    position: absolute; top: 52%; left: 0; right: 0; bottom: 0;
+    position: absolute; top: 48%; left: 0; right: 0; bottom: 0;
     background: linear-gradient(180deg, #3e3e3e 0%, #2e2e2e 40%, #1a1a1a 100%);
     overflow: hidden;
 }
@@ -59,44 +59,44 @@
     content: '';
     position: absolute; inset: 0;
     background-image:
-        radial-gradient(circle at 30% 20%, rgba(255,255,255,0.04) 1px, transparent 2px),
-        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.03) 1px, transparent 2px);
-    background-size: 40px 40px, 60px 60px;
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,0.04) 2px, transparent 3px),
+        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.03) 2px, transparent 3px);
+    background-size: 50px 50px, 75px 75px;
 }
 
 .road-line {
     position: absolute;
     top: 50%; left: 0; right: 0;
-    height: 6px;
+    height: 8px;
     transform: translateY(-50%);
     background-image: repeating-linear-gradient(
-        90deg, #FFD700 0 60px, transparent 60px 120px
+        90deg, #FFD700 0 80px, transparent 80px 160px
     );
     will-change: background-position-x;
-    box-shadow: 0 0 10px rgba(255,215,0,0.4);
+    box-shadow: 0 0 14px rgba(255,215,0,0.5);
 }
 
 .start-line {
     position: absolute;
-    top: 52%; bottom: 0; left: 0;
-    width: 26px;
+    top: 48%; bottom: 0; left: 0;
+    width: 34px;
     background:
         linear-gradient(90deg,
-            #fff 0 9px,
-            transparent 9px 17px,
-            #fff 17px 26px);
+            #fff 0 12px,
+            transparent 12px 22px,
+            #fff 22px 34px);
     z-index: 3;
-    box-shadow: 0 0 16px rgba(255,255,255,0.6);
+    box-shadow: 0 0 20px rgba(255,255,255,0.6);
     will-change: left;
 }
 
 .finish-line {
     position: absolute;
-    top: 52%; bottom: 0; left: 0;
-    width: 16px;
-    background: repeating-linear-gradient(0deg, #fff 0 18px, #000 18px 36px);
+    top: 48%; bottom: 0; left: 0;
+    width: 20px;
+    background: repeating-linear-gradient(0deg, #fff 0 24px, #000 24px 48px);
     z-index: 4;
-    box-shadow: 0 0 20px rgba(255,255,255,0.85);
+    box-shadow: 0 0 24px rgba(255,255,255,0.85);
     will-change: left;
 }
 
@@ -104,10 +104,10 @@
     position: absolute;
     left: 0; right: 0;
     z-index: 5;
-    height: 100px;
+    height: 130px;
 }
-.car-lane.player { bottom: 130px; }
-.car-lane.ghost  { bottom: 18px; }
+.car-lane.player { bottom: 150px; }
+.car-lane.ghost  { bottom: 20px; }
 
 .car-sprite {
     position: absolute;
@@ -116,25 +116,25 @@
     will-change: left;
 }
 .car-sprite img {
-    height: 95px; width: auto; display: block;
+    height: 130px; width: auto; display: block;
     transform: scaleX(-1);
-    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.85)) drop-shadow(0 0 10px rgba(255,138,0,0.35));
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.85)) drop-shadow(0 0 14px rgba(255,138,0,0.4));
 }
 .car-sprite.ghost-sprite img {
-    height: 82px;
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.75)) grayscale(0.5) brightness(0.85);
+    height: 110px;
+    filter: drop-shadow(0 8px 12px rgba(0,0,0,0.75)) grayscale(0.5) brightness(0.85);
 }
 .car-sprite::after {
     content: '';
     position: absolute;
-    bottom: -5px; left: 8%; right: 8%; height: 9px;
+    bottom: -6px; left: 8%; right: 8%; height: 12px;
     background: radial-gradient(ellipse at center, rgba(0,0,0,0.75) 0%, transparent 70%);
     z-index: -1;
 }
 .car-label {
     position: absolute;
-    top: -18px; left: 0;
-    font-size: 12px; color: #ff8a00;
+    top: -22px; left: 0;
+    font-size: 13px; color: #ff8a00;
     white-space: nowrap;
     font-weight: 800;
     text-shadow: 0 0 6px #000, 0 0 3px #000;
@@ -142,31 +142,31 @@
 .car-sprite.ghost-sprite .car-label { color: #ccc; }
 
 .bot-placeholder {
-    height: 60px; padding: 0 20px;
+    height: 70px; padding: 0 24px;
     background: rgba(0,0,0,0.6);
     border: 2px dashed #888; border-radius: 12px;
     display: flex; align-items: center;
-    color: #ddd; font-size: 16px; font-weight: 700;
+    color: #ddd; font-size: 18px; font-weight: 700;
 }
 
 .speed-panel {
     position: absolute;
-    top: 20px; right: 20px;
+    top: 16px; right: 16px;
     z-index: 9;
     background: rgba(0,0,0,0.82);
     border: 2px solid rgba(255,138,0,0.6);
     border-radius: 12px;
     padding: 10px 18px;
     text-align: center;
-    min-width: 108px;
+    min-width: 118px;
 }
 .speed-value {
-    font-size: 44px;
+    font-size: 48px;
     font-weight: 900;
     color: #fff;
     line-height: 1;
     font-family: 'Courier New', monospace;
-    text-shadow: 0 0 14px rgba(255,138,0,0.9);
+    text-shadow: 0 0 16px rgba(255,138,0,0.9);
     letter-spacing: -2px;
 }
 .speed-unit {
@@ -183,7 +183,7 @@
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     z-index: 20;
-    font-size: 160px;
+    font-size: 170px;
     font-weight: 900;
     color: #ff8a00;
     text-shadow: 0 0 40px rgba(255,138,0,0.9), 0 0 80px rgba(255,138,0,0.5);
@@ -193,12 +193,12 @@
 }
 .countdown-center.show { opacity: 1; }
 
-/* ═══ ТАЧ-ЗОНЫ (только на мобилке) ═══ */
+/* ТАЧ-ЗОНЫ */
 .touch-zone {
     position: absolute;
-    top: 0; bottom: 0;
+    top: 48%; bottom: 0;
     width: 50%;
-    z-index: 7;
+    z-index: 3;
     display: none;
     user-select: none;
     -webkit-user-select: none;
@@ -210,25 +210,25 @@
 
 .touch-hint {
     position: absolute;
-    bottom: 16px;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.55);
+    background: rgba(0,0,0,0.6);
     color: #fff;
-    padding: 8px 14px;
-    border-radius: 10px;
-    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
     font-weight: 700;
     text-align: center;
-    line-height: 1.3;
+    line-height: 1.2;
     pointer-events: none;
     border: 1px solid rgba(255,255,255,0.15);
     white-space: nowrap;
 }
-.touch-hint .big-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+.touch-hint .big-icon { font-size: 16px; display: block; margin-bottom: 2px; }
 
-.touch-left.active { background: rgba(76,175,80,0.18); }
-.touch-right.active { background: rgba(255,138,0,0.18); }
+.touch-left.active { background: rgba(76,175,80,0.22); }
+.touch-right.active { background: rgba(255,138,0,0.22); }
 
 .tacho-wrap {
     margin-top: 18px;
@@ -386,19 +386,16 @@
 }
 
 @media (max-width: 800px) {
-    .track { height: 320px; }
-    .car-sprite img { height: 78px; }
-    .car-sprite.ghost-sprite img { height: 68px; }
-    .car-lane.player { bottom: 105px; }
+    .track { height: 300px; }
+    .car-sprite img { height: 95px; }
+    .car-sprite.ghost-sprite img { height: 82px; }
+    .car-lane.player { bottom: 110px; }
     .car-lane.ghost  { bottom: 14px; }
-    .speed-panel { padding: 8px 14px; top: 12px; right: 12px; }
-    .speed-value { font-size: 32px; }
-    .countdown-center { font-size: 110px; }
+    .speed-panel { padding: 8px 14px; top: 10px; right: 10px; }
+    .speed-value { font-size: 34px; }
+    .countdown-center { font-size: 120px; }
 
-    /* показываем тач-зоны */
     .touch-zone { display: block; }
-
-    /* скрываем нижние кнопки — играем через трассу */
     .btn-control { display: none; }
 
     .btn-start-center { padding: 18px; font-size: 20px; }
@@ -449,7 +446,6 @@
             </div>
         </div>
 
-        <!-- ТАЧ-ЗОНЫ (мобилка) -->
         <div class="touch-zone touch-left" id="touchLeft">
             <div class="touch-hint">
                 <span class="big-icon">⚙</span>
@@ -508,7 +504,6 @@
 </div>
 
 <script>
-// ═══ ДАННЫЕ С СЕРВЕРА ═══
 const CAR_ID = {{ car.id }};
 const DISTANCE = "{{ distance }}";
 const GHOST_TIME = {{ '%.2f'|format(ghost.time) }};
@@ -516,7 +511,6 @@ const ZONE_MIN = {{ zone_min }};
 const ZONE_MAX = {{ zone_max }};
 const MAX_GEARS = 5;
 
-// ═══ ФИЗИКА ═══
 const CAR_TOP_SPEED = {{ car.top_speed or 200 }};
 const CAR_ACCEL = {{ car.acceleration or 8 }};
 
@@ -529,7 +523,6 @@ const DECEL = 1.0;
 var PROGRESS_K = { quarter: 0.003, half: 0.0015, mile: 0.00075 };
 var K = PROGRESS_K[DISTANCE] || 0.003;
 
-// ═══ СОСТОЯНИЕ ═══
 var speed = 0;
 var rpm = 0;
 var gear = 1;
@@ -544,7 +537,7 @@ var raceStarted = false;
 var raceFinished = false;
 var gasPressed = false;
 var shiftCooldown = false;
-var roadOffset = 0;
+var worldPixelOffset = 0;
 var tickInterval = null;
 var timerInterval = null;
 var carWidthCache = 0;
@@ -570,11 +563,11 @@ var flashMsg = document.getElementById('flashMsg');
 var touchLeft = document.getElementById('touchLeft');
 var touchRight = document.getElementById('touchRight');
 
-var PLAYER_X_RATIO = 0.18;
+var PLAYER_X_RATIO = 0.20;
 
 function getCarWidth() {
     if (!carWidthCache) {
-        carWidthCache = playerSprite.offsetWidth || 95;
+        carWidthCache = playerSprite.offsetWidth || 130;
     }
     return carWidthCache;
 }
@@ -590,16 +583,13 @@ function updateWorld() {
     delta = Math.max(-W * 0.14, Math.min(W * 0.5, delta));
     ghostSprite.style.left = (playerX + delta) + 'px';
 
-    var worldScroll = (progress / 100) * (W * 1.6);
-
-    // Стартовая линия — ЗА машиной (задний край + отступ)
-    startLine.style.left = (playerX + carW + 15 - worldScroll) + 'px';
+    // мир двигается по накопленному offset (учитывает реальную скорость)
+    startLine.style.left = (playerX + carW + 20 + worldPixelOffset) + 'px';
 
     var finishX = playerX + ((100 - progress) / 100) * (W * 1.2);
     finishLine.style.left = finishX + 'px';
 
-    roadOffset = -(progress / 100) * (W * 6);
-    roadLine.style.backgroundPositionX = roadOffset + 'px';
+    roadLine.style.backgroundPositionX = (worldPixelOffset * 1.8) + 'px';
 }
 
 function renderAll() {
@@ -625,7 +615,6 @@ btnStart.addEventListener('click', function() {
 function runCountdown() {
     var steps = ['3', '2', '1', 'GO!'];
     var i = 0;
-
     countdownCenter.classList.add('show');
     countdownCenter.textContent = steps[i];
 
@@ -650,6 +639,7 @@ function startRace() {
     speed = 0;
     gear = 1;
     progress = 0;
+    worldPixelOffset = 0;
     startTicking();
     startTimer();
     renderAll();
@@ -672,6 +662,10 @@ function startTicking() {
         progress += speed * K;
         if (progress > 100) progress = 100;
 
+        // мир двигается ОТ РЕАЛЬНОЙ СКОРОСТИ, а не от прогресса
+        // 100 км/ч → ~2px за тик, 300 км/ч → ~6px
+        worldPixelOffset -= speed * 0.05;
+
         if (progress >= 100) {
             finishRace();
             return;
@@ -690,7 +684,6 @@ function startTimer() {
     }, 50);
 }
 
-// ═══ КНОПКА ПЕРЕКЛЮЧЕНИЯ ═══
 btnShift.addEventListener('click', function() { doShift(); });
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyE' || e.code === 'Space') && raceStarted && !raceFinished) {
@@ -730,7 +723,7 @@ function doShift() {
     renderAll();
 }
 
-// ═══ ГАЗ — кнопка (ПК) ═══
+// ГАЗ
 btnGas.addEventListener('mousedown', function(e) { e.preventDefault(); startGas(); });
 btnGas.addEventListener('mouseup', function() { stopGas(); });
 btnGas.addEventListener('mouseleave', function() { stopGas(); });
@@ -738,7 +731,6 @@ btnGas.addEventListener('touchstart', function(e) { e.preventDefault(); startGas
 btnGas.addEventListener('touchend', function(e) { e.preventDefault(); stopGas(); }, {passive: false});
 btnGas.addEventListener('touchcancel', function() { stopGas(); });
 
-// ═══ ГАЗ — клавиатура ═══
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyW' || e.code === 'ArrowUp') && !e.repeat) {
         e.preventDefault();
@@ -762,8 +754,7 @@ function stopGas() {
     btnGas.classList.remove('active');
 }
 
-// ═══ ТАЧ-ЗОНЫ (мобилка) ═══
-// Левая — тап = переключение
+// ═══ ТАЧ-ЗОНЫ ═══
 touchLeft.addEventListener('pointerdown', function(e) {
     e.preventDefault();
     if (!raceStarted || raceFinished) return;
@@ -772,13 +763,11 @@ touchLeft.addEventListener('pointerdown', function(e) {
     setTimeout(function() { touchLeft.classList.remove('active'); }, 150);
 });
 
-// Правая — держи = газ
 touchRight.addEventListener('pointerdown', function(e) {
     e.preventDefault();
     if (!raceStarted || raceFinished) return;
     startGas();
     touchRight.classList.add('active');
-    // захватываем указатель, чтобы pointerup точно пришёл сюда
     try { touchRight.setPointerCapture(e.pointerId); } catch (err) {}
 });
 
@@ -790,9 +779,14 @@ touchRight.addEventListener('pointercancel', function(e) {
     stopGas();
     touchRight.classList.remove('active');
 });
-touchRight.addEventListener('pointerleave', function(e) {
-    // подстраховка, если палец ушёл за границы зоны
-    stopGas();
+
+// ═══ ЗАЩИТА: если палец отпущен где угодно — сбрасываем газ ═══
+document.addEventListener('pointerup', function() {
+    if (gasPressed) stopGas();
+    touchRight.classList.remove('active');
+});
+document.addEventListener('pointercancel', function() {
+    if (gasPressed) stopGas();
     touchRight.classList.remove('active');
 });
 
