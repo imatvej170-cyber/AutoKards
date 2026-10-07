@@ -149,6 +149,26 @@
             <input type="number" name="salvage_max_parts" min="1" max="9999"
                    value="{{ settings.salvage_max_parts }}" class="form-input">
 
+            <h3 class="section">🏁 Драг-гонки</h3>
+
+            <label class="check-row">
+                <input type="checkbox" name="drag_enabled" value="1"
+                       {% if settings.drag_enabled == '1' %}checked{% endif %}>
+                Включить драг-гонки
+            </label>
+
+            <label class="form-label">Макс. гонок в день</label>
+            <input type="number" name="drag_daily_races" min="1" max="9999"
+                   value="{{ settings.drag_daily_races }}" class="form-input">
+
+            <label class="form-label">Макс. монет в день</label>
+            <input type="number" name="drag_daily_reward" min="1" max="9999999"
+                   value="{{ settings.drag_daily_reward }}" class="form-input">
+
+            <label class="form-label">Базовая награда за победу</label>
+            <input type="number" name="drag_reward_win" min="1" max="99999"
+                   value="{{ settings.drag_reward_win }}" class="form-input">
+
             <button type="submit" class="btn btn-primary">Сохранить настройки</button>
 
         </form>
