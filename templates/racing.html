@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Гонки — AutoKards{% endblock %}
+{% block content %}
+
+<style>
+.racing-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 30px 16px 60px;
+}
+
+.racing-title {
+    font-size: 36px;
+    font-weight: 900;
+    text-align: center;
+    background: linear-gradient(90deg, #ff8a00, #ffb347);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+}
+.racing-sub {
+    text-align: center;
+    color: #888;
+    margin-bottom: 40px;
+    font-size: 15px;
+}
+
+/* Сетка карточек */
+.mode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.mode-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 26px;
+    border-radius: 22px;
+    background: linear-gradient(160deg, #2a1a08 0%, #1a1a1a 60%, #0f0f0f 100%);
+    border: 2px solid rgba(255,138,0,0.35);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.25s ease;
+    overflow: hidden;
+    cursor: pointer;
+    min-height: 280px;
+}
+
+.mode-card::before {
+    content: '';
+    position: absolute;
+    top: -60%;
+    right: -30%;
+    width: 240px; height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,138,0,0.35) 0%, transparent 70%);
+    opacity: 0.55;
+    transition: opacity 0.3s, transform 0.4s;
+    pointer-events: none;
+}
+
+.mode-card:hover {
+    transform: translateY(-6px);
+    border-color: #ff8a00;
+    box-shadow:
+        0 18px 40px rgba(255,138,0,0.25),
+        0 0 30px rgba(255,138,0,0.15);
+}
+.mode-card:hover::before {
+    opacity: 0.9;
+    transform: scale(1.15);
+}
+
+.mode-card.friends {
+    background: linear-gradient(160deg, #08202a 0%, #0e1a1f 60%, #0a0a0a 100%);
+    border-color: rgba(80,180,255,0.35);
+}
+.mode-card.friends::before {
+    background: radial-gradient(circle, rgba(80,180,255,0.35) 0%, transparent 70%);
+}
+.mode-card.friends:hover {
+    border-color: #4faaff;
+    box-shadow:
+        0 18px 40px rgba(80,180,255,0.25),
+        0 0 30px rgba(80,180,255,0.15);
+}
+
+.mode-icon {
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 18px;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+}
+
+.mode-title {
+    font-size: 26px;
+    font-weight: 900;
+    margin-bottom: 12px;
+    color: #ff8a00;
+    letter-spacing: 0.5px;
+}
+.mode-card.friends .mode-title { color: #4faaff; }
+
+.mode-desc {
+    color: #b0b0b0;
+    font-size: 14px;
+    line-height: 1.6;
+    flex: 1;
+    margin-bottom: 22px;
+}
+
+.mode-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    background: linear-gradient(135deg, #ff8a00, #ffb347);
+    color: #1a1a1a;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 15px;
+    align-self: flex-start;
+    box-shadow: 0 4px 16px rgba(255,138,0,0.4);
+    transition: all 0.2s;
+}
+.mode-card.friends .mode-cta {
+    background: linear-gradient(135deg, #2b8cd6, #4faaff);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(80,180,255,0.4);
+}
+.mode-card:hover .mode-cta {
+    transform: translateX(4px);
+}
+
+.mode-arrow {
+    font-size: 18px;
+    transition: transform 0.2s;
+}
+.mode-card:hover .mode-arrow {
+    transform: translateX(4px);
+}
+
+/* Футер с кнопкой "На главную" */
+.racing-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+.btn-back {
+    padding: 14px 28px;
+    background: rgba(255,255,255,0.05);
+    color: #ddd;
+    border: 1px solid rgba(255,138,0,0.3);
+    border-radius: 14px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 15px;
+    transition: all 0.2s;
+}
+.btn-back:hover {
+    background: rgba(255,138,0,0.15);
+    border-color: rgba(255,138,0,0.6);
+    color: #ff8a00;
+}
+
+@media (max-width: 700px) {
+    .racing-wrap { padding: 20px 12px 40px; }
+    .racing-title { font-size: 28px; }
+    .racing-sub { font-size: 13px; margin-bottom: 28px; }
+
+    .mode-grid { grid-template-columns: 1fr; gap: 14px; }
+
+    .mode-card {
+        padding: 22px 20px;
+        min-height: 200px;
+        border-radius: 18px;
+    }
+    .mode-icon { font-size: 48px; margin-bottom: 12px; }
+    .mode-title { font-size: 22px; margin-bottom: 8px; }
+    .mode-desc { font-size: 13px; margin-bottom: 16px; }
+    .mode-cta { padding: 10px 18px; font-size: 14px; }
+}
+</style>
+
+<div class="racing-wrap">
+    <div class="racing-title">🏁 Гонки</div>
+    <div class="racing-sub">Выбери режим — соревнуйся с друзьями или пройди драг против призрака</div>
+
+    <div class="mode-grid">
+
+        <a href="{{ url_for('races') }}" class="mode-card friends">
+            <div class="mode-icon">👥</div>
+            <div class="mode-title">Заезд с друзьями</div>
+            <div class="mode-desc">
+                Брось вызов другу или любому игроку. Ставки на монеты, машина на кону, честная гонка без подглядывания.
+            </div>
+            <div class="mode-cta">
+                Выбрать <span class="mode-arrow">→</span>
+            </div>
+        </a>
+
+        <a href="{{ url_for('drag') }}" class="mode-card drag">
+            <div class="mode-icon">🏁</div>
+            <div class="mode-title">Драг-гонки</div>
+            <div class="mode-desc">
+                Прямая, светофор, тахометр. Лови идеальные переключения передач, обгони призрака и заработай монеты.
+            </div>
+            <div class="mode-cta">
+                Выбрать <span class="mode-arrow">→</span>
+            </div>
+        </a>
+
+    </div>
+
+    <div class="racing-footer">
+        <a href="{{ url_for('index') }}" class="btn-back">← На главную</a>
+        <a href="{{ url_for('garage') }}" class="btn-back">🏠 В гараж</a>
+    </div>
+</div>
+
+{% endblock %}
