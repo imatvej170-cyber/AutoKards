@@ -11,7 +11,6 @@
 }
 .race-top b { color: #ff8a00; }
 
-/* ═══ ТРАССА ═══ */
 .track-bleed {
     width: 100vw;
     margin-left: calc(50% - 50vw);
@@ -77,7 +76,6 @@
     box-shadow: 0 0 10px rgba(255,215,0,0.4);
 }
 
-/* Стартовая линия — чуть позади машины */
 .start-line {
     position: absolute;
     top: 52%; bottom: 0; left: 0;
@@ -92,70 +90,6 @@
     will-change: left;
 }
 
-/* ═══ СВЕТОФОР (реалистичный, с козырьками) ═══ */
-.traffic-light {
-    position: absolute;
-    top: 18%;
-    left: 0;
-    z-index: 8;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    will-change: left;
-}
-.tl-box {
-    background: linear-gradient(180deg, #3a3a3a 0%, #1c1c1c 50%, #0a0a0a 100%);
-    border: 3px solid #555;
-    border-radius: 14px;
-    padding: 10px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    box-shadow:
-        0 8px 24px rgba(0,0,0,0.75),
-        inset 0 0 12px rgba(0,0,0,0.9),
-        inset 0 1px 0 rgba(255,255,255,0.08);
-}
-.tl-light {
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    position: relative;
-    background: radial-gradient(circle at 35% 30%, #2a2a2a, #080808 70%);
-    border: 2px solid #000;
-    box-shadow: inset 0 3px 8px rgba(0,0,0,0.95);
-    overflow: hidden;
-}
-.tl-light::before {
-    content: '';
-    position: absolute;
-    top: -3px; left: -5px; right: -5px;
-    height: 14px;
-    background: linear-gradient(180deg, #3a3a3a 0%, #0a0a0a 100%);
-    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-    z-index: 2;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-}
-.tl-light.on.red {
-    background: radial-gradient(circle at 35% 30%, #ff8888, #dd0000 55%, #660000 100%);
-    box-shadow: 0 0 28px #ff2020, inset 0 0 10px rgba(255,255,255,0.6);
-}
-.tl-light.on.yellow {
-    background: radial-gradient(circle at 35% 30%, #fff0a0, #ffcc00 55%, #997700 100%);
-    box-shadow: 0 0 28px #ffcc00, inset 0 0 10px rgba(255,255,255,0.7);
-}
-.tl-light.on.green {
-    background: radial-gradient(circle at 35% 30%, #aaffaa, #22dd22 55%, #006600 100%);
-    box-shadow: 0 0 34px #22dd22, inset 0 0 12px rgba(255,255,255,0.7);
-}
-.tl-pole {
-    width: 10px;
-    height: 70px;
-    background: linear-gradient(90deg, #666 0%, #333 50%, #666 100%);
-    box-shadow: 2px 0 6px rgba(0,0,0,0.6);
-    border-radius: 0 0 4px 4px;
-}
-
-/* ФИНИШ */
 .finish-line {
     position: absolute;
     top: 52%; bottom: 0; left: 0;
@@ -166,7 +100,6 @@
     will-change: left;
 }
 
-/* МАШИНЫ */
 .car-lane {
     position: absolute;
     left: 0; right: 0;
@@ -216,7 +149,6 @@
     color: #ddd; font-size: 16px; font-weight: 700;
 }
 
-/* СПИДОМЕТР */
 .speed-panel {
     position: absolute;
     top: 20px; right: 20px;
@@ -246,13 +178,12 @@
     font-weight: 700;
 }
 
-/* СЧЁТЧИК */
 .countdown-center {
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     z-index: 20;
-    font-size: 140px;
+    font-size: 160px;
     font-weight: 900;
     color: #ff8a00;
     text-shadow: 0 0 40px rgba(255,138,0,0.9), 0 0 80px rgba(255,138,0,0.5);
@@ -262,7 +193,6 @@
 }
 .countdown-center.show { opacity: 1; }
 
-/* ТАХОМЕТР */
 .tacho-wrap {
     margin-top: 18px;
     margin-bottom: 16px;
@@ -344,7 +274,6 @@
     padding: 0 2px;
 }
 
-/* УПРАВЛЕНИЕ */
 .controls {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -427,9 +356,7 @@
     .car-lane.ghost  { bottom: 14px; }
     .speed-panel { padding: 8px 14px; top: 12px; right: 12px; }
     .speed-value { font-size: 32px; }
-    .countdown-center { font-size: 100px; }
-    .tl-light { width: 24px; height: 24px; }
-    .tl-pole { height: 50px; }
+    .countdown-center { font-size: 110px; }
     .btn-control, .btn-start-center { padding: 26px 12px; font-size: 18px; }
     .mobile-hint { display: block; }
 }
@@ -451,16 +378,6 @@
         </div>
 
         <div class="start-line" id="startLine"></div>
-
-        <div class="traffic-light" id="trafficLight">
-            <div class="tl-box">
-                <div class="tl-light red" id="tlRed"></div>
-                <div class="tl-light yellow" id="tlYellow"></div>
-                <div class="tl-light green" id="tlGreen"></div>
-            </div>
-            <div class="tl-pole"></div>
-        </div>
-
         <div class="finish-line" id="finishLine"></div>
 
         <div class="speed-panel">
@@ -541,21 +458,31 @@ const ZONE_MIN = {{ zone_min }};
 const ZONE_MAX = {{ zone_max }};
 const MAX_GEARS = 5;
 
-// ═══ ФИЗИКА ═══
-const MAX_SPEEDS = [55, 95, 145, 205, 280];  // км/ч потолок на каждой передаче
-const ACCEL = 2.4;     // +км/ч за тик (50мс) при газе
-const DECEL = 1.8;     // -км/ч за тик без газа
+// ═══ ФИЗИКА — зависит от конкретной машины ═══
+const CAR_TOP_SPEED = {{ car.top_speed or 200 }};
+const CAR_ACCEL = {{ car.acceleration or 8 }};
 
-// Коэффициент прогресса: за ~12-15 сек при средней 150 км/ч = 100%
-// K = 0.045 для 1/4 мили, делится на 2 и 4 для 1/2 и 1 мили
-const PROGRESS_K = { quarter: 0.045, half: 0.0225, mile: 0.01125 };
-const K = PROGRESS_K[DISTANCE] || 0.045;
+// Потолок скорости на каждой передаче (пропорция от max speed)
+const GEAR_RATIOS = [0.22, 0.38, 0.55, 0.75, 1.0];
+const MAX_SPEEDS = GEAR_RATIOS.map(function(r) { return CAR_TOP_SPEED * r; });
+
+// Ускорение: км/ч за тик (50мс). Основано на разгоне 0-100.
+// 0-100 км/ч за CAR_ACCEL секунд → за 1 тик (0.05с) набирает 100/(CAR_ACCEL*20) км/ч
+const ACCEL = 100 / (CAR_ACCEL * 20);
+const DECEL = 1.0;
+
+// Коэффициент прогресса: подобрано так, чтобы:
+// - Huracan (top 325, acc 2.9) проходил 1/4 мили за ~11 сек
+// - Corolla (top 180, acc 16) проходил за ~18 сек
+// DISTANCE_MULT: чем длиннее, тем меньше K (медленнее прогресс)
+var PROGRESS_K = { quarter: 0.003, half: 0.0015, mile: 0.00075 };
+var K = PROGRESS_K[DISTANCE] || 0.003;
 
 // ═══ СОСТОЯНИЕ ═══
-var speed = 0;              // текущая скорость км/ч
-var rpm = 0;                // вычисляется из speed/maxSpeed
+var speed = 0;
+var rpm = 0;
 var gear = 1;
-var progress = 0;           // 0..100
+var progress = 0;
 var elapsed = 0;
 var playerFinishTime = 0;
 var ghostProgressPct = 0;
@@ -570,7 +497,6 @@ var roadOffset = 0;
 var tickInterval = null;
 var timerInterval = null;
 
-// ═══ ЭЛЕМЕНТЫ ═══
 var track = document.getElementById('track');
 var btnStart = document.getElementById('btnStart');
 var btnShift = document.getElementById('btnShift');
@@ -584,53 +510,38 @@ var missEl = document.getElementById('missCount');
 var playerSprite = document.getElementById('playerSprite');
 var ghostSprite = document.getElementById('ghostSprite');
 var startLine = document.getElementById('startLine');
-var trafficLight = document.getElementById('trafficLight');
 var finishLine = document.getElementById('finishLine');
 var roadLine = document.getElementById('roadLine');
 var speedValue = document.getElementById('speedValue');
-var tlRed = document.getElementById('tlRed');
-var tlYellow = document.getElementById('tlYellow');
-var tlGreen = document.getElementById('tlGreen');
 var countdownCenter = document.getElementById('countdownCenter');
 var flashMsg = document.getElementById('flashMsg');
 
-// ═══ ПОЗИЦИИ НА ТРАССЕ ═══
-// Игрок всегда на 18% от левой границы (визуально «за рулём»)
-const PLAYER_X_RATIO = 0.18;
+var PLAYER_X_RATIO = 0.18;
 
 function updateWorld() {
     var W = track.clientWidth;
     var playerX = W * PLAYER_X_RATIO;
 
-    // Игрок — фиксирован
     playerSprite.style.left = playerX + 'px';
 
-    // Бот — относительно игрока, отстаёт/обгоняет по прогрессу
-    var delta = ((ghostProgressPct - progress) / 100) * (W * 0.5);
-    delta = Math.max(-W * 0.12, Math.min(W * 0.5, delta));
+    // Бот — относительно игрока, движется с той же частотой обновления
+    var delta = ((ghostProgressPct - progress) / 100) * (W * 0.6);
+    delta = Math.max(-W * 0.14, Math.min(W * 0.5, delta));
     ghostSprite.style.left = (playerX + delta) + 'px';
 
     // Мир едет влево по прогрессу
     var worldScroll = (progress / 100) * (W * 1.6);
 
-    // Стартовая линия — уезжает влево
     startLine.style.left = (playerX + 40 - worldScroll) + 'px';
 
-    // Светофор — уезжает влево (стоит в 35% от старта)
-    trafficLight.style.left = (playerX + W * 0.28 - worldScroll) + 'px';
-
-    // Финиш — приближается справа
     var finishX = playerX + ((100 - progress) / 100) * (W * 1.2);
     finishLine.style.left = finishX + 'px';
 
-    // Разметка дороги — прокрутка по прогрессу
     roadOffset = -(progress / 100) * (W * 6);
     roadLine.style.backgroundPositionX = roadOffset + 'px';
 }
 
-// ═══ ОТРИСОВКА ТАХОМЕТРА И СПИДОМЕТРА ═══
 function renderAll() {
-    // rpm = speed / maxSpeed[текущая передача] * 100
     var maxForGear = MAX_SPEEDS[Math.min(gear, MAX_GEARS) - 1];
     rpm = (speed / maxForGear) * 100;
     if (rpm > 100) rpm = 100;
@@ -645,40 +556,30 @@ function renderAll() {
     missEl.textContent = misses;
 }
 
-// ═══ COUNTDOWN ═══
 btnStart.addEventListener('click', function() {
     btnStart.disabled = true;
     runCountdown();
 });
 
 function runCountdown() {
-    tlRed.classList.remove('on');
-    tlYellow.classList.remove('on');
-    tlGreen.classList.remove('on');
+    var steps = ['3', '2', '1', 'GO!'];
+    var i = 0;
 
     countdownCenter.classList.add('show');
-    countdownCenter.textContent = '3';
-    tlRed.classList.add('on');
+    countdownCenter.textContent = steps[i];
 
-    setTimeout(function() {
-        countdownCenter.textContent = '2';
-        tlYellow.classList.add('on');
-    }, 800);
-
-    setTimeout(function() {
-        countdownCenter.textContent = '1';
-        tlRed.classList.remove('on');
-    }, 1600);
-
-    setTimeout(function() {
-        countdownCenter.textContent = 'GO!';
-        tlYellow.classList.remove('on');
-        tlGreen.classList.add('on');
-        setTimeout(function() {
-            countdownCenter.classList.remove('show');
-        }, 500);
-        startRace();
-    }, 2400);
+    var cd = setInterval(function() {
+        i++;
+        if (i < steps.length) {
+            countdownCenter.textContent = steps[i];
+        } else {
+            clearInterval(cd);
+            setTimeout(function() {
+                countdownCenter.classList.remove('show');
+            }, 400);
+            startRace();
+        }
+    }, 700);
 }
 
 function startRace() {
@@ -693,14 +594,12 @@ function startRace() {
     renderAll();
 }
 
-// ═══ ИГРОВОЙ ЦИКЛ ═══
 function startTicking() {
     tickInterval = setInterval(function() {
         if (raceFinished) return;
 
         var maxForGear = MAX_SPEEDS[gear - 1];
 
-        // Ускорение / замедление
         if (gasPressed) {
             speed += ACCEL;
             if (speed > maxForGear) speed = maxForGear;
@@ -709,24 +608,10 @@ function startTicking() {
             if (speed < 0) speed = 0;
         }
 
-        // Прогресс = интеграл скорости
+        // Прогресс = интеграл скорости (медленно накапливается)
         progress += speed * K;
         if (progress > 100) progress = 100;
 
-        // Если на 5 передаче и скорость у лимита — просто стена
-        // Никаких перекрутов на 5-й
-
-        // Перекрут на 1-4 передачах
-        if (gear < MAX_GEARS) {
-            var maxNow = MAX_SPEEDS[gear - 1];
-            // Если игрок долго едет на максимуме передачи и не переключается — перекрут
-            if (speed >= maxNow - 0.1 && gasPressed && !shiftCooldown) {
-                // Автоматический перекрут через 1.5 сек удержания на максимуме
-                // (упрощённо — просто miss)
-            }
-        }
-
-        // Финиш
         if (progress >= 100) {
             finishRace();
             return;
@@ -737,23 +622,17 @@ function startTicking() {
     }, 50);
 }
 
-// ═══ ТАЙМЕР ═══
 function startTimer() {
     timerInterval = setInterval(function() {
         elapsed += 0.05;
         ghostProgressPct = Math.min(100, (elapsed / GHOST_TIME) * 100);
         updateWorld();
 
-        if (elapsed >= GHOST_TIME && raceFinished) {
-            clearInterval(timerInterval);
-            ghostProgressPct = 100;
-            updateWorld();
-            setTimeout(submitResult, 500);
-        }
+        // Если игрок уже финишировал — не ждём, сразу результат
+        // (всё равно submitResult вызывается в finishRace)
     }, 50);
 }
 
-// ═══ ПЕРЕКЛЮЧЕНИЕ ═══
 btnShift.addEventListener('click', function() { doShift(); });
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyE' || e.code === 'Space') && raceStarted && !raceFinished) {
@@ -774,30 +653,25 @@ function doShift() {
 
     totalShifts++;
 
-    // Переключение разрешено, если скорость достигла идеальной зоны (по rpm текущей передачи)
     var maxNow = MAX_SPEEDS[gear - 1];
     var currentRpm = (speed / maxNow) * 100;
 
     if (currentRpm >= ZONE_MIN && currentRpm <= ZONE_MAX) {
-        // ✅ PERFECT
         perfectShifts++;
         gear++;
         showFlash('PERFECT!', 'perfect');
     } else if (currentRpm < ZONE_MIN) {
-        // Слишком рано — потеря мощности
         misses++;
         showFlash('РАНО!', 'miss');
     } else {
-        // Слишком поздно — перекрут
         misses++;
-        speed = speed * 0.85; // потеря скорости
+        speed = speed * 0.85;
         showFlash('ПОЗДНО!', 'miss');
     }
 
     renderAll();
 }
 
-// ═══ ГАЗ ═══
 btnGas.addEventListener('mousedown', function(e) { e.preventDefault(); startGas(); });
 btnGas.addEventListener('mouseup', function() { stopGas(); });
 btnGas.addEventListener('mouseleave', function() { stopGas(); });
@@ -828,7 +702,6 @@ function stopGas() {
     btnGas.classList.remove('active');
 }
 
-// ═══ ФИНИШ ═══
 function finishRace() {
     if (raceFinished) return;
     raceFinished = true;
@@ -837,22 +710,15 @@ function finishRace() {
     btnGas.disabled = true;
     btnGas.classList.remove('active');
     clearInterval(tickInterval);
+    clearInterval(timerInterval);
 
     playerFinishTime = elapsed;
     progress = 100;
     updateWorld();
     renderAll();
 
-    tlGreen.classList.remove('on');
-
-    if (elapsed >= GHOST_TIME) {
-        clearInterval(timerInterval);
-        ghostProgressPct = 100;
-        updateWorld();
-        setTimeout(submitResult, 500);
-    } else {
-        showFlash('🏁 Финиш! Ждём призрака...', 'perfect');
-    }
+    // ⚡ НЕ ЖДЁМ бота — сразу результат
+    submitResult();
 }
 
 function submitResult() {
