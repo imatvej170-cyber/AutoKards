@@ -193,6 +193,43 @@
 }
 .countdown-center.show { opacity: 1; }
 
+/* ═══ ТАЧ-ЗОНЫ (только на мобилке) ═══ */
+.touch-zone {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 50%;
+    z-index: 7;
+    display: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+}
+.touch-left { left: 0; }
+.touch-right { right: 0; }
+
+.touch-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.3;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    white-space: nowrap;
+}
+.touch-hint .big-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+.touch-left.active { background: rgba(76,175,80,0.18); }
+.touch-right.active { background: rgba(255,138,0,0.18); }
+
 .tacho-wrap {
     margin-top: 18px;
     margin-bottom: 16px;
@@ -342,7 +379,7 @@
 
 .mobile-hint {
     text-align: center;
-    color: #666;
+    color: #888;
     font-size: 12px;
     margin-top: 8px;
     display: none;
@@ -357,7 +394,14 @@
     .speed-panel { padding: 8px 14px; top: 12px; right: 12px; }
     .speed-value { font-size: 32px; }
     .countdown-center { font-size: 110px; }
-    .btn-control, .btn-start-center { padding: 26px 12px; font-size: 18px; }
+
+    /* показываем тач-зоны */
+    .touch-zone { display: block; }
+
+    /* скрываем нижние кнопки — играем через трассу */
+    .btn-control { display: none; }
+
+    .btn-start-center { padding: 18px; font-size: 20px; }
     .mobile-hint { display: block; }
 }
 </style>
@@ -404,6 +448,20 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- ТАЧ-ЗОНЫ (мобилка) -->
+        <div class="touch-zone touch-left" id="touchLeft">
+            <div class="touch-hint">
+                <span class="big-icon">⚙</span>
+                ТАП — ПЕРЕКЛЮЧИТЬ
+            </div>
+        </div>
+        <div class="touch-zone touch-right" id="touchRight">
+            <div class="touch-hint">
+                <span class="big-icon">🔥</span>
+                ДЕРЖИ — ГАЗ
+            </div>
+        </div>
     </div>
 </div>
 
@@ -443,7 +501,7 @@
     </div>
 
     <div class="mobile-hint">
-        📱 Справа — держи газ. Слева — тапай для переключения.
+        📱 Тап слева — переключение. Держи справа — газ.
     </div>
 
     <div class="flash-msg" id="flashMsg"></div>
@@ -458,23 +516,16 @@ const ZONE_MIN = {{ zone_min }};
 const ZONE_MAX = {{ zone_max }};
 const MAX_GEARS = 5;
 
-// ═══ ФИЗИКА — зависит от конкретной машины ═══
+// ═══ ФИЗИКА ═══
 const CAR_TOP_SPEED = {{ car.top_speed or 200 }};
 const CAR_ACCEL = {{ car.acceleration or 8 }};
 
-// Потолок скорости на каждой передаче (пропорция от max speed)
 const GEAR_RATIOS = [0.22, 0.38, 0.55, 0.75, 1.0];
 const MAX_SPEEDS = GEAR_RATIOS.map(function(r) { return CAR_TOP_SPEED * r; });
 
-// Ускорение: км/ч за тик (50мс). Основано на разгоне 0-100.
-// 0-100 км/ч за CAR_ACCEL секунд → за 1 тик (0.05с) набирает 100/(CAR_ACCEL*20) км/ч
 const ACCEL = 100 / (CAR_ACCEL * 20);
 const DECEL = 1.0;
 
-// Коэффициент прогресса: подобрано так, чтобы:
-// - Huracan (top 325, acc 2.9) проходил 1/4 мили за ~11 сек
-// - Corolla (top 180, acc 16) проходил за ~18 сек
-// DISTANCE_MULT: чем длиннее, тем меньше K (медленнее прогресс)
 var PROGRESS_K = { quarter: 0.003, half: 0.0015, mile: 0.00075 };
 var K = PROGRESS_K[DISTANCE] || 0.003;
 
@@ -496,6 +547,7 @@ var shiftCooldown = false;
 var roadOffset = 0;
 var tickInterval = null;
 var timerInterval = null;
+var carWidthCache = 0;
 
 var track = document.getElementById('track');
 var btnStart = document.getElementById('btnStart');
@@ -515,24 +567,33 @@ var roadLine = document.getElementById('roadLine');
 var speedValue = document.getElementById('speedValue');
 var countdownCenter = document.getElementById('countdownCenter');
 var flashMsg = document.getElementById('flashMsg');
+var touchLeft = document.getElementById('touchLeft');
+var touchRight = document.getElementById('touchRight');
 
 var PLAYER_X_RATIO = 0.18;
+
+function getCarWidth() {
+    if (!carWidthCache) {
+        carWidthCache = playerSprite.offsetWidth || 95;
+    }
+    return carWidthCache;
+}
 
 function updateWorld() {
     var W = track.clientWidth;
     var playerX = W * PLAYER_X_RATIO;
+    var carW = getCarWidth();
 
     playerSprite.style.left = playerX + 'px';
 
-    // Бот — относительно игрока, движется с той же частотой обновления
     var delta = ((ghostProgressPct - progress) / 100) * (W * 0.6);
     delta = Math.max(-W * 0.14, Math.min(W * 0.5, delta));
     ghostSprite.style.left = (playerX + delta) + 'px';
 
-    // Мир едет влево по прогрессу
     var worldScroll = (progress / 100) * (W * 1.6);
 
-    startLine.style.left = (playerX + 40 - worldScroll) + 'px';
+    // Стартовая линия — ЗА машиной (задний край + отступ)
+    startLine.style.left = (playerX + carW + 15 - worldScroll) + 'px';
 
     var finishX = playerX + ((100 - progress) / 100) * (W * 1.2);
     finishLine.style.left = finishX + 'px';
@@ -608,7 +669,6 @@ function startTicking() {
             if (speed < 0) speed = 0;
         }
 
-        // Прогресс = интеграл скорости (медленно накапливается)
         progress += speed * K;
         if (progress > 100) progress = 100;
 
@@ -627,12 +687,10 @@ function startTimer() {
         elapsed += 0.05;
         ghostProgressPct = Math.min(100, (elapsed / GHOST_TIME) * 100);
         updateWorld();
-
-        // Если игрок уже финишировал — не ждём, сразу результат
-        // (всё равно submitResult вызывается в finishRace)
     }, 50);
 }
 
+// ═══ КНОПКА ПЕРЕКЛЮЧЕНИЯ ═══
 btnShift.addEventListener('click', function() { doShift(); });
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyE' || e.code === 'Space') && raceStarted && !raceFinished) {
@@ -672,6 +730,7 @@ function doShift() {
     renderAll();
 }
 
+// ═══ ГАЗ — кнопка (ПК) ═══
 btnGas.addEventListener('mousedown', function(e) { e.preventDefault(); startGas(); });
 btnGas.addEventListener('mouseup', function() { stopGas(); });
 btnGas.addEventListener('mouseleave', function() { stopGas(); });
@@ -679,6 +738,7 @@ btnGas.addEventListener('touchstart', function(e) { e.preventDefault(); startGas
 btnGas.addEventListener('touchend', function(e) { e.preventDefault(); stopGas(); }, {passive: false});
 btnGas.addEventListener('touchcancel', function() { stopGas(); });
 
+// ═══ ГАЗ — клавиатура ═══
 document.addEventListener('keydown', function(e) {
     if ((e.code === 'KeyW' || e.code === 'ArrowUp') && !e.repeat) {
         e.preventDefault();
@@ -702,6 +762,41 @@ function stopGas() {
     btnGas.classList.remove('active');
 }
 
+// ═══ ТАЧ-ЗОНЫ (мобилка) ═══
+// Левая — тап = переключение
+touchLeft.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    if (!raceStarted || raceFinished) return;
+    doShift();
+    touchLeft.classList.add('active');
+    setTimeout(function() { touchLeft.classList.remove('active'); }, 150);
+});
+
+// Правая — держи = газ
+touchRight.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    if (!raceStarted || raceFinished) return;
+    startGas();
+    touchRight.classList.add('active');
+    // захватываем указатель, чтобы pointerup точно пришёл сюда
+    try { touchRight.setPointerCapture(e.pointerId); } catch (err) {}
+});
+
+touchRight.addEventListener('pointerup', function(e) {
+    stopGas();
+    touchRight.classList.remove('active');
+});
+touchRight.addEventListener('pointercancel', function(e) {
+    stopGas();
+    touchRight.classList.remove('active');
+});
+touchRight.addEventListener('pointerleave', function(e) {
+    // подстраховка, если палец ушёл за границы зоны
+    stopGas();
+    touchRight.classList.remove('active');
+});
+
+// ═══ ФИНИШ ═══
 function finishRace() {
     if (raceFinished) return;
     raceFinished = true;
@@ -717,7 +812,6 @@ function finishRace() {
     updateWorld();
     renderAll();
 
-    // ⚡ НЕ ЖДЁМ бота — сразу результат
     submitResult();
 }
 
@@ -761,8 +855,13 @@ function showFlash(text, type) {
     }, 700);
 }
 
-window.addEventListener('resize', updateWorld);
+window.addEventListener('resize', function() {
+    carWidthCache = 0;
+    updateWorld();
+});
+
 window.addEventListener('load', function() {
+    carWidthCache = 0;
     updateWorld();
     renderAll();
 });
