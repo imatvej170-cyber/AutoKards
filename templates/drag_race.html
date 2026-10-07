@@ -21,8 +21,11 @@
     position: relative;
     height: 380px;
     overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
-
 .sky {
     position: absolute; top: 0; left: 0; right: 0;
     height: 38%;
@@ -119,6 +122,11 @@
     height: 130px; width: auto; display: block;
     transform: scaleX(-1);
     filter: drop-shadow(0 10px 18px rgba(0,0,0,0.85)) drop-shadow(0 0 14px rgba(255,138,0,0.4));
+    pointer-events: none;             /* тап «сквозь» картинку проходит на тач-зону */
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 .car-sprite.ghost-sprite img {
     height: 110px;
@@ -196,12 +204,13 @@
 /* ТАЧ-ЗОНЫ */
 .touch-zone {
     position: absolute;
-    top: 48%; bottom: 0;
+    top: 0; bottom: 0;
     width: 50%;
-    z-index: 3;
+    z-index: 10;
     display: none;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
     touch-action: none;
 }
@@ -754,42 +763,65 @@ function stopGas() {
     btnGas.classList.remove('active');
 }
 
-// ═══ ТАЧ-ЗОНЫ ═══
-touchLeft.addEventListener('pointerdown', function(e) {
+// ═══ ТАЧ-ЗОНЫ (iPhone-friendly) ═══
+
+// ── ЛЕВАЯ: тап = переключение ──
+touchLeft.addEventListener('touchstart', function(e) {
     e.preventDefault();
+    e.stopPropagation();
     if (!raceStarted || raceFinished) return;
     doShift();
     touchLeft.classList.add('active');
     setTimeout(function() { touchLeft.classList.remove('active'); }, 150);
+}, { passive: false });
+
+// отключаем click на левой зоне (чтобы не было двойного срабатывания)
+touchLeft.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
 });
 
-touchRight.addEventListener('pointerdown', function(e) {
+// ── ПРАВАЯ: держи = газ ──
+touchRight.addEventListener('touchstart', function(e) {
     e.preventDefault();
+    e.stopPropagation();
     if (!raceStarted || raceFinished) return;
     startGas();
     touchRight.classList.add('active');
-    try { touchRight.setPointerCapture(e.pointerId); } catch (err) {}
-});
+}, { passive: false });
 
-touchRight.addEventListener('pointerup', function(e) {
+touchRight.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    stopGas();
+    touchRight.classList.remove('active');
+}, { passive: false });
+
+touchRight.addEventListener('touchcancel', function(e) {
     stopGas();
     touchRight.classList.remove('active');
 });
-touchRight.addEventListener('pointercancel', function(e) {
-    stopGas();
-    touchRight.classList.remove('active');
-});
 
-// ═══ ЗАЩИТА: если палец отпущен где угодно — сбрасываем газ ═══
-document.addEventListener('pointerup', function() {
-    if (gasPressed) stopGas();
-    touchRight.classList.remove('active');
-});
-document.addEventListener('pointercancel', function() {
+// ── Глобальная защита: если палец где угодно отпущен — сбрасываем газ ──
+document.addEventListener('touchend', function() {
     if (gasPressed) stopGas();
     touchRight.classList.remove('active');
 });
 
+// ── Для ПК: клик мышью по зонам ──
+touchLeft.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    if (!raceStarted || raceFinished) return;
+    doShift();
+});
+
+touchRight.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    if (!raceStarted || raceFinished) return;
+    startGas();
+});
+touchRight.addEventListener('mouseup', function() { stopGas(); });
+touchRight.addEventListener('mouseleave', function() { stopGas(); });
 // ═══ ФИНИШ ═══
 function finishRace() {
     if (raceFinished) return;
@@ -858,6 +890,10 @@ window.addEventListener('load', function() {
     carWidthCache = 0;
     updateWorld();
     renderAll();
+
+    // скрываем float-кнопки (уведомления, тема, вверх) — мешают тач-зонам
+    var fb = document.querySelector('.float-buttons');
+    if (fb) fb.style.display = 'none';
 });
 </script>
 
