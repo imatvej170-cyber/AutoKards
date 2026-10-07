@@ -4912,6 +4912,15 @@ def drag_result(race_id):
         user=session.get('username'),
         is_admin=is_admin(session.get('username'))
     )
+  # ─────────── ХАБ ГОНОК ───────────
+
+@app.route('/racing')
+@login_required
+def racing():
+    return render_template('racing.html',
+        user=session.get('username'),
+        is_admin=is_admin(session.get('username'))
+    )
 # ---------- ЛИЧНЫЙ ГАРАЖ ----------
 def get_user_cars(user_id):
     conn = get_db(); c = conn.cursor()
