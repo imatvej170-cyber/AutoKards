@@ -765,56 +765,65 @@ function stopGas() {
 
 // ═══ ТАЧ-ЗОНЫ (iPhone-friendly) ═══
 
-// ── ЛЕВАЯ: тап = переключение ──
-touchLeft.addEventListener('touchstart', function(e) {
+// ═══ МУЛЬТИТАЧ — два пальца одновременно ═══
+
+function isInsideTrack(touch) {
+    var r = track.getBoundingClientRect();
+    return touch.clientY >= r.top && touch.clientY <= r.bottom &&
+           touch.clientX >= r.left && touch.clientX <= r.right;
+}
+
+function handleTouchStart(e) {
     e.preventDefault();
-    e.stopPropagation();
     if (!raceStarted || raceFinished) return;
-    doShift();
-    touchLeft.classList.add('active');
-    setTimeout(function() { touchLeft.classList.remove('active'); }, 150);
-}, { passive: false });
 
-// отключаем click на левой зоне (чтобы не было двойного срабатывания)
-touchLeft.addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-});
+    var W = window.innerWidth;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (!isInsideTrack(t)) continue;
 
-// ── ПРАВАЯ: держи = газ ──
-touchRight.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!raceStarted || raceFinished) return;
-    startGas();
-    touchRight.classList.add('active');
-}, { passive: false });
+        if (t.clientX < W / 2) {
+            // ЛЕВАЯ ПОЛОВИНА = переключение
+            doShift();
+            touchLeft.classList.add('active');
+            (function() {
+                setTimeout(function() { touchLeft.classList.remove('active'); }, 150);
+            })();
+        } else {
+            // ПРАВАЯ ПОЛОВИНА = газ
+            startGas();
+            touchRight.classList.add('active');
+        }
+    }
+}
 
-touchRight.addEventListener('touchend', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    stopGas();
-    touchRight.classList.remove('active');
-}, { passive: false });
+function handleTouchEnd(e) {
+    // проверяем, остались ли пальцы на правой половине
+    var W = window.innerWidth;
+    var rightStillTouching = false;
+    for (var i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].clientX >= W / 2) {
+            rightStillTouching = true;
+            break;
+        }
+    }
+    if (!rightStillTouching) {
+        stopGas();
+        touchRight.classList.remove('active');
+    }
+}
 
-touchRight.addEventListener('touchcancel', function(e) {
-    stopGas();
-    touchRight.classList.remove('active');
-});
+// вешаем на ВСЮ трассу, а не на отдельные зоны
+track.addEventListener('touchstart', handleTouchStart, { passive: false });
+track.addEventListener('touchend', handleTouchEnd, { passive: false });
+track.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
-// ── Глобальная защита: если палец где угодно отпущен — сбрасываем газ ──
-document.addEventListener('touchend', function() {
-    if (gasPressed) stopGas();
-    touchRight.classList.remove('active');
-});
-
-// ── Для ПК: клик мышью по зонам ──
+// для мыши на ПК — клик по зонам
 touchLeft.addEventListener('mousedown', function(e) {
     e.preventDefault();
     if (!raceStarted || raceFinished) return;
     doShift();
 });
-
 touchRight.addEventListener('mousedown', function(e) {
     e.preventDefault();
     if (!raceStarted || raceFinished) return;
